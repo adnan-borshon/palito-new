@@ -11,9 +11,9 @@ Phase A: source mapping, shared foundation and mobile design assets. Implementat
 | Approved plan and role scope | Recorded | User's complete mobile-first plan; decisions.md |
 | SRS discovery | Analyzed | All 49 physical pages; three defined use cases; requirements-matrix.md |
 | Figma discovery | Mapped | ALL SCREENS page only; 56 variants in screen-inventory.md |
-| High-fidelity design references | In progress | Refreshed onboarding, home, animal vitals, vet category; figma-analysis.md |
+| High-fidelity design references | Canonical references saved; source access limited | Onboarding, home, vitals, vet category, collateral and vet heading; remaining Figma refresh hit Starter-plan call limit |
 | Local fonts | Downloaded | Seven TTFs and two OFL licenses; assets/palito/manifest.ts |
-| Original Figma image assets | In progress | Download exact source assets/illustration exports, inspect geometry |
+| Original Figma image assets | 16 bundled; finer fidelity work pending | Original artwork/photos in assets/palito; provenance and source gaps in figma-analysis.md |
 | Repository migration | Confirmed by foundation owner | frontend/mobile/assets is available; runtime compatibility still requires fresh checks |
 | Shared domain and UI | In progress, separately owned | Do not infer completion from source mapping |
 | Five role workflows | Pending verification | requirements-matrix.md status remains pending until implementation evidence exists |

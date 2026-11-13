@@ -6,8 +6,13 @@ import { hasText, isPositiveMoney, isValidDate, isoAfter } from './validation.ts
 function validateAnimal(input: AnimalInput, now: string) {
   assertDomain(hasText(input.name, 1, 80) && hasText(input.breed, 1, 100));
   assertDomain(['cattle', 'goat', 'buffalo'].includes(input.species) && ['female', 'male'].includes(input.sex));
-  assertDomain(isValidDate(input.birthDate) && input.birthDate <= now && Date.parse(now) - Date.parse(input.birthDate) < 40 * 366 * 86_400_000);
+  assertDomain(isValidDate(input.birthDate) && Date.parse(input.birthDate) <= Date.parse(now) && Date.parse(now) - Date.parse(input.birthDate) < 40 * 366 * 86_400_000);
   assertDomain(Number.isFinite(input.weightKg) && input.weightKg > 0 && input.weightKg <= 2000 && isPositiveMoney(input.value));
+}
+
+function availableSlot(state: DemoState, vetId: string, scheduledAt: string, exceptId?: string) {
+  // Each sample appointment reserves a 30-minute slot.
+  assertDomain(!state.appointments.some(item => item.id !== exceptId && item.vetId === vetId && ['requested', 'accepted', 'in_progress'].includes(item.status) && Math.abs(Date.parse(item.scheduledAt) - Date.parse(scheduledAt)) < 30 * 60_000), 'duplicate');
 }
 
 export function handleHealth(state: DemoState, command: DemoCommand): { id?: string } | undefined {
@@ -100,6 +105,7 @@ export function handleHealth(state: DemoState, command: DemoCommand): { id?: str
       assertDomain(isValidDate(command.scheduledAt) && Date.parse(command.scheduledAt) >= Date.parse(state.now) && Date.parse(command.scheduledAt) <= Date.parse(isoAfter(state.now, 1440 * 365)));
       assertDomain(hasText(command.reason, 3, 1000) && ['video', 'visit'].includes(command.mode) && ['routine', 'urgent', 'emergency'].includes(command.priority));
       assertDomain(!state.appointments.some(item => item.animalId === animal.id && item.vetId === vet.id && item.scheduledAt === command.scheduledAt && !['cancelled', 'rejected'].includes(item.status)), 'duplicate');
+      availableSlot(state, vet.id, command.scheduledAt);
       const alert = command.alertId ? findById(state.alerts, command.alertId) : undefined;
       if (alert) { assertDomain(alert.animalId === animal.id, 'unauthorized'); assertDomain(alert.status !== 'resolved' && !alert.appointmentId, 'duplicate'); }
       const id = nextId(state, 'appointment');
@@ -120,7 +126,7 @@ export function handleHealth(state: DemoState, command: DemoCommand): { id?: str
       const user = actor(state, ['farmer', 'vet']); const appointment = findById(state.appointments, command.appointmentId);
       assertDomain(user.id === appointment.farmerId || user.id === appointment.vetId, 'unauthorized'); assertDomain(['requested', 'accepted'].includes(appointment.status), 'invalid_transition');
       if (command.type === 'appointment.cancel') { assertDomain(hasText(command.reason, 3, 1000)); appointment.status = 'cancelled'; appointment.decisionNote = command.reason; if (appointment.alertId) { const alert = findById(state.alerts, appointment.alertId); alert.appointmentId = undefined; alert.status = 'open'; } }
-      else { assertDomain(isValidDate(command.scheduledAt) && Date.parse(command.scheduledAt) > Date.parse(state.now)); appointment.scheduledAt = command.scheduledAt; appointment.status = 'requested'; }
+      else { assertDomain(isValidDate(command.scheduledAt) && Date.parse(command.scheduledAt) > Date.parse(state.now) && Date.parse(command.scheduledAt) <= Date.parse(isoAfter(state.now, 1440 * 365))); availableSlot(state, appointment.vetId, command.scheduledAt, appointment.id); appointment.scheduledAt = command.scheduledAt; appointment.status = 'requested'; }
       notify(state, user.role === 'farmer' ? appointment.vetId : appointment.farmerId, bilingual('বুকিং পরিবর্তন', 'Appointment changed'), bilingual('বুকিংয়ের সময় বা অবস্থা পরিবর্তিত হয়েছে।', 'The appointment time or status has changed.'), 'appointments', appointment.id); return { id: appointment.id };
     }
     case 'consultation.start': {
