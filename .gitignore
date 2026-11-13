@@ -41,3 +41,14 @@ example
 # generated native folders
 /ios
 /android
+
+# Mobile workspace generated files and local source research
+frontend/mobile/ios/
+frontend/mobile/android/
+**/.expo/
+**/dist/
+**/expo-env.d.ts
+**/coverage/
+**/test-results/
+**/playwright-report/
+docs/.references/

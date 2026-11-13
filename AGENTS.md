@@ -1,5 +1,13 @@
 This is an Expo/React Native mobile application. Prioritize mobile-first patterns, performance, and cross-platform compatibility.
 
+## Mandatory delivery order and durable context
+
+Complete all five mobile roles, test and fix them, deliver mobile for user review, address feedback, then wait for explicit user approval before implementing any web application. No Next.js screens or web-specific designs during the mobile phase. Expo React Native Web output is a mobile preview only. All integrations remain frontend simulations; no production API, database, real payment or paid infrastructure.
+
+At every continuation read this file, `docs/implementation-plan.md`, current requirements/design/progress/test documents and the latest user feedback; inspect the real repository state. Retrieve relevant Claude-Mem history when available. Files remain authoritative. Record meaningful decisions and verification results without secrets. Never infer approval from silence or a finished milestone.
+
+The Expo app is in `frontend/mobile`; run Expo commands there. Shared portable code is in `frontend/shared`. Root npm scripts forward to workspaces. Read the Expo major version from `frontend/mobile/package.json`. Routes are in `frontend/mobile/src/app`. `frontend/web` is reserved and `backend` is intentionally empty. Use native dependencies only in the mobile package and one version of React. Follow the shared command contract in `docs/shared-contract.md`.
+
 ## Expo has changed — do not trust your training data
 
 Expo ships breaking changes every SDK release. APIs you remember are likely renamed, moved, or removed. Before writing any code that touches an Expo, EAS, or React Native API:
