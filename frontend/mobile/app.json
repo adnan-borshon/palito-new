@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "palito",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "ios": {
       "icon": "./assets/expo.icon"
     },
@@ -20,7 +20,7 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "output": "server",
+      "output": "single",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
@@ -28,9 +28,23 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
+          "backgroundColor": "#F8FAFC",
+          "image": "./assets/palito/images/palito-mark.png",
           "imageWidth": 76
+        }
+      ],
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/palito/fonts/AnekBangla-Regular.ttf",
+            "./assets/palito/fonts/AnekBangla-Medium.ttf",
+            "./assets/palito/fonts/AnekBangla-SemiBold.ttf",
+            "./assets/palito/fonts/AnekBangla-Bold.ttf",
+            "./assets/palito/fonts/PlusJakartaSans-Regular.ttf",
+            "./assets/palito/fonts/PlusJakartaSans-SemiBold.ttf",
+            "./assets/palito/fonts/PlusJakartaSans-Bold.ttf"
+          ]
         }
       ]
     ],

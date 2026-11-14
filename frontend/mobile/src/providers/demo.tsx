@@ -27,7 +27,7 @@ export function DemoProvider({ children, repository }: { children: ReactNode; re
   const locale = state.session.locale;
   const t = useCallback((bn: string, en: string) => locale === 'bn' ? bn : en, [locale]);
   const currency = useMemo(() => new Intl.NumberFormat(locale === 'bn' ? 'bn-BD' : 'en-BD', { style: 'currency', currency: 'BDT', maximumFractionDigits: 0 }), [locale]);
-  const dates = useMemo(() => new Intl.DateTimeFormat(locale === 'bn' ? 'bn-BD' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }), [locale]);
+  const dates = useMemo(() => new Intl.DateTimeFormat(locale === 'bn' ? 'bn-BD' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Dhaka' }), [locale]);
   const money = useCallback((amount: number) => currency.format(amount), [currency]);
   const date = useCallback((iso: string) => Number.isNaN(Date.parse(iso)) ? '—' : dates.format(new Date(iso)), [dates]);
   const clearError = useCallback(() => setError(null), []);

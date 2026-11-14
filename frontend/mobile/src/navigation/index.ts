@@ -21,4 +21,4 @@ export function routeFor(role: Role, screen = 'home', id?: string): Href {
   return id ? { pathname: '/[role]/[screen]/[id]', params: { role, screen, id } } : { pathname: '/[role]/[screen]', params: { role, screen } };
 }
 export function navigate(role: Role, screen: string, id?: string) { router.push(routeFor(role, screen, id)); }
-export function isRole(value: unknown): value is Role { return typeof value === 'string' && value in roleNames; }
+export function isRole(value: unknown): value is Role { return typeof value === 'string' && Object.hasOwn(roleNames, value); }

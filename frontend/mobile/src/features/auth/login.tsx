@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { Redirect, router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { palitoImages } from '@/assets/palito/manifest';
 import { AppFeedback } from '@/components/app-feedback';
@@ -16,12 +16,24 @@ export default function Login() {
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [requested, setRequested] = useState(false);
+  const [resendSeconds, setResendSeconds] = useState(0);
+  const [requestTick, setRequestTick] = useState(0);
+  useEffect(() => {
+    if (!requested || !state.session.otpExpiresAt) return;
+    const domainRemaining = Math.max(0, Math.ceil((Date.parse(state.session.otpExpiresAt) - Date.parse(state.now) - 270000) / 1000));
+    const timer = setInterval(() => setResendSeconds(Math.max(0, domainRemaining - Math.floor((Date.now() - requestTick) / 1000))), 1000);
+    return () => clearInterval(timer);
+  }, [requested, requestTick, state.now, state.session.otpExpiresAt]);
   if (!ready) return <LoadingState />;
   if (user) return <Redirect href={routeFor(user.role)} />;
   async function submit() {
-    if (!requested) { const result = await run({ type: 'auth.requestOtp', phone }); if (result.ok) setRequested(true); return; }
+    if (!requested) { await requestCode(); return; }
     const result = await run({ type: 'auth.verifyOtp', code });
     if (result.ok) { const snapshot = repo.getSnapshot(); const account = snapshot.users.find(item => item.id === snapshot.session.userId); if (account) router.replace(routeFor(account.role)); }
+  }
+  async function requestCode() {
+    const result = await run({ type: 'auth.requestOtp', phone: state.session.pendingPhone && requested ? state.session.pendingPhone : phone });
+    if (result.ok) { setRequested(true); setCode(''); setRequestTick(Date.now()); setResendSeconds(30); }
   }
   const accounts = Object.keys(roleNames).map(role => state.users.find(account => account.role === role)).filter(account => account !== undefined);
   return <Screen testID="login-screen">
@@ -29,7 +41,7 @@ export default function Login() {
     <View style={styles.intro}><AppText variant="hero" color={colors.brandDeep}>{requested ? t('ফিরে আসার জন্য ধন্যবাদ', 'Welcome back') : t('পালিতে স্বাগতম', 'Welcome to Palito')}</AppText><AppText color={colors.muted}>{requested ? t('এই ডেমোর যাচাইকরণ কোড দিন। কোনো SMS পাঠানো হয়নি।', 'Enter the demo verification code. No SMS has been sent.') : t('আপনার খামারের যত্ন শুরু হোক এখানেই।', 'A little care today. A healthier farm tomorrow.')}</AppText></View>
     <AppFeedback />
     <Card><Badge tone="info">{t('নিরাপদ অনুশীলন · ডেমো অ্যাকাউন্ট', 'Practice mode · demo accounts')}</Badge>
-      {requested ? <><Field label={t('যাচাইকরণ কোড', 'Verification code')} value={code} onChangeText={setCode} keyboardType="number-pad" maxLength={6} autoComplete="one-time-code" hint={t('ডেমো কোড: 123456', 'Demo code: 123456')} testID="otp-input" /><Button title={t('নম্বর পরিবর্তন করুন', 'Change phone number')} variant="ghost" onPress={() => { setRequested(false); setCode(''); clearError(); clearFeedback(); }} /></> : <Field label={t('মোবাইল নম্বর', 'Mobile number')} value={phone} onChangeText={setPhone} keyboardType="phone-pad" autoComplete="tel" placeholder="01700000001" hint={t('নিচের যেকোনো ডেমো অ্যাকাউন্ট বেছে নিন।', 'Choose any demo account below.')} testID="phone-input" />}
+      {requested ? <><Field label={t('যাচাইকরণ কোড', 'Verification code')} value={code} onChangeText={setCode} keyboardType="number-pad" maxLength={6} autoComplete="one-time-code" hint={t('ডেমো কোড: 123456 · মেয়াদ ৫ মিনিট', 'Demo code: 123456 · valid for 5 minutes')} testID="otp-input" /><Button title={resendSeconds > 0 ? t(`${resendSeconds} সেকেন্ড পরে আবার কোড নিন`, `Resend code in ${resendSeconds}s`) : t('আবার কোড নিন', 'Resend code')} variant="secondary" disabled={resendSeconds > 0 || busy} onPress={() => void requestCode()} testID="resend-otp" /><Button title={t('নম্বর পরিবর্তন করুন', 'Change phone number')} variant="ghost" onPress={() => { setRequested(false); setCode(''); clearError(); clearFeedback(); }} /></> : <Field label={t('মোবাইল নম্বর', 'Mobile number')} value={phone} onChangeText={setPhone} keyboardType="phone-pad" autoComplete="tel" placeholder={state.users.find(account => account.role === 'farmer')?.phone} hint={t('নিচের যেকোনো ডেমো অ্যাকাউন্ট বেছে নিন।', 'Choose any demo account below.')} testID="phone-input" />}
       <Button title={requested ? t('যাচাই করে প্রবেশ করুন', 'Verify and sign in') : t('যাচাইকরণ কোড নিন', 'Get verification code')} onPress={() => void submit()} loading={busy} testID={requested ? 'verify-otp' : 'request-otp'} />
     </Card>
     <Section title={t('একটি ভূমিকা বেছে নিন', 'Choose a role')}><Card>{accounts.map(account => <Row key={account.id} title={roleNames[account.role][locale]} subtitle={`${locale === 'bn' ? account.nameBn : account.name} · ${account.phone}`} icon={roleIcons[account.role]} testID={`demo-${account.role}`} onPress={() => { setPhone(account.phone); setRequested(false); setCode(''); clearError(); }} />)}</Card></Section>

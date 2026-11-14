@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { type ComponentProps, type ReactNode, useId } from 'react';
+import { createContext, type ComponentProps, type ReactNode, useContext, useId } from 'react';
 import {
   ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Text, TextInput, View, type StyleProp, type TextInputProps, type TextProps,
@@ -11,6 +11,7 @@ import { colors, fonts, radii } from '@/theme';
 import { useLocale } from '@/providers/locale';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
+export const ScreenInsetContext = createContext(true);
 export function Icon({ name, size = 22, color = colors.brand }: { name: IconName; size?: number; color?: string }) {
   return <Ionicons name={name} size={size} color={color} accessible={false} />;
 }
@@ -27,8 +28,9 @@ export function Screen({ children, title, subtitle, back = false, action, scroll
 }) {
   const insets = useSafeAreaInsets();
   const locale = useLocale();
-  const body = <View style={[styles.content, style]}>{children}</View>;
-  return <KeyboardAvoidingView testID={testID} style={[styles.screen, { paddingTop: insets.top }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+  const addTopInset = useContext(ScreenInsetContext);
+  const body = <View style={[styles.content, !scroll && styles.flex, style]}>{children}</View>;
+  return <KeyboardAvoidingView testID={testID} style={[styles.screen, { paddingTop: addTopInset ? insets.top : 0 }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
     {title ? <View style={styles.header}>
       {back ? <Pressable accessibilityLabel={locale === 'bn' ? 'ফিরে যান' : 'Back'} accessibilityRole="button" testID="back-button" onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={styles.iconButton}><Icon name="arrow-back" color={colors.text} /></Pressable> : null}
       <View style={styles.flex}><AppText variant="title" accessibilityRole="header">{title}</AppText>{subtitle ? <AppText variant="small" color={colors.muted}>{subtitle}</AppText> : null}</View>

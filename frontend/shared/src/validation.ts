@@ -27,7 +27,7 @@ export const maximumLoanAmount = (verifiedValue: number, ratio = 0.7): number =>
   if (!isNonNegativeMoney(verifiedValue) || !Number.isFinite(ratio) || ratio < 0) return 0;
   // Avoid floating-point rounding past the cap when dealing with large integers.
   const cap = Math.floor(verifiedValue / 10) * 7 + Math.floor((verifiedValue % 10) * 7 / 10);
-  return Math.min(cap, Math.floor(verifiedValue * Math.min(0.7, ratio)));
+  return ratio >= 0.7 ? cap : Math.min(cap, Math.floor(verifiedValue * ratio));
 };
 
 export const uniqueIds = (ids: readonly string[]): boolean =>

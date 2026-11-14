@@ -5,7 +5,9 @@ import { hasText, isPositiveMoney, isValidDate, isoAfter, maximumLoanAmount } fr
 
 /** Fixed, illustrative demo policy. It is not a market valuation or an actual lending rate. */
 export function demoLoanQuote(animal: Animal) {
-  const collateralValue = Math.floor(animal.value * (animal.healthScore < 75 ? 0.8 : 1));
+  const collateralValue = animal.healthScore < 75
+    ? Math.floor(animal.value / 5) * 4 + Math.floor((animal.value % 5) * 4 / 5)
+    : animal.value;
   return { collateralValue, maximumAmount: maximumLoanAmount(collateralValue), annualRate: animal.healthScore < 75 ? 15 : 10 };
 }
 function policyActor(state: DemoState, policyId: string) {
@@ -37,7 +39,8 @@ export function handleFinance(state: DemoState, command: DemoCommand): { id?: st
       assertDomain(insurer.role === 'insurer' && insurer.status === 'active', 'validation');
       assertDomain(isPositiveMoney(command.coverage) && command.coverage <= animal.value);
       assertDomain(!state.policies.some(item => item.animalId === animal.id && ['submitted', 'active'].includes(item.status)), 'duplicate');
-      const id = nextId(state, 'policy'); state.policies.push({ id, farmerId: animal.ownerId, animalId: animal.id, insurerId: insurer.id, coverage: command.coverage, premium: Math.max(1, Math.ceil(command.coverage * 0.03)), status: 'submitted', submittedAt: state.now, enhanced: true });
+      const premium = Math.floor(command.coverage / 100) * 3 + Math.ceil((command.coverage % 100) * 3 / 100);
+      const id = nextId(state, 'policy'); state.policies.push({ id, farmerId: animal.ownerId, animalId: animal.id, insurerId: insurer.id, coverage: command.coverage, premium: Math.max(1, premium), status: 'submitted', submittedAt: state.now, enhanced: true });
       notify(state, insurer.id, bilingual('নতুন বীমা আবেদন', 'New insurance application'), bilingual('আবেদন ও পশুর স্বাস্থ্য তথ্য পর্যালোচনা করুন।', 'Review the application and animal health record.'), 'applications', id); return { id };
     }
     case 'policy.decide': {

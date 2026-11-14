@@ -29,4 +29,4 @@ Read root and mobile AGENTS, this plan, requirements/design/progress/testing doc
 
 ## Current phase
 
-Phase A in progress. Source migration completed 2026-11-14. Shared types and repository contract published in `docs/shared-contract.md`; native shell and persisted mock engine in implementation. No readiness claim until verification and complete coverage.
+Phase A foundation implemented 2026-11-14. Source migration, workspaces, shared contract, persisted provider, fonts, bilingual controls, onboarding/auth and role shell are present. Feature integration and complete mobile coverage remain in progress. The temporary registry fallback is not a completed workflow. See `docs/testing/foundation.md` for actual check results. No mobile readiness claim until complete coverage and verification.

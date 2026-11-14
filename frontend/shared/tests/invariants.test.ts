@@ -22,6 +22,8 @@ test('Money cap rejects NaN, Infinity, unsafe integers, negative values and rati
   for (const value of [NaN, Infinity, -Infinity, Number.MAX_SAFE_INTEGER + 1, -1, 1.5]) assert.equal(maximumLoanAmount(value), 0);
   assert.equal(maximumLoanAmount(100, NaN), 0); assert.equal(maximumLoanAmount(100, Infinity), 0); assert.equal(maximumLoanAmount(100, -1), 0);
   assert.equal(maximumLoanAmount(101), 70); assert.equal(maximumLoanAmount(100, 1), 70);
+  assert.equal(maximumLoanAmount(88000), 61600);
+  assert.equal(maximumLoanAmount(Number.MAX_SAFE_INTEGER), Number(BigInt(Number.MAX_SAFE_INTEGER) * 7n / 10n));
   const repo = repository(); await login(repo, ids.farmer);
   for (const amount of [NaN, Infinity, -Infinity, Number.MAX_SAFE_INTEGER + 1, 0, -1, 100.1, 98001]) await failsAtomically(repo, { type: 'loan.offer', animalId: ids.healthy, amount, termMonths: 12, purpose: 'Sample purpose', repaymentSource: 'Sample sales' });
   await failsAtomically(repo, { type: 'loan.offer', animalId: ids.healthy, amount: 1000, termMonths: 0, purpose: 'Sample purpose', repaymentSource: 'Sample sales' });
