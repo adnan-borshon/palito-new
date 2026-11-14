@@ -1,25 +1,30 @@
 {
-    "name":  "palito",
-    "version":  "1.0.0",
-    "private":  true,
-    "engines":  {
-                    "node":  "^24.3.0"
-                },
-    "workspaces":  [
-                       "frontend/mobile",
-                       "frontend/shared"
-                   ],
-    "scripts":  {
-                    "start":  "npm run start --workspace @palito/mobile",
-                    "android":  "npm run android --workspace @palito/mobile",
-                    "ios":  "npm run ios --workspace @palito/mobile",
-                    "web":  "npm run web --workspace @palito/mobile",
-                    "lint":  "npm run lint --workspace @palito/mobile",
-                    "typecheck":  "npm run typecheck --workspaces --if-present",
-                    "doctor":  "npm run doctor --workspace @palito/mobile",
-                    "test":  "npm run test --workspaces --if-present",
-                    "test:shared":  "npm run test --workspace @palito/shared",
-                    "test:mobile":  "npm run test --workspace @palito/mobile",
-                    "export:web":  "npm run export:web --workspace @palito/mobile"
-                }
+  "name": "palito",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": "^24.3.0"
+  },
+  "workspaces": [
+    "frontend/mobile",
+    "frontend/web",
+    "frontend/shared"
+  ],
+  "scripts": {
+    "start": "npm run start --workspace @palito/mobile",
+    "android": "npm run android --workspace @palito/mobile",
+    "ios": "npm run ios --workspace @palito/mobile",
+    "web": "npm run web --workspace @palito/mobile",
+    "dev:web": "npm run dev --workspace @palito/web",
+    "build:web": "npm run build --workspace @palito/web",
+    "start:web": "npm run start --workspace @palito/web",
+    "lint": "npm run lint --workspace @palito/mobile",
+    "lint:web": "npm run lint --workspace @palito/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "doctor": "npm run doctor --workspace @palito/mobile",
+    "test": "npm run test --workspaces --if-present",
+    "test:shared": "npm run test --workspace @palito/shared",
+    "test:mobile": "npm run test --workspace @palito/mobile",
+    "export:web": "npm run export:web --workspace @palito/mobile"
+  }
 }

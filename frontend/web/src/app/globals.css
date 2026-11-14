@@ -1,0 +1,209 @@
+/* hallmark-stamp: v2.0.0 | shape: workbench | theme: custom (palito-clinical-fintech) | genre: modern-minimal | signature: master-detail-underwriting-triage-workbench */
+/* critique: left-aligned bilingual clinical-fintech workbench with tabular numerals, zero tracked eyebrows, and strict Palito brand tokens */
+
+@import "tailwindcss";
+
+:root {
+  /* Layer 1: Primitive Tokens (Extracted from Palito Mobile Brand Kit) */
+  --palito-green-700: #15803D;
+  --palito-green-800: #0F602D;
+  --palito-green-900: #0A401E;
+  --palito-green-50: #EBF4EE;
+  --palito-green-100: #D8E9DE;
+  --palito-slate-50: #F8FAFC;
+  --palito-white: #FFFFFF;
+  --palito-slate-800: #1F2937;
+  --palito-slate-600: #475569;
+  --palito-slate-500: #64748B;
+  --palito-slate-400: #94A3B8;
+  --palito-slate-200: #E2E8F0;
+  --palito-rose-700: #BE123C;
+  --palito-rose-50: #FFF1F2;
+  --palito-amber-800: #92400E;
+  --palito-amber-50: #FFFBEB;
+  --palito-blue-700: #1D4ED8;
+  --palito-blue-50: #EFF6FF;
+
+  /* Layer 2: Semantic Tokens */
+  --bg-canvas: var(--palito-slate-50);
+  --bg-surface: var(--palito-white);
+  --bg-subtle: var(--palito-green-50);
+  --bg-subtle-strong: var(--palito-green-100);
+  --text-main: var(--palito-slate-800);
+  --text-secondary: var(--palito-slate-600);
+  --text-muted: var(--palito-slate-500);
+  --border-hairline: var(--palito-slate-200);
+  --brand-primary: var(--palito-green-700);
+  --brand-hover: var(--palito-green-800);
+  --brand-deep: var(--palito-green-900);
+  --status-danger: var(--palito-rose-700);
+  --status-danger-bg: var(--palito-rose-50);
+  --status-warning: var(--palito-amber-800);
+  --status-warning-bg: var(--palito-amber-50);
+  --status-info: var(--palito-blue-700);
+  --status-info-bg: var(--palito-blue-50);
+
+  /* Layer 3: Component & Floor Tokens */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --container-max: 1440px;
+}
+
+@font-face {
+  font-family: 'Anek Bangla';
+  src: url('/fonts/AnekBangla-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Anek Bangla';
+  src: url('/fonts/AnekBangla-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Anek Bangla';
+  src: url('/fonts/AnekBangla-SemiBold.ttf') format('truetype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Anek Bangla';
+  src: url('/fonts/AnekBangla-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  src: url('/fonts/PlusJakartaSans-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  src: url('/fonts/PlusJakartaSans-SemiBold.ttf') format('truetype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  src: url('/fonts/PlusJakartaSans-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+html,
+body {
+  overflow-x: clip;
+  background-color: var(--bg-canvas);
+  color: var(--text-main);
+  font-family: 'Anek Bangla', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+  transition: none;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+h1, h2, h3, h4 {
+  overflow-wrap: break-word;
+  min-width: 0;
+  color: var(--text-main);
+}
+
+/* Native <dialog> scroll containment (modern-web-guidance: dialog) */
+dialog:modal {
+  overscroll-behavior: contain;
+}
+
+dialog::backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
+  background-color: rgb(15 23 42 / 0.45);
+  backdrop-filter: blur(2px);
+}
+
+/* Accessible single-row tablist with forced-colors-safe border underline (modern-web-guidance: tabs) */
+.palito-tablist {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: inline proximity;
+  border-block-end: 1px solid var(--border-hairline);
+  gap: 0.25rem;
+}
+
+.palito-tab {
+  position: relative;
+  flex: none;
+  scroll-snap-align: start;
+  padding: 0.65rem 1rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.palito-tab[aria-selected="true"] {
+  color: var(--brand-primary);
+}
+
+.palito-tab[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  border-block-end: 3px solid var(--brand-primary);
+}
+
+/* Responsive table wrapper (modern-web-guidance: responsive-table) */
+.palito-table-region {
+  overflow: auto;
+  max-inline-size: 100%;
+  container-type: inline-size;
+}
+
+.palito-table-region table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.palito-table-region thead {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
+  background-color: var(--bg-canvas);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

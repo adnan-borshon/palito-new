@@ -1,0 +1,58 @@
+[
+  {
+    "route": "/[role]/[[...slug]]",
+    "firstLoadUncompressedJsBytes": 716334,
+    "firstLoadChunkPaths": [
+      ".next\\static\\chunks\\3qfy96eoyh-ek.js",
+      ".next\\static\\chunks\\3d-3vhrn3y7s_.js",
+      ".next\\static\\chunks\\2wqw6xncvf88-.js",
+      ".next\\static\\chunks\\3ycurnzhtl6y5.js",
+      ".next\\static\\chunks\\310vm2bl3xxpt.js",
+      ".next\\static\\chunks\\1d-3ziz_810o8.js",
+      ".next\\static\\chunks\\39_j1bdzreq0m.js",
+      ".next\\static\\chunks\\0gy1dczh8t-w0.js",
+      ".next\\static\\chunks\\turbopack-2u1d16houkiyo.js"
+    ]
+  },
+  {
+    "route": "/login",
+    "firstLoadUncompressedJsBytes": 560476,
+    "firstLoadChunkPaths": [
+      ".next\\static\\chunks\\3qfy96eoyh-ek.js",
+      ".next\\static\\chunks\\3d-3vhrn3y7s_.js",
+      ".next\\static\\chunks\\3wbdm6-96ogzm.js",
+      ".next\\static\\chunks\\310vm2bl3xxpt.js",
+      ".next\\static\\chunks\\1d-3ziz_810o8.js",
+      ".next\\static\\chunks\\39_j1bdzreq0m.js",
+      ".next\\static\\chunks\\0gy1dczh8t-w0.js",
+      ".next\\static\\chunks\\turbopack-2u1d16houkiyo.js"
+    ]
+  },
+  {
+    "route": "/",
+    "firstLoadUncompressedJsBytes": 528734,
+    "firstLoadChunkPaths": [
+      ".next\\static\\chunks\\3qfy96eoyh-ek.js",
+      ".next\\static\\chunks\\3d-3vhrn3y7s_.js",
+      ".next\\static\\chunks\\23y64x07aj6po.js",
+      ".next\\static\\chunks\\310vm2bl3xxpt.js",
+      ".next\\static\\chunks\\1d-3ziz_810o8.js",
+      ".next\\static\\chunks\\39_j1bdzreq0m.js",
+      ".next\\static\\chunks\\0gy1dczh8t-w0.js",
+      ".next\\static\\chunks\\turbopack-2u1d16houkiyo.js"
+    ]
+  },
+  {
+    "route": "/_not-found",
+    "firstLoadUncompressedJsBytes": 521697,
+    "firstLoadChunkPaths": [
+      ".next\\static\\chunks\\3qfy96eoyh-ek.js",
+      ".next\\static\\chunks\\3d-3vhrn3y7s_.js",
+      ".next\\static\\chunks\\310vm2bl3xxpt.js",
+      ".next\\static\\chunks\\1d-3ziz_810o8.js",
+      ".next\\static\\chunks\\39_j1bdzreq0m.js",
+      ".next\\static\\chunks\\0gy1dczh8t-w0.js",
+      ".next\\static\\chunks\\turbopack-2u1d16houkiyo.js"
+    ]
+  }
+]

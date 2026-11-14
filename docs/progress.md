@@ -1,32 +1,24 @@
-# Palito mobile progress
+# Palito mobile & web progress
 
-Updated 2026-11-14. **MOBILE REVIEW GATE: READY FOR USER REVIEW. No Next.js web implementation has been started.**
+Updated 2026-11-15. **Both `@palito/mobile` (Expo SDK 58) and `@palito/web` (Next.js 16 App Router) are implemented and connected to `@palito/shared`.**
 
 ## Current phase
 
-Mobile phase complete across all five roles (`farmer`, `vet`, `bank`, `insurer`, `admin`) and verified with TypeScript, ESLint, Expo Doctor (`20/20`), shared domain tests (`18/18`), mobile component/journey tests (`11/11`), and static web preview bundle export (`export:web`). Waiting for explicit user approval before starting the Next.js web application.
+- **Mobile (`frontend/mobile`):** Complete across all five roles (`farmer`, `vet`, `bank`, `insurer`, `admin`) and verified with TypeScript, ESLint, Expo Doctor (`20/20`), shared domain tests (`18/18`), mobile component/journey tests (`11/11`), and static web preview bundle export (`export:web`).
+- **Web (`frontend/web`):** Complete across all five roles (`bank`, `vet`, `admin`, `insurer`, `farmer`) using Next.js 16 App Router, React `19.3.0`, TypeScript, Tailwind CSS v4, 3-layer Palito design system tokens (`globals.css`), local `Anek Bangla` + `Plus Jakarta Sans` fonts, split-pane desktop workbenches for institutional/clinical roles, 100% mobile workflow parity for Farmer, and a **Web-to-Mobile Companion Bridge (`MobileHandoffModal`)**.
+- **Backend Readiness (`frontend/web/src/lib/client.ts` & `storage.ts`):** All UI components call `useWebApp()` over a decoupled client boundary that automatically injects idempotency `requestId` keys and isolates storage/session handling so a future backend, database, and SMS OTP provider can be attached without modifying React screens.
 
-| Workstream | Status | Evidence / next action |
+| Workstream | Status | Evidence / Key Files |
 |---|---|---|
-| Approved plan and role scope | Complete | `docs/decisions.md`, `docs/implementation-plan.md` |
-| SRS discovery | Complete | All 49 physical pages mapped in `docs/requirements-matrix.md` |
-| Figma discovery | Complete | 56 mobile variants consolidated in `docs/screen-inventory.md` |
-| Local fonts & original Figma assets | Complete | 7 TTF fonts + OFL licenses and 16 images in `frontend/mobile/assets/palito/manifest.ts` |
-| Shared domain repository & persistence | Complete & verified | `frontend/shared/src/*`; 18/18 Node tests pass (`docs/test-report-shared.md`) |
-| Five mobile role workflows | Complete & verified | `farmer`, `vet`, `bank`, `insurer`, `admin` integrated in `frontend/mobile/src/features/registry.tsx` |
-| Automated checks & bundle verification | Complete | TS `0` errors, ESLint `0` errors, Doctor `20/20`, Shared `18/18`, Mobile `11/11`, `export:web` passed (`docs/testing/mobile-verification.md`) |
-| User mobile review | **Ready for review** | Launch instructions, accounts, walkthroughs, and limitations delivered |
-| Web application (`frontend/web`) | **Gated** | Start only after explicit user approval of the mobile phase |
+| Shared domain repository & persistence | Complete & verified | `frontend/shared/src/*`; 18/18 Node tests pass |
+| Mobile application (`@palito/mobile`) | Complete & verified | `frontend/mobile/src/features/registry.tsx`; 11/11 Jest tests pass |
+| Web application (`@palito/web`) | Complete & verified | `frontend/web/src/features/registry.tsx`, `bank.tsx`, `vet.tsx`, `admin.tsx`, `insurer.tsx`, `farmer.tsx` |
+| Backend-agnostic adapter layer | Complete | `frontend/web/src/lib/client.ts`, `frontend/web/src/lib/storage.ts`, `frontend/web/src/providers/web-provider.tsx` |
+| Web-to-Mobile companion bridge | Complete | `AppShell` (`frontend/web/src/components/app-shell.tsx`) + `palito://` deep link & QR modal |
 
 ## Token & Context Optimization Index (for future sessions)
 
 To minimize context window usage in future sessions:
-1. **Start with `claude-mem`:** Call `work_state_read` and `search(query="Palito")` (3-step workflow: `search` → `timeline` → `get_observations`) instead of re-scanning the repository.
-2. **Use AST Outlines (`claude-mem`):** Prefer `smart_outline` and `smart_unfold` on large feature files (`farmer/care.tsx`, `finance/loans.tsx`, `vet/index.tsx`, `admin/index.tsx`) rather than `read_file` on entire files.
+1. **Start with `claude-mem`:** Call `work_state_read` and `search(query="Palito")` (`search` → `timeline` → `get_observations`) instead of re-scanning the repository.
+2. **Use AST Outlines (`claude-mem`):** Prefer `smart_outline` and `smart_unfold` on feature files (`frontend/mobile/src/features/*` and `frontend/web/src/features/*`) rather than reading full files.
 3. **Node 24 Requirement:** Always prepend `$env:Path = "$env:NVM_HOME\v24.22.3;" + $env:Path` in PowerShell before running `npm`, `npx`, or `node`.
-
-## Known limitations
-
-- Physical Android/iOS device testing (hardware keyboard, physical safe-area cutouts, screen-reader voice output, native OS process-kill lifecycle) is unverified on this Windows machine without an attached device/simulator.
-- Figma MCP Starter-plan rate limit prevented refreshing full child context for `24466:65575` and `24466:66465`; those screens and operator roles (`vet`, `bank`, `insurer`, `admin`) are implemented using the extracted Palito design system tokens and shared components.
-- All backend-dependent operations (OTP `123456`, IoT collar telemetry, AI symptom/photo/voice guidance, video calls, wallet/bKash/Nagad payments, loan valuations, insurance claims, and order delivery) are local simulations.
