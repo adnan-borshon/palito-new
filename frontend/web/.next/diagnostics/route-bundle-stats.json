@@ -1,12 +1,12 @@
 [
   {
     "route": "/[role]/[[...slug]]",
-    "firstLoadUncompressedJsBytes": 761366,
+    "firstLoadUncompressedJsBytes": 761371,
     "firstLoadChunkPaths": [
       ".next\\static\\chunks\\3qfy96eoyh-ek.js",
       ".next\\static\\chunks\\3d-3vhrn3y7s_.js",
       ".next\\static\\chunks\\3cfq09sk_t2xq.js",
-      ".next\\static\\chunks\\0hkbdq_-uukq8.js",
+      ".next\\static\\chunks\\04dpb136u9kfn.js",
       ".next\\static\\chunks\\35kqrg9-q2c-x.js",
       ".next\\static\\chunks\\310vm2bl3xxpt.js",
       ".next\\static\\chunks\\1d-3ziz_810o8.js",

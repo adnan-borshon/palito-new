@@ -67,7 +67,10 @@ test('navigation helpers resolve common screens, sidebar aliases, and mobile han
 
   assert.equal(webHref('bank', 'home'), '/bank/home');
   assert.equal(webHref('vet', 'claim', 'c-1'), '/vet/claim/c-1');
-  assert.equal(mobileDeepLink('farmer', 'animal', DEMO_IDS.healthy), `palito://farmer/animal?id=${DEMO_IDS.healthy}`);
+  assert.equal(
+    mobileDeepLink('farmer', 'animal', DEMO_IDS.healthy),
+    `palito://farmer/animal/${DEMO_IDS.healthy}`,
+  );
 });
 
 test('web client executes end-to-end 5-role workflows with automatic requestId', async () => {
@@ -144,7 +147,28 @@ test('web client executes end-to-end 5-role workflows with automatic requestId',
     assert.equal(disb.ok, true);
   }
 
-  // 5. Switch to Insurer, refer claim to vet -> vet reviews -> insurer approves & pays
+  // 5. Farmer submits claim on active policy -> Insurer refers to Vet -> Vet reviews -> Insurer approves & pays
+  await client.execute({ type: 'auth.switch', userId: DEMO_IDS.farmer });
+  const activePolicy = client
+    .getSnapshot()
+    .policies.find((p) => p.farmerId === DEMO_IDS.farmer && p.status === 'active');
+  assert.ok(activePolicy);
+  const submitClaim = await client.execute({
+    type: 'claim.submit',
+    policyId: activePolicy.id,
+    kind: 'illness',
+    amount: 15000,
+    evidence: {
+      photo: true,
+      location: true,
+      description: 'Acute fever verified by collar telemetry',
+      capturedAt: client.getSnapshot().now,
+      latitude: 24.3396,
+      longitude: 89.6011,
+    },
+  });
+  assert.equal(submitClaim.ok, true);
+
   await client.execute({ type: 'auth.switch', userId: DEMO_IDS.insurer });
   const openClaim = client
     .getSnapshot()
