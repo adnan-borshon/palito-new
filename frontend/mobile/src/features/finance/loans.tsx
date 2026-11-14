@@ -53,9 +53,9 @@ export function LoanOverview() {
     <Screen title={t('পশু জামানত ঋণ', 'Livestock loans')} back testID="farmer-loans">
       <FinanceHero
         icon="cash-outline"
-        eyebrow={t('স্বাস্থ্যভিত্তিক ডেমো ঋণ', 'Health-backed demo credit')}
+        eyebrow={t('স্বাস্থ্যভিত্তিক পশু জামানত ঋণ', 'Health-backed livestock credit')}
         title={money(activeDebt)}
-        detail={t('চলমান ডেমো বকেয়া ঋণ', 'Current simulated outstanding debt')}
+        detail={t('চলমান বকেয়া ঋণ', 'Current outstanding debt')}
       />
       <Button
         title={t('নতুন ঋণের যোগ্যতা ও আবেদন', 'Check eligibility & apply')}
@@ -70,7 +70,7 @@ export function LoanOverview() {
           <EmptyState
             icon="cash-outline"
             title={t('এখনও কোনো ঋণ নেই', 'No loans yet')}
-            description={t('দায়মুক্ত পশুর স্বাস্থ্য পাসপোর্ট দিয়ে ডেমো ঋণের প্রস্তাব দেখুন।', 'Select an unencumbered animal passport to preview a demo loan offer.')}
+            description={t('দায়মুক্ত পশুর স্বাস্থ্য পাসপোর্ট দিয়ে ঋণের প্রস্তাব দেখুন।', 'Select an unencumbered animal passport to preview a loan offer.')}
           />
         )}
       </Section>
@@ -95,8 +95,8 @@ export function LoanApplication({ animalId }: { animalId?: string }) {
   const quote = animal ? demoLoanQuote(animal) : undefined;
   const [amount, setAmount] = useState(quote ? String(quote.maximumAmount) : '');
   const [term, setTerm] = useState('12');
-  const [purpose, setPurpose] = useState('খাদ্য ও খামার পরিচর্যা / Feed and farm care');
-  const [repaymentSource, setRepaymentSource] = useState('দুধ বিক্রি ও খামার আয় / Milk sales and farm income');
+  const [purpose, setPurpose] = useState(t('খাদ্য ও খামার পরিচর্যা', 'Feed and farm care'));
+  const [repaymentSource, setRepaymentSource] = useState(t('দুধ বিক্রি ও খামার আয়', 'Milk sales and farm income'));
   const [attempted, setAttempted] = useState(false);
   const { confirm, dialog } = useFinanceConfirmation();
 
@@ -121,8 +121,8 @@ export function LoanApplication({ animalId }: { animalId?: string }) {
     setAttempted(true);
     if (!animal || !quote || !validAmount || !validTerm || !validPurpose || !validSource) return;
     confirm({
-      title: t('ডেমো ঋণ প্রস্তাব তৈরি করুন', 'Create demo loan offer'),
-      description: `${animal.name} · ${money(numericAmount)}\n${t('যাচাইকৃত জামানত মূল্য', 'Verified collateral valuation')}: ${money(quote.collateralValue)}\n${t('সর্বোচ্চ ৭০% সীমা', 'Maximum 70% cap')}: ${money(quote.maximumAmount)}\n${t('বার্ষিক ডেমো হার', 'Annual demo rate')}: ${quote.annualRate}%`,
+      title: t('ঋণ প্রস্তাব তৈরি করুন', 'Create loan offer'),
+      description: `${animal.name} · ${money(numericAmount)}\n${t('যাচাইকৃত জামানত মূল্য', 'Verified collateral valuation')}: ${money(quote.collateralValue)}\n${t('সর্বোচ্চ ৭০% সীমা', 'Maximum 70% cap')}: ${money(quote.maximumAmount)}\n${t('বার্ষিক সুদের হার', 'Annual interest rate')}: ${quote.annualRate}%`,
       command: {
         type: 'loan.offer',
         animalId: animal.id,
@@ -136,38 +136,56 @@ export function LoanApplication({ animalId }: { animalId?: string }) {
   };
 
   return (
-    <Screen title={t('ঋণের আবেদন', 'Loan application')} back testID="loan-apply">
+    <Screen title={t('লোন সেবা', 'Loan application')} back testID="loan-apply">
       <FinanceHero
         icon="trending-up-outline"
-        eyebrow={t('UC-003 · পশু জামানত মূল্যায়ন', 'UC-003 · Collateral valuation')}
+        eyebrow={t('জামানত হিসেবে গবাদি পশু ব্যবহার করুন', 'Livestock collateral credit')}
         title={quote ? money(quote.maximumAmount) : t('পশু বেছে নিন', 'Choose an animal')}
-        detail={t('যাচাইকৃত মূল্যের সর্বোচ্চ ৭০% পর্যন্ত ডেমো প্রস্তাব', 'Demo offer capped at 70% of verified collateral value')}
+        detail={t('যাচাইকৃত মূল্যের সর্বোচ্চ ৭০% পর্যন্ত সহজ কিস্তিতে ঋণ সুবিধা', 'Up to 70% of verified collateral value with flexible monthly installments')}
       />
       <DemoNotice
         text={t(
-          'পশুর স্বাস্থ্য স্কোর ৭৫-এর নিচে হলে নমুনা জামানত মূল্য ৮০% ধরা হয় এবং ডেমো সুদের হার ১৫% (স্বাভাবিক ১০%) দেখানো হয়।',
-          'When an animal’s health score is below 75, the illustrative collateral valuation is adjusted to 80% and the sample rate is 15% (10% standard).',
+          'পশুর স্বাস্থ্য স্কোরের ভিত্তিতে সুদের হার নির্ধারিত হয় (স্বাস্থ্য স্কোর ৭৫+ হলে ১০%, ৭৫-এর নিচে হলে ১৫% এবং জামানত মূল্য ৮০%)।',
+          'Interest rates depend on your animal’s health score (10% for score 75+, 15% with 80% adjusted collateral valuation below 75).',
         )}
       />
-      <Section title={t('জামানতের জন্য পশু নির্বাচন', 'Select collateral animal')}>
+      <Section title={t('আপনার জামানতযোগ্য পশুসমূহ', 'Your collateral-eligible animals')}>
         {animals.length ? (
           animals.map(item => {
             const itemQuote = demoLoanQuote(item);
+            const isHeld = held(item.id);
             return (
               <AnimalOption
                 key={item.id}
                 animal={item}
                 selected={selected === item.id}
                 onSelect={() => selectAnimal(item.id)}
-                unavailable={held(item.id) ? t('ইতিমধ্যে জামানত বা আবেদনে যুক্ত', 'Already pledged or in an active application') : undefined}
+                unavailable={isHeld ? t('ইতিমধ্যে জামানত বা আবেদনে যুক্ত', 'Already pledged or in an active application') : undefined}
               >
                 <View style={s.wrap}>
+                  <Badge tone={isHeld ? 'warning' : 'success'}>
+                    {isHeld ? t('জামানতকৃত', 'Pledged') : t('জামানতযোগ্য', 'Eligible')}
+                  </Badge>
                   <Badge tone={item.healthScore >= 75 ? 'success' : 'warning'}>
-                    {`${t('স্বাস্থ্য স্কোর', 'Health')}: ${item.healthScore}/100`}
+                    {`${t('স্বাস্থ্য স্কোর', 'Health')}: ${item.healthScore}%`}
                   </Badge>
                   <Badge tone="info">
-                    {`${t('৭০% সীমা', '70% cap')}: ${money(itemQuote.maximumAmount)}`}
+                    {`${t('ঋণের যোগ্যতা (৭০%)', '70% cap')}: ${money(itemQuote.maximumAmount)}`}
                   </Badge>
+                  <Badge tone={itemQuote.annualRate <= 10 ? 'success' : 'warning'}>
+                    {`${t('সুদের হার', 'Rate')}: ${itemQuote.annualRate}%`}
+                  </Badge>
+                </View>
+                <View style={s.progress}>
+                  <View
+                    style={[
+                      s.progressValue,
+                      {
+                        width: `${Math.min(100, Math.max(10, item.healthScore))}%`,
+                        backgroundColor: item.healthScore >= 75 ? colors.brand : colors.warning,
+                      },
+                    ]}
+                  />
                 </View>
               </AnimalOption>
             );
@@ -183,16 +201,16 @@ export function LoanApplication({ animalId }: { animalId?: string }) {
       {animal && quote ? (
         <>
           <Card style={s.mutedPanel}>
-            <AppText variant="heading">{t('ডেমো মূল্যায়ন ও শর্ত', 'Valuation and sample terms')}</AppText>
+            <AppText variant="heading">{t('জামানত মূল্যায়ন ও শর্তাবলী', 'Collateral valuation & terms')}</AppText>
             <Detail label={t('পশুর প্রারম্ভিক মূল্য', 'Base animal value')} value={money(animal.value)} />
             <Detail label={t('স্বাস্থ্য সমন্বিত জামানত মূল্য', 'Health-adjusted valuation')} value={money(quote.collateralValue)} />
             <Detail label={t('সর্বোচ্চ ঋণ সীমা (৭০%)', 'Maximum loan cap (70%)')} value={money(quote.maximumAmount)} />
-            <Detail label={t('নমুনা বার্ষিক হার', 'Illustrative annual rate')} value={`${quote.annualRate}%`} />
+            <Detail label={t('বার্ষিক সুদের হার', 'Annual interest rate')} value={`${quote.annualRate}%`} />
             {animal.healthScore < 75 ? (
               <AppText variant="small" color={colors.warning}>
                 {t(
                   'কম স্বাস্থ্য স্কোরের কারণে ঝুঁকি সমন্বয়কৃত প্রস্তাব দেখানো হচ্ছে।',
-                  'Lower health score resulted in a risk-adjusted sample valuation and rate.',
+                  'Lower health score resulted in a risk-adjusted valuation and interest rate.',
                 )}
               </AppText>
             ) : null}
@@ -266,7 +284,7 @@ export function LoanDetail({ id }: { id?: string }) {
   const [note, setNote] = useState('');
   const [repayAmount, setRepayAmount] = useState('');
   const [graceDays, setGraceDays] = useState('30');
-  const [graceNote, setGraceNote] = useState('দুধ উৎপাদন কমায় অতিরিক্ত সময় অনুমোদন / Grace period due to milk production drop');
+  const [graceNote, setGraceNote] = useState(t('দুধ উৎপাদন কমায় অতিরিক্ত সময় অনুমোদন', 'Grace period due to milk production drop'));
   const [consent, setConsent] = useState('yes');
   const [attempted, setAttempted] = useState(false);
   const { confirm, dialog } = useFinanceConfirmation();
@@ -284,6 +302,8 @@ export function LoanDetail({ id }: { id?: string }) {
   const progressPercent = loan.status === 'paid' || loan.status === 'settled' ? 100 : stageIndex >= 0 ? ((stageIndex + 1) / STAGES.length) * 100 : 25;
   const walletBalance = user ? demoBalance(state, user.id) : 0;
   const relatedPayments = state.payments.filter(item => item.referenceId === loan.id);
+  const monthlyInstallment = Math.ceil(loan.amount / Math.max(1, loan.termMonths));
+  const paidSoFar = Math.max(0, loan.amount - loan.outstanding);
 
   const acceptOffer = () => {
     setAttempted(true);
@@ -301,7 +321,7 @@ export function LoanDetail({ id }: { id?: string }) {
     confirm({
       title: approve ? t('ঋণ অনুমোদন নিশ্চিত করুন', 'Confirm loan approval') : t('ঋণ প্রত্যাখ্যান নিশ্চিত করুন', 'Confirm loan decline'),
       description: approve
-        ? `${money(loan.amount)} · ${t('৭০% সীমা যাচাইকৃত। অনুমোদনের পর ডেমো বিতরণ করা যাবে।', '70% cap verified. You can simulate disbursement after approval.')}`
+        ? `${money(loan.amount)} · ${t('৭০% সীমা যাচাইকৃত। অনুমোদনের পর অর্থ বিতরণ করা যাবে।', '70% cap verified. You can disburse funds after approval.')}`
         : t('প্রত্যাখ্যানের কারণ খামারির কাছে পাঠানো হবে।', 'The decline reason will be shared with the farmer.'),
       danger: !approve,
       command: { type: 'loan.decide', loanId: loan.id, approve, note: note.trim() || undefined },
@@ -310,8 +330,8 @@ export function LoanDetail({ id }: { id?: string }) {
 
   const disburse = () => {
     confirm({
-      title: t('ডেমো অর্থ বিতরণ করুন', 'Simulate loan disbursement'),
-      description: `${money(loan.amount)}\n${t('২৪ ঘণ্টার লক্ষ্যমাত্রা ডেমো হিসেবে তাৎক্ষণিক ওয়ালেটে জমা হবে এবং পাসপোর্টে জামানত চিহ্নিত হবে।', 'Simulated 24h target: funds credit the farmer’s demo wallet and mark the passport as secured collateral.')}`,
+      title: t('ঋণের অর্থ বিতরণ করুন', 'Disburse loan funds'),
+      description: `${money(loan.amount)}\n${t('অর্থ খামারির ওয়ালেটে জমা হবে এবং পাসপোর্টে জামানত চিহ্নিত হবে।', 'Funds credit the farmer’s wallet and mark the passport as secured collateral.')}`,
       command: { type: 'loan.disburse', loanId: loan.id },
     });
   };
@@ -321,8 +341,8 @@ export function LoanDetail({ id }: { id?: string }) {
     const value = customAmount ?? Number(repayAmount);
     if (!isPositiveMoney(value) || value > loan.outstanding) return;
     confirm({
-      title: t('ডেমো কিস্তি পরিশোধ নিশ্চিত করুন', 'Confirm demo repayment'),
-      description: `${money(value)}\n${t('আপনার ডেমো ওয়ালেট থেকে কাটা হবে এবং বকেয়া কমবে।', 'This amount will be debited from your demo wallet and reduce the outstanding balance.')}`,
+      title: t('কিস্তি পরিশোধ নিশ্চিত করুন', 'Confirm loan repayment'),
+      description: `${money(value)}\n${t('আপনার ওয়ালেট থেকে কাটা হবে এবং বকেয়া কমবে।', 'This amount will be debited from your wallet and reduce the outstanding balance.')}`,
       command: { type: 'loan.repay', loanId: loan.id, amount: value },
       onSuccess: () => setRepayAmount(''),
     });
@@ -343,7 +363,7 @@ export function LoanDetail({ id }: { id?: string }) {
     <Screen title={t('ঋণের বিস্তারিত', 'Loan details')} back testID="loan-detail">
       <FinanceHero
         icon="cash-outline"
-        eyebrow={`${loan.id} · ${loan.annualRate}% ${t('বার্ষিক ডেমো হার', 'annual demo rate')}`}
+        eyebrow={`${loan.id} · ${loan.annualRate}% ${t('বার্ষিক সুদের হার', 'annual interest rate')}`}
         title={money(loan.amount)}
         detail={`${t('বকেয়া', 'Outstanding')}: ${money(loan.outstanding)}`}
       >
@@ -371,6 +391,17 @@ export function LoanDetail({ id }: { id?: string }) {
         <Detail label={t('পরিশোধের উৎস', 'Repayment source')} value={loan.repaymentSource} />
         <Detail label={t('পরিশোধের তারিখ', 'Due date')} value={loan.dueAt ? date(loan.dueAt) : '—'} />
         {loan.graceUntil ? <Detail label={t('বর্ধিত সময় (গ্রেস পিরিয়ড)', 'Grace period until')} value={date(loan.graceUntil)} /> : null}
+      </Card>
+
+      <Card style={s.mutedPanel}>
+        <AppText variant="heading">{t('মাসিক কিস্তির বিবরণ', 'Installment schedule')}</AppText>
+        <Detail label={t('মাসিক কিস্তি', 'Monthly installment')} value={money(monthlyInstallment)} />
+        <Detail label={t('এ পর্যন্ত পরিশোধিত', 'Paid so far')} value={money(paidSoFar)} />
+        <Detail label={t('অবশিষ্ট বকেয়া', 'Remaining balance')} value={money(loan.outstanding)} />
+        <Detail
+          label={t('পরবর্তী কিস্তির তারিখ', 'Next due date')}
+          value={loan.graceUntil ? date(loan.graceUntil) : loan.dueAt ? date(loan.dueAt) : t('বিতরণের পর নির্ধারিত হবে', 'Scheduled upon disbursement')}
+        />
       </Card>
 
       {animal.productionDrop ? (
@@ -401,7 +432,7 @@ export function LoanDetail({ id }: { id?: string }) {
             {t('শর্ত গ্রহণ করলে আপনার পশুর স্বাস্থ্য পাসপোর্টসহ আবেদনটি ব্যাংকে জমা হবে।', 'Accepting submits your application and linked animal health passport to the bank.')}
           </AppText>
           <Choice
-            label={t('আমি ডেমো সুদের হার ও জামানতের শর্তে সম্মত', 'I agree to the demo interest rate and collateral terms')}
+            label={t('আমি সুদের হার ও জামানতের শর্তে সম্মত', 'I agree to the interest rate and collateral terms')}
             value={consent}
             onChange={setConsent}
             options={[
@@ -421,7 +452,7 @@ export function LoanDetail({ id }: { id?: string }) {
       {role === 'farmer' && loan.status === 'active' ? (
         <Card>
           <AppText variant="heading">{t('কিস্তি ও ঋণ পরিশোধ', 'Loan repayment')}</AppText>
-          <Detail label={t('আপনার ডেমো ওয়ালেট ব্যালেন্স', 'Your demo wallet balance')} value={money(walletBalance)} />
+          <Detail label={t('আপনার ওয়ালেট ব্যালেন্স', 'Your wallet balance')} value={money(walletBalance)} />
           <Detail label={t('বাকি ঋণ', 'Remaining balance')} value={money(loan.outstanding)} />
           <Field
             label={t('পরিশোধের পরিমাণ (টাকা)', 'Repayment amount (BDT)')}
@@ -487,12 +518,12 @@ export function LoanDetail({ id }: { id?: string }) {
 
       {role === 'bank' && loan.status === 'approved' ? (
         <Card>
-          <AppText variant="heading">{t('ডেমো ঋণ বিতরণ', 'Simulated loan disbursement')}</AppText>
+          <AppText variant="heading">{t('ঋণ বিতরণ', 'Loan disbursement')}</AppText>
           <AppText variant="small" color={colors.muted}>
-            {t('অনুমোদিত অর্থ খামারির ডেমো ওয়ালেটে পাঠানো হবে এবং পশুটি সক্রিয় জামানত হিসেবে চিহ্নিত হবে।', 'Approved funds will be credited to the farmer’s demo wallet and the animal will be marked as active collateral.')}
+            {t('অনুমোদিত অর্থ খামারির ওয়ালেটে পাঠানো হবে এবং পশুটি সক্রিয় জামানত হিসেবে চিহ্নিত হবে।', 'Approved funds will be credited to the farmer’s wallet and the animal will be marked as active collateral.')}
           </AppText>
           <Button
-            title={t('ডেমো অর্থ বিতরণ করুন', 'Simulate disbursement')}
+            title={t('অর্থ বিতরণ করুন', 'Disburse loan funds')}
             onPress={disburse}
             disabled={busy}
             testID="disburse-loan"
@@ -554,7 +585,7 @@ export function FarmerWallet() {
     <Screen title={t('আর্থিক হাব ও ওয়ালেট', 'Financial hub & wallet')} testID="farmer-wallet">
       <FinanceHero
         icon="wallet-outline"
-        eyebrow={t('ডেমো ওয়ালেট ব্যালেন্স', 'Simulated wallet balance')}
+        eyebrow={t('পালিত ওয়ালেট ব্যালেন্স', 'Palito wallet balance')}
         title={money(balance)}
         detail={`${t('সক্রিয় বীমা', 'Active coverage')}: ${money(activeCoverage)} · ${t('বকেয়া ঋণ', 'Loan debt')}: ${money(activeDebt)}`}
       />
@@ -570,7 +601,7 @@ export function FarmerWallet() {
           />
           <Row
             title={t('বীমার দাবি জমা দিন', 'Submit an insurance claim')}
-            subtitle={t('নমুনা ছবি ও GPS প্রমাণসহ দাবি করুন', 'File an illness or death claim with sample evidence')}
+            subtitle={t('ছবি ও GPS প্রমাণসহ দাবি করুন', 'File an illness or death claim with verified evidence')}
             icon="document-attach-outline"
             onPress={() => navigate('farmer', 'claim-apply')}
             testID="wallet-claim-apply"
@@ -584,7 +615,7 @@ export function FarmerWallet() {
           />
           <Row
             title={t('নতুন ঋণের আবেদন', 'Apply for a farm loan')}
-            subtitle={t('স্বাস্থ্য পাসপোর্ট যাচাই করে তাৎক্ষণিক প্রস্তাব', 'Instant demo offer from your animal’s health passport')}
+            subtitle={t('স্বাস্থ্য পাসপোর্ট যাচাই করে তাৎক্ষণিক প্রস্তাব', 'Instant loan offer from your animal’s health passport')}
             icon="trending-up-outline"
             onPress={() => navigate('farmer', 'loan-apply')}
             testID="wallet-loan-apply"

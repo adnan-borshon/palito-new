@@ -22,6 +22,7 @@ Recorded 2026-11-14. These decisions implement the user's approved plan. They ar
 | D16 | Preview in a browser is a mobile implementation preview, not evidence of native correctness. | Approved test requirements. Device-only behavior remains unverified until tested on a device/emulator. |
 | D17 | Bundled original Figma assets and licensed local fonts; no transient URLs at runtime. | Figma design-to-code skill and offline requirement. Full-screen references are QA only, never app assets. |
 | D18 | No asserted model accuracy, payout service level or security certification. | SRS competitive and aspirational claims pp.10–13 are not achieved results. Time limits are labeled simulated workflow targets. |
+| D19 | Production-style UI copy with zero "demo/simulation" disclaimers; preserve 1-tap login & OTP `123456` workflow. | Explicit user instruction on 2026-11-14: present the app as a real production frontend without "demo/simulation/sample" labels, while keeping the quick-access login role selector and environment switcher for testing. |
 
 ## Handling gaps
 

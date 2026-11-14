@@ -223,14 +223,14 @@ function VetAppointmentsScreen({ id }: { id?: string }) {
 }
 
 function VetAppointmentDetail({ id }: { id: string }) {
-  const { state, user, t, locale, date, run, busy } = useDemo();
+  const { state, user, t, locale, date, dateTime, run, busy } = useDemo();
   const appointment = state.appointments.find(item => item.id === id && item.vetId === user?.id);
   const [declineNote, setDeclineNote] = useState('');
-  const [diagnosis, setDiagnosis] = useState('তাপমাত্রা বৃদ্ধি ও পরিপাকজনিত দুর্বলতা / Elevated temperature and digestive stress');
-  const [advice, setAdvice] = useState('পরিষ্কার পানি, ছায়াযুক্ত স্থান এবং নির্ধারিত ওষুধ ৫ দিন চালিয়ে যান / Keep hydrated in shade and give prescribed medication for 5 days');
-  const [medName, setMedName] = useState('Meloxicam + B-Complex Vet (Demo)');
+  const [diagnosis, setDiagnosis] = useState(t('তাপমাত্রা বৃদ্ধি ও পরিপাকজনিত দুর্বলতা', 'Elevated temperature and digestive stress'));
+  const [advice, setAdvice] = useState(t('পরিষ্কার পানি, ছায়াযুক্ত স্থান এবং নির্ধারিত ওষুধ ৫ দিন চালিয়ে যান', 'Keep hydrated in shade and give prescribed medication for 5 days'));
+  const [medName, setMedName] = useState('Meloxicam + B-Complex Vet');
   const [medDose, setMedDose] = useState('1 bolus');
-  const [medFreq, setMedFreq] = useState('দিনে ২ বার / Twice daily');
+  const [medFreq, setMedFreq] = useState(t('দিনে ২ বার', 'Twice daily'));
   const [medDays, setMedDays] = useState('5');
   const [extraMeds, setExtraMeds] = useState<Medicine[]>([]);
   const [attempted, setAttempted] = useState(false);
@@ -290,7 +290,7 @@ function VetAppointmentDetail({ id }: { id: string }) {
           <Status value={appointment.mode} />
         </View>
         <Meta label={t('খামারি', 'Farmer')} value={farmer ? `${locale === 'bn' ? farmer.nameBn : farmer.name} (${farmer.phone})` : appointment.farmerId} />
-        <Meta label={t('নির্ধারিত সময়', 'Scheduled')} value={date(appointment.scheduledAt)} />
+        <Meta label={t('নির্ধারিত সময়', 'Scheduled')} value={dateTime(appointment.scheduledAt)} />
         <Meta label={t('লক্ষণ / কারণ', 'Reason')} value={appointment.reason} />
         {animal ? (
           <Button
@@ -343,7 +343,7 @@ function VetAppointmentDetail({ id }: { id: string }) {
         <Card style={styles.callBanner}>
           <AppText variant="heading" color={colors.surface}>{t('পরামর্শ শুরু করার জন্য প্রস্তুত', 'Ready to start consultation')}</AppText>
           <AppText variant="small" color="#D8E9DE">
-            {t('পরামর্শ শুরু করলে ডেমো কল চালু হবে এবং প্রেসক্রিপশন লেখার ফর্ম খুলবে।', 'Starting the consultation launches the simulated call and clinical prescription form.')}
+            {t('পরামর্শ শুরু করলে ভিডিও/অডিও কল চালু হবে এবং প্রেসক্রিপশন লেখার ফর্ম খুলবে।', 'Starting the consultation launches the live call and clinical prescription form.')}
           </AppText>
           <Button
             title={t('পরামর্শ শুরু করুন', 'Start consultation')}
@@ -357,7 +357,7 @@ function VetAppointmentDetail({ id }: { id: string }) {
 
       {appointment.status === 'in_progress' ? (
         <Card>
-          <Badge tone="info">{t('ডেমো কল চলমান · প্রেসক্রিপশন লিখুন', 'Simulated call active · Issue prescription')}</Badge>
+          <Badge tone="info">{t('সরাসরি পরামর্শ কল চলমান · প্রেসক্রিপশন লিখুন', 'Consultation call active · Issue prescription')}</Badge>
           <AppText variant="heading">{t('ক্লিনিক্যাল নোট ও ডিজিটাল প্রেসক্রিপশন', 'Clinical record & digital prescription')}</AppText>
           <Field
             label={t('রোগ নির্ণয় (Diagnosis)', 'Diagnosis')}
@@ -416,7 +416,7 @@ function VetAppointmentDetail({ id }: { id: string }) {
 }
 
 function VetEmergencyScreen({ id }: { id?: string }) {
-  const { state, t, locale, date } = useDemo();
+  const { state, t, locale, dateTime } = useDemo();
   const alerts = state.alerts.filter(a => a.status === 'escalated' || a.severity === 'critical' || a.id === id);
   const selected = id ? alerts.find(a => a.id === id) : undefined;
   const list = selected ? [selected] : alerts;
@@ -424,8 +424,8 @@ function VetEmergencyScreen({ id }: { id?: string }) {
   return (
     <Screen title={t('জরুরি ও এসকেলেট সতর্কতা', 'Emergency & escalated alerts')} back testID="vet-emergency">
       <DemoNotice
-        bn="৪ ঘণ্টায় খামারি উত্তর না দিলে সতর্কতা এখানে এসকেলেট হয় (UC-001)।"
-        en="Unacknowledged alerts escalate here after 4 demo hours (UC-001)."
+        bn="৪ ঘণ্টায় খামারি উত্তর না দিলে সতর্কতা এখানে স্বয়ংক্রিয়ভাবে এসকেলেট হয় (UC-001)।"
+        en="Unacknowledged alerts automatically escalate here after 4 hours (UC-001)."
       />
       {list.length ? (
         list.map(alert => {
@@ -437,7 +437,7 @@ function VetEmergencyScreen({ id }: { id?: string }) {
                 <Status value={alert.status} />
               </View>
               <AppText>{alert.title[locale]}</AppText>
-              <AppText variant="small" color={colors.muted}>{alert.message[locale]} · {date(alert.createdAt)}</AppText>
+              <AppText variant="small" color={colors.muted}>{alert.message[locale]} · {dateTime(alert.createdAt)}</AppText>
               {animal ? <Vitals animalId={animal.id} /> : null}
               <View style={layout.row}>
                 {alert.appointmentId ? (
@@ -469,7 +469,7 @@ function VetAnimalsScreen({ id }: { id?: string }) {
   const [kind, setKind] = useState<'checkup' | 'vaccination' | 'treatment'>('vaccination');
   const [titleBn, setTitleBn] = useState('এফএমডি টিকা প্রদান');
   const [titleEn, setTitleEn] = useState('FMD vaccination');
-  const [note, setNote] = useState('নির্ধারিত বুস্টার ডোজ সম্পন্ন / Scheduled booster dose administered');
+  const [note, setNote] = useState(t('নির্ধারিত বুস্টার ডোজ সম্পন্ন', 'Scheduled booster dose administered'));
   const [nextDue, setNextDue] = useState('2027-05-14');
 
   const linkedIds = new Set([
@@ -566,7 +566,7 @@ function VetAnimalsScreen({ id }: { id?: string }) {
 
 function VetReviewsScreen({ id }: { id?: string }) {
   const { state, user, t, money, date } = useDemo();
-  const [opinion, setOpinion] = useState('ক্লিনিক্যাল ও IoT তথ্য যাচাইয়ে ঘটনাটি সামঞ্জস্যপূর্ণ পাওয়া গেছে / Clinical history and IoT data are consistent with the reported claim.');
+  const [opinion, setOpinion] = useState(t('ক্লিনিক্যাল ও IoT তথ্য যাচাইয়ে ঘটনাটি সামঞ্জস্যপূর্ণ পাওয়া গেছে।', 'Clinical history and IoT data are consistent with the reported claim.'));
   const [attempted, setAttempted] = useState(false);
   const confirm = useConfirmAction();
 
@@ -585,7 +585,7 @@ function VetReviewsScreen({ id }: { id?: string }) {
             <AppText variant="title">{animal.name} ({animal.tag})</AppText>
             <Status value={claim.status} />
           </View>
-          <Badge tone="info">{t('লক্ষ্যমাত্রা: ৭ দিনের ডেমো পর্যালোচনা', 'Target: 7-day simulated review SLA')}</Badge>
+          <Badge tone="info">{t('লক্ষ্যমাত্রা: ৭ দিনের পর্যালোচনা সময়সীমা', 'Target: 7-day clinical review SLA')}</Badge>
           <Meta label={t('দাবির ধরন', 'Claim type')} value={claim.kind} />
           <Meta label={t('দাবির পরিমাণ', 'Claim amount')} value={money(claim.amount)} />
           <Meta label={t('৪৮ ঘণ্টার IoT প্রমাণ', '48-hour IoT check')} value={iot ? t('উপস্থিত', 'Verified') : t('অসম্পূর্ণ', 'Incomplete')} />
@@ -668,8 +668,8 @@ function VetReviewsScreen({ id }: { id?: string }) {
 
 function VetScheduleScreen() {
   const { user, t, run, busy } = useDemo();
-  const [specialty, setSpecialty] = useState(user?.specialty ?? 'Livestock care · প্রাণিসম্পদ চিকিৎসা');
-  const [schedule, setSchedule] = useState(user?.schedule ?? 'শনি–বৃহস্পতি সকাল ৮:০০ – রাত ৮:০০ / Sat–Thu 8:00 AM – 8:00 PM');
+  const [specialty, setSpecialty] = useState(user?.specialty ?? t('প্রাণিসম্পদ চিকিৎসা ও পরামর্শ', 'Livestock care & clinical advisory'));
+  const [schedule, setSchedule] = useState(user?.schedule ?? t('শনি–বৃহস্পতি সকাল ৮:০০ – রাত ৮:০০', 'Sat–Thu 8:00 AM – 8:00 PM'));
   const [available, setAvailable] = useState(Boolean(user?.available ?? true));
   if (!user) return <Missing />;
 

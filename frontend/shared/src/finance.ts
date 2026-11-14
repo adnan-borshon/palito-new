@@ -52,7 +52,7 @@ export function handleFinance(state: DemoState, command: DemoCommand): { id?: st
         policy.status = 'active'; policy.startsAt = state.now; policy.expiresAt = isoAfter(state.now, 365 * 1440);
       } else policy.status = 'rejected';
       policy.decisionNote = command.note;
-      notify(state, policy.farmerId, bilingual('বীমা আবেদনের সিদ্ধান্ত', 'Insurance application decision'), command.approve ? bilingual('ডেমো প্রিমিয়াম পরিশোধ হয়েছে ও কভারেজ সক্রিয়।', 'The demo premium was paid and coverage is active.') : bilingual('আবেদন প্রত্যাখ্যান করা হয়েছে। কারণ দেখুন।', 'The application was declined. Review the reason.'), 'insurance', policy.id); return { id: policy.id };
+      notify(state, policy.farmerId, bilingual('বীমা আবেদনের সিদ্ধান্ত', 'Insurance application decision'), command.approve ? bilingual('প্রিমিয়াম পরিশোধিত হয়েছে এবং আপনার বীমা কভারেজ সক্রিয় হয়েছে।', 'Your premium has been paid and insurance coverage is now active.') : bilingual('আবেদন প্রত্যাখ্যান করা হয়েছে। কারণ দেখুন।', 'The application was declined. Review the reason.'), 'insurance', policy.id); return { id: policy.id };
     }
     case 'policy.renew': {
       const policy = findById(state.policies, command.policyId); const animal = activeAnimal(state, policy.animalId);
@@ -75,7 +75,7 @@ export function handleFinance(state: DemoState, command: DemoCommand): { id?: st
       if (command.evidence.latitude !== undefined || command.evidence.longitude !== undefined) assertDomain(Number.isFinite(command.evidence.latitude) && Number.isFinite(command.evidence.longitude) && Math.abs(command.evidence.latitude!) <= 90 && Math.abs(command.evidence.longitude!) <= 180, 'evidence');
       assertDomain(!state.claims.some(item => item.policyId === policy.id && item.status !== 'rejected'), 'duplicate');
       const id = nextId(state, 'claim'); state.claims.push({ id, policyId: policy.id, animalId: animal.id, farmerId: animal.ownerId, insurerId: policy.insurerId, kind: command.kind, amount: command.amount, evidence: { ...command.evidence, capturedAt }, status: 'submitted', createdAt: state.now });
-      notify(state, policy.insurerId, bilingual('নতুন দাবি', 'New claim'), bilingual('নমুনা প্রমাণ ও স্বাস্থ্য রেকর্ড যাচাই করুন।', 'Review the sample evidence and health records.'), 'claims', id); return { id };
+      notify(state, policy.insurerId, bilingual('নতুন দাবি জমা পড়েছে', 'New claim submitted'), bilingual('ঘটনার প্রমাণ, জিপিএস ও স্বাস্থ্য রেকর্ড যাচাই করুন।', 'Review the incident evidence, GPS data, and health records.'), 'claims', id); return { id };
     }
     case 'claim.autoReview': {
       const claim = claimActor(state, command.claimId); assertDomain(claim.status === 'submitted', 'invalid_transition');
@@ -84,7 +84,7 @@ export function handleFinance(state: DemoState, command: DemoCommand): { id?: st
       const complete = claim.evidence.photo && claim.evidence.location && !!claim.evidence.capturedAt;
       // Only the complete enhanced death scenario demonstrates an automatic decision.
       claim.status = claim.kind === 'death' && policy.enhanced && iot && complete ? 'approved' : 'manual_review';
-      claim.decisionNote = claim.status === 'approved' ? 'ডেমো নিয়ম: নমুনা ছবি, GPS/সময় ও ৪৮ ঘণ্টার IoT তথ্য মিলে গেছে। / Demo rule: sample photo, GPS/time and 48-hour IoT evidence matched.' : 'ডেমো নিয়ম: প্রমাণ বা IoT তথ্যের জন্য মানুষের পর্যালোচনা প্রয়োজন। / Demo rule: evidence or IoT data requires manual review.';
+      claim.decisionNote = claim.status === 'approved' ? 'স্বয়ংক্রিয় যাচাই সম্পন্ন: ছবি, জিপিএস/সময় ও ৪৮ ঘণ্টার আইওটি টেলিমেট্রি তথ্য মিলে গেছে। / Automated verification passed: photo, GPS/timestamp, and 48-hour IoT telemetry matched.' : 'স্বয়ংক্রিয় যাচাই: প্রমাণ বা আইওটি তথ্যের জন্য ম্যানুয়াল পর্যালোচনা প্রয়োজন। / Automated check: evidence or IoT telemetry requires manual officer review.';
       notify(state, claim.farmerId, bilingual('দাবি পর্যালোচনা আপডেট', 'Claim review updated'), bilingual('আপনার দাবির বর্তমান অবস্থা দেখুন।', 'View the current status of your claim.'), 'claims', claim.id); return { id: claim.id };
     }
     case 'claim.refer': {
@@ -103,7 +103,7 @@ export function handleFinance(state: DemoState, command: DemoCommand): { id?: st
       const claim = claimActor(state, command.claimId); assertDomain(['submitted', 'manual_review'].includes(claim.status), 'invalid_transition'); assertDomain(hasText(command.note, 3, 2000));
       assertDomain(!claim.vetId || hasText(claim.vetOpinion), 'invalid_transition');
       claim.status = command.approve ? 'approved' : 'rejected'; claim.decisionNote = command.note;
-      notify(state, claim.farmerId, bilingual('দাবির সিদ্ধান্ত', 'Claim decision'), command.approve ? bilingual('ডেমো দাবি অনুমোদিত। পেআউটের অপেক্ষায়।', 'The demo claim is approved and awaits payout.') : bilingual('দাবি প্রত্যাখ্যান হয়েছে। কারণ দেখুন।', 'The claim was declined. Review the reason.'), 'claims', claim.id); return { id: claim.id };
+      notify(state, claim.farmerId, bilingual('দাবির সিদ্ধান্ত', 'Claim decision'), command.approve ? bilingual('বীমা দাবি অনুমোদিত হয়েছে এবং পেআউটের জন্য প্রস্তুত।', 'Your insurance claim is approved and ready for payout.') : bilingual('দাবি প্রত্যাখ্যান হয়েছে। কারণ দেখুন।', 'The claim was declined. Review the reason.'), 'claims', claim.id); return { id: claim.id };
     }
     case 'claim.pay': {
       const claim = claimActor(state, command.claimId); assertDomain(claim.status === 'approved', 'invalid_transition');
@@ -118,13 +118,13 @@ export function handleFinance(state: DemoState, command: DemoCommand): { id?: st
         // Cancel offers/approvals that have not disbursed; deceased livestock cannot secure new funds.
         for (const loan of state.loans.filter(item => item.animalId === claim.animalId && ['offered', 'submitted', 'approved'].includes(item.status))) { loan.status = 'rejected'; loan.decisionNote = 'পশুর মৃত্যুজনিত দাবি / Animal death claim'; }
         const animal = findById(state.animals, claim.animalId); animal.status = 'deceased';
-        state.records.push({ id: nextId(state, 'record'), animalId: animal.id, kind: 'death', title: bilingual('মৃত্যুজনিত দাবি নিষ্পত্তি · ডেমো', 'Death claim settled · demo'), note: claim.evidence.description, createdAt: state.now });
+        state.records.push({ id: nextId(state, 'record'), animalId: animal.id, kind: 'death', title: bilingual('মৃত্যুজনিত বীমা দাবি নিষ্পত্তি', 'Mortality insurance claim settled'), note: claim.evidence.description, createdAt: state.now });
         for (const device of state.devices.filter(item => item.animalId === animal.id)) device.connected = false;
       }
       if (remainder > 0) payment(state, claim.farmerId, 'insurance_payout', remainder, 'credit', claim.id);
       claim.payout = claim.amount; claim.debtSettlement = settlement; claim.farmerPayout = remainder; claim.status = 'paid'; policy.status = 'settled';
-      notify(state, claim.farmerId, bilingual('ডেমো পেআউট সম্পন্ন', 'Demo payout complete'), bilingual('জামানতের বকেয়া ঋণ সমন্বয় করে অবশিষ্ট টাকা ওয়ালেটে যোগ হয়েছে।', 'Any secured debt was settled first; the remaining payout was credited to your wallet.'), 'claims', claim.id);
-      if (settlement > 0) notify(state, findById(state.loans, state.loans.find(item => item.animalId === claim.animalId && item.farmerId === claim.farmerId)!.id).bankId, bilingual('জামানতের ঋণ সমন্বয়', 'Collateral debt settlement'), bilingual('বীমা দাবি থেকে ডেমো ঋণ সমন্বয় হয়েছে।', 'The insurance claim funded a simulated debt settlement.'), 'loans');
+      notify(state, claim.farmerId, bilingual('বীমা পেআউট সম্পন্ন', 'Insurance payout complete'), bilingual('জামানতের বকেয়া ঋণ সমন্বয় করে অবশিষ্ট টাকা ওয়ালেটে যোগ হয়েছে।', 'Any secured debt was settled first; the remaining payout was credited to your wallet.'), 'claims', claim.id);
+      if (settlement > 0) notify(state, findById(state.loans, state.loans.find(item => item.animalId === claim.animalId && item.farmerId === claim.farmerId)!.id).bankId, bilingual('জামানতের ঋণ সমন্বয়', 'Collateral debt settlement'), bilingual('বীমা দাবি থেকে জামানতকৃত ঋণের বকেয়া সমন্বয় হয়েছে।', 'The insurance claim settled the outstanding collateralized loan balance.'), 'loans');
       return { id: claim.id };
     }
     case 'loan.offer': {
@@ -142,27 +142,27 @@ export function handleFinance(state: DemoState, command: DemoCommand): { id?: st
     case 'loan.decide': {
       const loan = loanActor(state, command.loanId); assertDomain(loan.status === 'submitted', 'invalid_transition'); assertDomain(command.approve || hasText(command.note, 3, 1000));
       assertDomain(loan.amount <= maximumLoanAmount(loan.collateralValue), 'ltv'); loan.status = command.approve ? 'approved' : 'rejected'; loan.decisionNote = command.note;
-      notify(state, loan.farmerId, bilingual('ঋণ আবেদনের সিদ্ধান্ত', 'Loan application decision'), command.approve ? bilingual('ডেমো আবেদন অনুমোদিত। বিতরণের অপেক্ষায়।', 'The demo loan is approved and awaits disbursement.') : bilingual('ঋণ আবেদন প্রত্যাখ্যান হয়েছে।', 'The loan application was declined.'), 'loans', loan.id); return { id: loan.id };
+      notify(state, loan.farmerId, bilingual('ঋণ আবেদনের সিদ্ধান্ত', 'Loan application decision'), command.approve ? bilingual('আপনার ঋণ আবেদন অনুমোদিত হয়েছে এবং অর্থ ছাড়ের অপেক্ষায় আছে।', 'Your loan application is approved and awaiting disbursement.') : bilingual('ঋণ আবেদন প্রত্যাখ্যান হয়েছে।', 'The loan application was declined.'), 'loans', loan.id); return { id: loan.id };
     }
     case 'loan.disburse': {
       const loan = loanActor(state, command.loanId); assertDomain(loan.status === 'approved', 'invalid_transition');
       const animal = findById(state.animals, loan.animalId); assertDomain(!['sold', 'deceased'].includes(animal.status), 'invalid_transition'); assertDomain(!heldCollateral(state, loan.animalId, loan.id), 'collateral');
       assertDomain(loan.amount <= maximumLoanAmount(loan.collateralValue), 'ltv'); payment(state, loan.farmerId, 'loan_disbursement', loan.amount, 'credit', loan.id);
       loan.status = 'active'; loan.outstanding = loan.amount; loan.dueAt = isoAfter(state.now, 30 * 1440);
-      notify(state, loan.farmerId, bilingual('ডেমো ঋণ বিতরণ', 'Demo loan disbursed'), bilingual('ওয়ালেটে নমুনা অর্থ যোগ হয়েছে। কোনো বাস্তব লেনদেন হয়নি।', 'Sample funds were added to the wallet. No real transaction occurred.'), 'loans', loan.id); return { id: loan.id };
+      notify(state, loan.farmerId, bilingual('ঋণের অর্থ ছাড় হয়েছে', 'Loan disbursed'), bilingual('অনুমোদিত ঋণের অর্থ আপনার ওয়ালেটে জমা হয়েছে।', 'Approved loan funds have been credited to your wallet.'), 'loans', loan.id); return { id: loan.id };
     }
     case 'loan.repay': {
       const user = actor(state, ['farmer']); const loan = findById(state.loans, command.loanId); assertDomain(loan.farmerId === user.id, 'unauthorized'); assertDomain(loan.status === 'active', 'invalid_transition');
       assertDomain(isPositiveMoney(command.amount) && command.amount <= loan.outstanding);
       payment(state, user.id, 'repayment', command.amount, 'debit', loan.id); loan.outstanding -= command.amount;
       if (loan.outstanding === 0) loan.status = 'paid';
-      notify(state, loan.bankId, bilingual('ঋণ পরিশোধ এসেছে', 'Repayment received'), bilingual('ডেমো বকেয়া আপডেট হয়েছে।', 'The simulated outstanding balance was updated.'), 'loans', loan.id); return { id: loan.id };
+      notify(state, loan.bankId, bilingual('ঋণ পরিশোধ এসেছে', 'Repayment received'), bilingual('ঋণের বকেয়া স্থিতি আপডেট হয়েছে।', 'The loan outstanding balance has been updated.'), 'loans', loan.id); return { id: loan.id };
     }
     case 'loan.grace': {
       const loan = loanActor(state, command.loanId); assertDomain(loan.status === 'active' && !loan.graceUntil, 'invalid_transition');
       assertDomain(findById(state.animals, loan.animalId).productionDrop, 'invalid_transition'); assertDomain(Number.isInteger(command.days) && command.days >= 1 && command.days <= 90 && hasText(command.note, 3, 1000));
       loan.graceUntil = isoAfter(loan.dueAt && loan.dueAt > state.now ? loan.dueAt : state.now, command.days * 1440); loan.decisionNote = command.note;
-      notify(state, loan.farmerId, bilingual('পরিশোধের সময় বাড়ানো হয়েছে', 'Repayment grace period granted'), bilingual('উৎপাদন কমার নমুনা তথ্য দেখে ব্যাংক সময় বাড়িয়েছে।', 'The bank granted more time after reviewing the sample production drop.'), 'loans', loan.id); return { id: loan.id };
+      notify(state, loan.farmerId, bilingual('পরিশোধের সময় বাড়ানো হয়েছে', 'Repayment grace period granted'), bilingual('দুধ উৎপাদন হ্রাসের তথ্য যাচাই করে ব্যাংক কিস্তির সময় বাড়িয়েছে।', 'The bank granted a repayment extension after verifying the milk production drop.'), 'loans', loan.id); return { id: loan.id };
     }
     default: return undefined;
   }

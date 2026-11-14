@@ -26,12 +26,23 @@ export function AnimalStatus({ animal }: { animal: Animal }) {
 export const AnimalCard = memo(function AnimalCard({ animal, onPress }: { animal: Animal; onPress?: () => void }) {
   const { state, t, locale } = useDemo();
   const policy = state.policies.some(p => p.animalId === animal.id && p.status === 'active');
+  const pledged = state.loans.some(l => l.animalId === animal.id && ['offered', 'submitted', 'approved', 'active'].includes(l.status));
   const years = Math.max(0, (Date.parse(state.now) - Date.parse(animal.birthDate)) / (365.25 * 86400000));
   const age = new Intl.NumberFormat(locale === 'bn' ? 'bn-BD' : 'en', { maximumFractionDigits: 1 }).format(years);
+  const score = new Intl.NumberFormat(locale === 'bn' ? 'bn-BD' : 'en').format(animal.healthScore);
   return <Card testID={'animal-card-' + animal.id} accessibilityLabel={animal.name + ', ' + animal.tag} onPress={onPress ?? (() => go('animal', animal.id))} style={s.animalCard}>
     <View style={s.row}>
-      {animal.species === 'cattle' ? <Image source={palitoImages.cow} contentFit="contain" style={s.cow} accessibilityLabel={t('গরুর নমুনা ছবি', 'Sample cattle image')} /> : <View style={s.cowIcon}><Icon name="paw-outline" size={28} /></View>}
-      <View style={s.flex}><AppText variant="label">{animal.name} <AppText variant="small" color={colors.muted}>({animal.tag})</AppText></AppText><AppText variant="small" color={colors.muted}>{animal.breed} · {age} {t('বছর', 'years')}</AppText><View style={s.wrap}><AnimalStatus animal={animal} />{policy ? <Badge tone="success">{t('বীমাকৃত', 'Insured')}</Badge> : null}</View></View>
+      {animal.species === 'cattle' ? <Image source={palitoImages.cow} contentFit="contain" style={s.cow} accessibilityLabel={t('প্রাণীর ছবি', 'Animal photo')} /> : <View style={s.cowIcon}><Icon name="paw-outline" size={28} /></View>}
+      <View style={s.flex}>
+        <AppText variant="label">{animal.name} <AppText variant="small" color={colors.muted}>({animal.tag})</AppText></AppText>
+        <AppText variant="small" color={colors.muted}>{animal.breed} · {age} {t('বছর', 'years')} · {animal.weightKg} {t('কেজি', 'kg')}</AppText>
+        <View style={s.wrap}>
+          <AnimalStatus animal={animal} />
+          <Badge tone={animal.healthScore >= 75 ? 'info' : 'warning'}>{`♥ ${score}%`}</Badge>
+          {policy ? <Badge tone="success">{t('বীমাকৃত', 'Insured')}</Badge> : null}
+          {pledged ? <Badge tone="warning">{t('জামানতকৃত', 'Pledged')}</Badge> : null}
+        </View>
+      </View>
       <Icon name="chevron-forward" size={18} color={colors.muted} />
     </View>
   </Card>;

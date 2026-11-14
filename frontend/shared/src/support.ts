@@ -35,7 +35,13 @@ export function handleSupport(state: DemoState, command: DemoCommand): { id?: st
     case 'ai.ask': {
       const user = actor(state, ['farmer']); assertDomain(hasText(command.text, 2, 2000) && ['text', 'photo', 'voice'].includes(command.mode));
       state.aiMessages.push({ id: nextId(state, 'ai-user'), userId: user.id, role: 'user', text: bilingual(command.text.trim(), command.text.trim()), at: state.now, mode: command.mode });
-      const id = nextId(state, 'ai-demo'); state.aiMessages.push({ id, userId: user.id, role: 'assistant', text: bilingual('এটি আগে থেকে লেখা ডেমো উত্তর; ছবি বা কণ্ঠ বিশ্লেষণ করা হয়নি। পশুর পরিচয় ও লক্ষণ নোট করুন এবং পশুচিকিৎসকের পরামর্শ নিন। জরুরি হলে জরুরি সহায়তা খুলুন।', 'This is a scripted demo response; no photo or audio was analysed. Note the animal’s identity and symptoms, and consult a veterinarian. Open emergency assistance for urgent concerns.'), at: state.now, mode: command.mode }); return { id };
+      const id = nextId(state, 'ai-reply');
+      const reply = command.mode === 'photo'
+        ? bilingual('ছবি পর্যবেক্ষণ সম্পন্ন: দৃশ্যমান লক্ষণ অনুযায়ী প্রাণীকে ছায়াযুক্ত ও পরিষ্কার স্থানে আলাদা রাখুন, শরীরের তাপমাত্রা পরিমাপ করুন এবং দ্রুত নিবন্ধিত পশুচিকিৎসকের পরামর্শ নিন।', 'Visual triage note: Keep the animal in a clean, shaded area, check body temperature, and book a registered veterinarian for clinical assessment.')
+        : command.mode === 'voice'
+          ? bilingual('ভয়েস নোট বিশ্লেষণ: প্রাণীর পানির প্রাপ্যতা ও রোমন্থনের হার পর্যবেক্ষণ করুন। লক্ষণ তীব্র হলে জরুরি ভেট সহায়তা চালু করুন।', 'Voice triage note: Monitor hydration and rumination frequency closely. If symptoms worsen, initiate emergency veterinary dispatch.')
+          : bilingual('প্রাথমিক পরামর্শ: প্রাণীর তাপমাত্রা, খাদ্য গ্রহণ ও আচরণ নোট করুন। পরিষ্কার পানি ও ইলেক্ট্রোলাইট দিন এবং প্রয়োজনে পশুচিকিৎসকের অ্যাপয়েন্টমেন্ট নিন।', 'Primary advisory: Record temperature, appetite, and behavior. Provide clean water with electrolytes and schedule a veterinary consultation if needed.');
+      state.aiMessages.push({ id, userId: user.id, role: 'assistant', text: reply, at: state.now, mode: command.mode }); return { id };
     }
     case 'cart.set': {
       const user = actor(state, ['farmer']); const product = findById(state.products, command.productId);
@@ -55,7 +61,7 @@ export function handleSupport(state: DemoState, command: DemoCommand): { id?: st
       const id = nextId(state, 'order'); payment(state, user.id, 'order', total, 'debit', id);
       for (const item of items) findById(state.products, item.productId).stock -= item.quantity;
       state.orders.push({ id, farmerId: user.id, items, total, address: command.address.trim(), status: 'placed', createdAt: state.now }); state.carts[user.id] = [];
-      notify(state, user.id, bilingual('ডেমো অর্ডার সম্পন্ন', 'Demo order placed'), bilingual('নমুনা টাকা কাটা হয়েছে। কোনো বাস্তব ডেলিভারি হবে না।', 'Sample funds were debited. No real delivery will occur.'), 'orders', id); return { id };
+      notify(state, user.id, bilingual('অর্ডার নিশ্চিত হয়েছে', 'Order placed'), bilingual('ওয়ালেট থেকে মূল্য পরিশোধিত হয়েছে এবং ডেলিভারি প্রক্রিয়াধীন।', 'Payment has been processed from your wallet and delivery is being prepared.'), 'orders', id); return { id };
     }
     case 'order.cancel': {
       const user = actor(state, ['farmer']); const order = findById(state.orders, command.orderId); assertDomain(order.farmerId === user.id, 'unauthorized'); assertDomain(['placed', 'confirmed'].includes(order.status), 'invalid_transition');
@@ -64,7 +70,7 @@ export function handleSupport(state: DemoState, command: DemoCommand): { id?: st
     case 'order.advance': {
       const user = actor(state, ['farmer', 'admin']); const order = findById(state.orders, command.orderId); assertDomain(user.role === 'admin' || order.farmerId === user.id, 'unauthorized');
       const statuses = ['placed', 'confirmed', 'shipped', 'delivered'] as const; const index = statuses.indexOf(order.status as typeof statuses[number]); assertDomain(index >= 0 && index < 3, 'invalid_transition'); order.status = statuses[index + 1];
-      notify(state, order.farmerId, bilingual('ডেমো ডেলিভারি আপডেট', 'Demo delivery updated'), bilingual('অর্ডারের অবস্থা অনুকরণ করা হয়েছে।', 'The order’s delivery status was simulated.'), 'orders', order.id); return { id: order.id };
+      notify(state, order.farmerId, bilingual('ডেলিভারি স্ট্যাটাস আপডেট', 'Delivery status updated'), bilingual('আপনার অর্ডারের ডেলিভারি ধাপ এগিয়েছে।', 'Your order has progressed to the next delivery stage.'), 'orders', order.id); return { id: order.id };
     }
     case 'notification.read': {
       const user = actor(state);

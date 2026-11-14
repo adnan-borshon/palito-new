@@ -18,6 +18,13 @@ Mobile phase complete across all five roles (`farmer`, `vet`, `bank`, `insurer`,
 | User mobile review | **Ready for review** | Launch instructions, accounts, walkthroughs, and limitations delivered |
 | Web application (`frontend/web`) | **Gated** | Start only after explicit user approval of the mobile phase |
 
+## Token & Context Optimization Index (for future sessions)
+
+To minimize context window usage in future sessions:
+1. **Start with `claude-mem`:** Call `work_state_read` and `search(query="Palito")` (3-step workflow: `search` → `timeline` → `get_observations`) instead of re-scanning the repository.
+2. **Use AST Outlines (`claude-mem`):** Prefer `smart_outline` and `smart_unfold` on large feature files (`farmer/care.tsx`, `finance/loans.tsx`, `vet/index.tsx`, `admin/index.tsx`) rather than `read_file` on entire files.
+3. **Node 24 Requirement:** Always prepend `$env:Path = "$env:NVM_HOME\v24.22.3;" + $env:Path` in PowerShell before running `npm`, `npx`, or `node`.
+
 ## Known limitations
 
 - Physical Android/iOS device testing (hardware keyboard, physical safe-area cutouts, screen-reader voice output, native OS process-kill lifecycle) is unverified on this Windows machine without an attached device/simulator.

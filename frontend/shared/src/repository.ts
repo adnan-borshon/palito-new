@@ -34,14 +34,14 @@ function advanceClock(state: DemoState, hours: number) {
   for (const alert of state.alerts.filter(item => item.status === 'open' && elapsedHours(item.createdAt, state.now) >= 4)) {
     alert.status = 'escalated';
     const animal = state.animals.find(item => item.id === alert.animalId)!;
-    for (const vet of state.users.filter(item => item.role === 'vet' && item.status === 'active')) notify(state, vet.id, bilingual('৪ ঘণ্টার অমীমাংসিত সতর্কতা', 'Unacknowledged alert after four hours'), bilingual('কৃষকের সঙ্গে যোগাযোগের ডেমো ফলোআপ প্রয়োজন।', 'A simulated follow-up with the farmer is needed.'), 'emergency', alert.id);
+    for (const vet of state.users.filter(item => item.role === 'vet' && item.status === 'active')) notify(state, vet.id, bilingual('৪ ঘণ্টার অমীমাংসিত সতর্কতা', 'Unacknowledged alert after four hours'), bilingual('কৃষকের সঙ্গে জরুরি ফলোআপ প্রয়োজন।', 'An urgent follow-up with the farmer is needed.'), 'emergency', alert.id);
     notify(state, animal.ownerId, bilingual('সতর্কতা এসকেলেট হয়েছে', 'Alert escalated'), bilingual('পশুচিকিৎসকের কাছে ফলোআপ অনুরোধ পাঠানো হয়েছে।', 'A follow-up request was sent to the veterinarian.'), 'alerts', alert.id);
   }
   for (const policy of state.policies.filter(item => item.status === 'active' && item.expiresAt && item.expiresAt <= state.now)) {
     policy.status = 'expired'; notify(state, policy.farmerId, bilingual('বীমার মেয়াদ শেষ', 'Insurance expired'), bilingual('নবায়নের বিকল্প দেখুন।', 'Review your renewal options.'), 'insurance', policy.id);
   }
   for (const claim of state.claims.filter(item => ['manual_review', 'vet_review'].includes(item.status) && elapsedHours(item.createdAt, state.now) >= 7 * 24)) {
-    if (!state.notifications.some(item => item.entityId === claim.id && item.screen === 'review-overdue')) notify(state, claim.insurerId, bilingual('ডেমো পর্যালোচনা ৭ দিন পেরিয়েছে', 'Demo review is older than seven days'), bilingual('দাবির ফলোআপ প্রয়োজন। এটি বাস্তব সেবার নিশ্চয়তা নয়।', 'The claim needs follow-up. This is not a real service guarantee.'), 'review-overdue', claim.id);
+    if (!state.notifications.some(item => item.entityId === claim.id && item.screen === 'review-overdue')) notify(state, claim.insurerId, bilingual('দাবি পর্যালোচনা ৭ দিন পেরিয়েছে', 'Claim review older than seven days'), bilingual('অগ্রাধিকার ভিত্তিতে দাবির ফলোআপ সম্পন্ন করুন।', 'Complete a priority follow-up on this pending claim.'), 'review-overdue', claim.id);
   }
 }
 
@@ -99,7 +99,7 @@ export function createDemoRepository(options: RepositoryOptions = {}): DemoRepos
       draft.revision = state.revision + 1;
       if (command.requestId) draft.processedRequests.push({ requestId: command.requestId, command: fingerprint, resultId: result.id });
       // Keep identifiers and action labels only: OTP values and personal form text never enter the audit log.
-      draft.audit.push({ id: nextId(draft, 'audit'), actorId: state.session.userId ?? 'demo-guest', action: command.type, entityId: result.id, at: draft.now, detail: 'Local frontend simulation / স্থানীয় ফ্রন্টএন্ড ডেমো' });
+      draft.audit.push({ id: nextId(draft, 'audit'), actorId: state.session.userId ?? 'guest', action: command.type, entityId: result.id, at: draft.now, detail: 'কার্যক্রম নিবন্ধিত / Activity recorded' });
       await commit(draft);
       if (command.type === 'demo.failNext') failNext = true;
       if (command.type === 'demo.reset') failNext = false;

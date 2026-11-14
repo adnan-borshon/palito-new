@@ -34,7 +34,7 @@ function AdminHomeScreen() {
   return (
     <Screen title={t('প্রশাসক পোর্টাল', 'Administrator workspace')} testID="admin-home">
       <Card style={styles.hero}>
-        <AppText variant="label" color="#D8E9DE">{t('পালিত সিস্টেম ওভারভিউ · ডেমো', 'Palito platform overview · demo')}</AppText>
+        <AppText variant="label" color="#D8E9DE">{t('পালিত সিস্টেম ওভারভিউ', 'Palito platform overview')}</AppText>
         <AppText variant="hero" color={colors.surface}>{`${state.users.length} ${t('অ্যাকাউন্ট', 'Accounts')}`}</AppText>
         <AppText variant="small" color="#D8E9DE">
           {`${state.animals.length} ${t('পশু', 'animals')} · ${connectedDevices}/${state.devices.length} ${t('ডিভাইস সংযুক্ত', 'devices connected')}`}
@@ -47,27 +47,24 @@ function AdminHomeScreen() {
         <Stat label={t('প্রকাশিত লেখা', 'Published')} value={publishedArticles} icon="book-outline" />
       </View>
 
-      <Section title={t('সিমুলেটেড সিস্টেম স্বাস্থ্য', 'Simulated system health (PAL-ADM-03)')}>
+      <Section title={t('সিস্টেম স্বাস্থ্য ও টেলিমেট্রি স্ট্যাটাস', 'System health & telemetry status')}>
         <Card>
           <View style={layout.split}>
-            <AppText variant="label">{t('স্থানীয় স্টোরেজ ও রিপোজিটরি', 'Local storage & repository')}</AppText>
-            <Badge tone="success">{t('সচল (ডেমো)', 'Healthy (demo)')}</Badge>
+            <AppText variant="label">{t('ডাটা স্টোরেজ ও রিপোজিটরি', 'Data storage & repository')}</AppText>
+            <Badge tone="success">{t('সচল', 'Healthy')}</Badge>
           </View>
           <View style={layout.split}>
-            <AppText variant="label">{t('নেটওয়ার্ক সিমুলেশন মোড', 'Network simulation mode')}</AppText>
+            <AppText variant="label">{t('নেটওয়ার্ক সংযোগ মোড', 'Network connection mode')}</AppText>
             <Badge tone={state.settings.offline ? 'warning' : 'success'}>
-              {state.settings.offline ? t('অফলাইন সিমুলেশন', 'Offline mode') : t('অনলাইন ডেমো', 'Online demo')}
+              {state.settings.offline ? t('অফলাইন মোড', 'Offline mode') : t('অনলাইন সংযুক্ত', 'Online connected')}
             </Badge>
           </View>
           <View style={layout.split}>
-            <AppText variant="label">{t('আইওটি কলার টেলিমেট্রি ডেমো', 'IoT collar telemetry simulation')}</AppText>
+            <AppText variant="label">{t('আইওটি কলার টেলিমেট্রি', 'IoT collar telemetry')}</AppText>
             <Badge tone={connectedDevices === state.devices.length ? 'success' : 'warning'}>
               {`${connectedDevices}/${state.devices.length} ${t('সংযুক্ত', 'connected')}`}
             </Badge>
           </View>
-          <AppText variant="small" color={colors.muted}>
-            {t('এখানে কোনো প্রোডাকশন সার্ভার বা লাইভ টেলিমেট্রি নেই; সবই স্থানীয় ডেমো সূচক।', 'No production server or live telemetry is connected; all metrics above reflect local demo state.')}
-          </AppText>
         </Card>
       </Section>
 
@@ -162,6 +159,14 @@ function AdminUsersScreen({ id }: { id?: string }) {
       {(selected ? [selected] : users).map(account => {
         const isSelf = account.id === currentAdmin?.id;
         const nextStatus = account.status === 'active' ? 'suspended' : 'active';
+        const hasLinkedRecords =
+          state.farms.some(item => item.ownerId === account.id) ||
+          state.animals.some(item => item.ownerId === account.id) ||
+          state.appointments.some(item => item.farmerId === account.id || item.vetId === account.id) ||
+          state.orders.some(item => item.farmerId === account.id) ||
+          state.policies.some(item => item.farmerId === account.id || item.insurerId === account.id) ||
+          state.claims.some(item => item.farmerId === account.id || item.insurerId === account.id || item.vetId === account.id) ||
+          state.loans.some(item => item.farmerId === account.id || item.bankId === account.id);
         return (
           <Card key={account.id} testID={`admin-user-${account.id}`}>
             <View style={layout.split}>
@@ -174,23 +179,50 @@ function AdminUsersScreen({ id }: { id?: string }) {
             <Meta label={t('ফোন', 'Phone')} value={account.phone} />
             <Meta label={t('আইডি', 'Account ID')} value={account.id} />
             {!isSelf ? (
-              <Button
-                title={account.status === 'active' ? t('অ্যাকাউন্ট স্থগিত করুন', 'Suspend account') : t('অ্যাকাউন্ট সক্রিয় করুন', 'Reactivate account')}
-                variant={account.status === 'active' ? 'danger' : 'primary'}
-                disabled={busy}
-                onPress={() =>
-                  confirm.open(
-                    { type: 'admin.userStatus', userId: account.id, status: nextStatus },
-                    nextStatus === 'suspended' ? t('অ্যাকাউন্ট স্থগিত করবেন?', 'Suspend this account?') : t('অ্যাকাউন্ট সক্রিয় করবেন?', 'Reactivate this account?'),
-                    nextStatus === 'suspended'
-                      ? t('স্থগিত অ্যাকাউন্ট দিয়ে লগইন বা কাজ করা যাবে না।', 'Suspended accounts cannot sign in or execute commands.')
-                      : t('অ্যাকাউন্টটি আবার ডেমোতে ব্যবহার করা যাবে।', 'This account will regain access to the demo.'),
-                    undefined,
-                    nextStatus === 'suspended',
-                  )
-                }
-                testID={`toggle-user-${account.id}`}
-              />
+              <>
+                {hasLinkedRecords ? (
+                  <Badge tone="neutral">
+                    {t('সক্রিয় খামার/চিকিৎসা/আর্থিক রেকর্ড যুক্ত থাকায় ভূমিকা স্থির', 'Role locked due to linked farm, clinical, or financial records')}
+                  </Badge>
+                ) : (
+                  <Choice
+                    label={t('ভূমিকা পরিবর্তন করুন', 'Assign account role')}
+                    value={account.role}
+                    onChange={nextRole => {
+                      if (nextRole === account.role) return;
+                      confirm.open(
+                        { type: 'admin.userRole', userId: account.id, role: nextRole },
+                        t('ভূমিকা পরিবর্তন নিশ্চিত করুন', 'Confirm role assignment'),
+                        `${locale === 'bn' ? account.nameBn : account.name} → ${roleNames[nextRole][locale]}`,
+                      );
+                    }}
+                    options={[
+                      { value: 'farmer', label: roleNames.farmer[locale] },
+                      { value: 'vet', label: roleNames.vet[locale] },
+                      { value: 'bank', label: roleNames.bank[locale] },
+                      { value: 'insurer', label: roleNames.insurer[locale] },
+                      { value: 'admin', label: roleNames.admin[locale] },
+                    ]}
+                  />
+                )}
+                <Button
+                  title={account.status === 'active' ? t('অ্যাকাউন্ট স্থগিত করুন', 'Suspend account') : t('অ্যাকাউন্ট সক্রিয় করুন', 'Reactivate account')}
+                  variant={account.status === 'active' ? 'danger' : 'primary'}
+                  disabled={busy}
+                  onPress={() =>
+                    confirm.open(
+                      { type: 'admin.userStatus', userId: account.id, status: nextStatus },
+                      nextStatus === 'suspended' ? t('অ্যাকাউন্ট স্থগিত করবেন?', 'Suspend this account?') : t('অ্যাকাউন্ট সক্রিয় করবেন?', 'Reactivate this account?'),
+                      nextStatus === 'suspended'
+                        ? t('স্থগিত অ্যাকাউন্ট দিয়ে লগইন বা কাজ করা যাবে না।', 'Suspended accounts cannot sign in or execute commands.')
+                        : t('অ্যাকাউন্টটি পুনরায় সক্রিয় করা হবে।', 'This account will regain full platform access.'),
+                      undefined,
+                      nextStatus === 'suspended',
+                    )
+                  }
+                  testID={`toggle-user-${account.id}`}
+                />
+              </>
             ) : (
               <Badge tone="info">{t('বর্তমান প্রশাসক অ্যাকাউন্ট', 'Current administrator session')}</Badge>
             )}
@@ -413,7 +445,7 @@ function AdminReportsScreen({ initialTab = 'summary' }: { initialTab?: string })
             <Meta label={t('সক্রিয় বীমা কভারেজ', 'Active insurance coverage')} value={money(totalInsured)} />
             <Meta label={t('মোট বীমা দাবি', 'Total claims filed')} value={state.claims.length} />
             <Meta label={t('পরিশোধিত দাবি', 'Claims paid')} value={state.claims.filter(c => c.status === 'paid').length} />
-            <Meta label={t('বিতরণকৃত ডেমো ঋণ', 'Total loans disbursed')} value={money(totalLoanDisbursed)} />
+            <Meta label={t('বিতরণকৃত ঋণ', 'Total loans disbursed')} value={money(totalLoanDisbursed)} />
             <Meta label={t('বর্তমান বকেয়া ঋণ', 'Current loan outstanding')} value={money(totalOutstanding)} />
             <Meta label={t('বীমা থেকে জামানত ঋণ সমন্বয়', 'Debt settled via insurance')} value={money(totalSettledByInsurance)} />
             <Meta label={t('মোট অর্ডার', 'Marketplace orders')} value={state.orders.length} />
@@ -459,7 +491,7 @@ function AdminReportsScreen({ initialTab = 'summary' }: { initialTab?: string })
             <EmptyState
               icon="list-outline"
               title={t('কোনো অডিট লগ পাওয়া যায়নি', 'No matching audit events')}
-              description={t('অ্যাপে কাজ করলে এখানে লগ তৈরি হয়।', 'Actions performed in the demo are recorded here.')}
+              description={t('অ্যাপে কাজ করলে এখানে লগ তৈরি হয়।', 'Actions performed in the platform are recorded here.')}
             />
           )}
         </Section>

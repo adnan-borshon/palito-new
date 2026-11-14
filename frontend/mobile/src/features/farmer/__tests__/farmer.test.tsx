@@ -62,7 +62,7 @@ describe('farmer mobile interactions', () => {
   test('emergency confirmation creates one dispatch shared with the veterinarian', async () => {
     const repo = repository();
     await render(<DemoProvider repository={repo}><EmergencyScreen /></DemoProvider>);
-    expect(screen.getByText('This is a demonstration')).toBeTruthy();
+    expect(screen.getByText('Emergency dispatch notice')).toBeTruthy();
     await fireEvent.press(screen.getByTestId('emergency-request'));
     await fireEvent.press(screen.getByTestId('confirm-action'));
     await waitFor(() => expect(repo.getSnapshot().appointments.filter(a => a.priority === 'emergency')).toHaveLength(1));

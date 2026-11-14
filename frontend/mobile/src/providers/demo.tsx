@@ -5,7 +5,7 @@ import { LocaleContext } from './locale';
 
 export interface DemoContextValue {
   state: DemoState; repo: DemoRepository; user: User | undefined; role: Role | undefined; locale: Locale;
-  t: (bn: string, en: string) => string; money: (amount: number) => string; date: (iso: string) => string;
+  t: (bn: string, en: string) => string; money: (amount: number) => string; date: (iso: string) => string; dateTime: (iso: string) => string;
   run: (command: DemoCommand) => Promise<CommandResult>; busy: boolean; ready: boolean;
   error: string | null; feedback: string | null; clearError: () => void; clearFeedback: () => void;
 }
@@ -28,8 +28,10 @@ export function DemoProvider({ children, repository }: { children: ReactNode; re
   const t = useCallback((bn: string, en: string) => locale === 'bn' ? bn : en, [locale]);
   const currency = useMemo(() => new Intl.NumberFormat(locale === 'bn' ? 'bn-BD' : 'en-BD', { style: 'currency', currency: 'BDT', maximumFractionDigits: 0 }), [locale]);
   const dates = useMemo(() => new Intl.DateTimeFormat(locale === 'bn' ? 'bn-BD' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Dhaka' }), [locale]);
+  const dateTimes = useMemo(() => new Intl.DateTimeFormat(locale === 'bn' ? 'bn-BD' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Dhaka' }), [locale]);
   const money = useCallback((amount: number) => currency.format(amount), [currency]);
   const date = useCallback((iso: string) => Number.isNaN(Date.parse(iso)) ? '—' : dates.format(new Date(iso)), [dates]);
+  const dateTime = useCallback((iso: string) => Number.isNaN(Date.parse(iso)) ? '—' : dateTimes.format(new Date(iso)), [dateTimes]);
   const clearError = useCallback(() => setError(null), []);
   const clearFeedback = useCallback(() => setSuccess(null), []);
   const run = useCallback(async (command: DemoCommand): Promise<CommandResult> => {
@@ -43,7 +45,7 @@ export function DemoProvider({ children, repository }: { children: ReactNode; re
   }, [repo]);
   const user = state.users.find(account => account.id === state.session.userId);
   const value: DemoContextValue = {
-    state, repo, user, role: user?.role, locale, t, money, date, run, ready, busy: pending > 0,
+    state, repo, user, role: user?.role, locale, t, money, date, dateTime, run, ready, busy: pending > 0,
     error: errorMessage?.message?.[locale] ?? null, feedback: successMessage?.message?.[locale] ?? null,
     clearError, clearFeedback,
   };

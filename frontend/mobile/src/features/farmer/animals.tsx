@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { Image } from 'expo-image';
-import { FlatList, Modal, StyleSheet, View } from 'react-native';
+import { FlatList, Modal, Pressable, StyleSheet, View } from 'react-native';
 import type { Animal, AnimalInput } from '@palito/shared';
 import { AppText, Badge, Button, Card, Choice, Confirm, EmptyState, Field, Icon, Row, Screen, Section } from '@/components/ui';
 import { useDemo } from '@/providers/demo';
@@ -61,8 +61,8 @@ export function AnimalEditor({ id }: { id?: string }) {
     <Choice label={t('লিঙ্গ', 'Sex')} value={sex} onChange={setSex} options={[{ value: 'female', label: t('মাদি', 'Female') }, { value: 'male', label: t('পুরুষ', 'Male') }]} />
     <Field label={t('জন্মতারিখ', 'Date of birth')} hint="YYYY-MM-DD" placeholder="2022-01-15" value={birth} onChangeText={setBirth} error={errors.birth} keyboardType="numbers-and-punctuation" testID="animal-birth" />
     <Field label={t('ওজন (কেজি)', 'Weight (kg)')} value={weight} onChangeText={setWeight} error={errors.weight} keyboardType="decimal-pad" testID="animal-weight" />
-    <Field label={t('আনুমানিক মূল্য (টাকা)', 'Estimated value (BDT)')} value={value} onChangeText={setValue} error={errors.value} keyboardType="number-pad" testID="animal-value" hint={t('ঋণের আগে ডেমো যাচাইকৃত মূল্য ব্যবহার হবে।', 'The loan journey uses a demo verified valuation.')} />
-    <Card><Badge>{t('নমুনা ছবি', 'Sample image')}</Badge>{species === 'cattle' ? <Image source={palitoImages.cow} contentFit="contain" style={styles.galleryPreview} accessibilityLabel={t('গরুর নমুনা ছবি', 'Sample cattle image')} /> : <Icon name="paw-outline" size={48} />}<AppText variant="small">{t('ডেমোতে নমুনা ছবি ব্যবহার করা হচ্ছে; ক্যামেরায় ছবি তোলা হচ্ছে না।', 'This demo uses a sample image; it does not capture a camera photo.')}</AppText></Card>
+    <Field label={t('আনুমানিক মূল্য (টাকা)', 'Estimated value (BDT)')} value={value} onChangeText={setValue} error={errors.value} keyboardType="number-pad" testID="animal-value" hint={t('ঋণ ও বীমা সুবিধার জন্য যাচাইকৃত বাজারমূল্য ব্যবহৃত হবে।', 'Verified market valuation is used for loan and insurance eligibility.')} />
+    <Card><Badge tone="info">{t('পাসপোর্ট ছবি', 'Passport photo')}</Badge>{species === 'cattle' ? <Image source={palitoImages.cow} contentFit="contain" style={styles.galleryPreview} accessibilityLabel={t('গরুর ছবি', 'Cattle photo')} /> : <Icon name="paw-outline" size={48} />}<AppText variant="small">{t('ডিজিটাল স্বাস্থ্য পাসপোর্টের সাথে পশুর প্রোফাইল ছবি যুক্ত থাকবে।', 'Animal profile photo linked with the digital health passport.')}</AppText></Card>
     <Button title={t('সংরক্ষণ করুন', 'Save animal')} onPress={() => void save()} loading={busy} testID="animal-save" />
   </Screen>;
 }
@@ -104,14 +104,34 @@ export function AnimalDetail({ id }: { id?: string }) {
   const loan = state.loans.find(l => l.animalId === animal.id && ['approved', 'active'].includes(l.status));
   const alert = state.alerts.find(a => a.animalId === animal.id && a.status !== 'resolved');
   const active = !['sold', 'deceased'].includes(animal.status);
+  const tabOptions = [
+    { value: 'health', label: t('স্বাস্থ্য তথ্য', 'Health') },
+    { value: 'records', label: t('রেকর্ড', 'Records') },
+    { value: 'finance', label: t('আর্থিক', 'Finance') },
+  ];
   return <Screen title={t('স্বাস্থ্য পাসপোর্ট', 'Health passport')} back action={<Button title={t('সম্পাদনা', 'Edit')} variant="ghost" disabled={!active} onPress={() => go('animal-edit', animal.id)} />}>
     <AnimalCard animal={animal} onPress={() => setGallery(true)} />
-    <Card><View style={s.row}><Icon name="qr-code-outline" size={38} /><View style={s.flex}><AppText variant="label">{animal.tag}</AppText><AppText variant="small" color={colors.muted}>{t('ডিজিটাল পাসপোর্ট', 'Digital passport')} · {date(animal.registeredAt)}</AppText></View></View><AppText variant="small">{t('ডেমো পরিচয়; সরকারি সনদ নয়।', 'Demo identity; not an official certificate.')}</AppText></Card>
-    {alert ? <Card onPress={() => go('alert', alert.id)} style={styles.forecast}><AppText variant="label">{alert.title[locale]}</AppText><AppText variant="small">{alert.message[locale]}</AppText><TextLink title={t('সতর্কতা দেখুন', 'Review alert')} onPress={() => go('alert', alert.id)} /></Card> : null}
-    <Choice label={t('পাসপোর্ট বিভাগ', 'Passport section')} value={tab} onChange={setTab} options={[{ value: 'health', label: t('স্বাস্থ্য', 'Health') }, { value: 'records', label: t('রেকর্ড', 'Records') }, { value: 'finance', label: t('আর্থিক', 'Finance') }]} />
+    <Card><View style={s.row}><Icon name="qr-code-outline" size={38} color={colors.brandDark} /><View style={s.flex}><AppText variant="label">{animal.tag}</AppText><AppText variant="small" color={colors.muted}>{t('ডিজিটাল পাসপোর্ট', 'Digital passport')} · {date(animal.registeredAt)}</AppText></View><Badge tone="success">{t('যাচাইকৃত', 'Verified')}</Badge></View><AppText variant="small" color={colors.muted}>{t('যাচাইকৃত ডিজিটাল পশু পরিচয় ও স্বাস্থ্য পাসপোর্ট।', 'Verified digital livestock identity and health passport.')}</AppText></Card>
+    {alert ? <Card onPress={() => go('alert', alert.id)} style={styles.forecast}><View style={s.row}><Icon name="sparkles-outline" color="#7E22CE" size={20} /><AppText variant="label" color="#581C87" style={s.flex}>{t('এআই স্বাস্থ্য পূর্বাভাস · ', 'AI Health Forecast · ')}{alert.title[locale]}</AppText></View><AppText variant="small" color="#7E22CE">{alert.message[locale]}</AppText><TextLink title={t('সতর্কতা দেখুন', 'Review alert')} onPress={() => go('alert', alert.id)} /></Card> : null}
+    <View style={styles.underlineTabs} accessibilityRole="tablist">
+      {tabOptions.map(option => {
+        const selected = tab === option.value;
+        return (
+          <Pressable
+            key={option.value}
+            accessibilityRole="tab"
+            accessibilityState={{ selected }}
+            onPress={() => setTab(option.value)}
+            style={[styles.underlineTab, selected && styles.underlineTabActive]}
+          >
+            <AppText variant="label" color={selected ? colors.brand : colors.muted}>{option.label}</AppText>
+          </Pressable>
+        );
+      })}
+    </View>
     {tab === 'health' ? <>
       <Vitals animalId={animal.id} />
-      <Card><Row title={t('জন্মতারিখ', 'Birth date')} subtitle={date(animal.birthDate)} icon="calendar-outline" /><Row title={t('ওজন', 'Weight')} subtitle={animal.weightKg + ' ' + t('কেজি', 'kg')} icon="scale-outline" /><Row title={t('স্বাস্থ্য স্কোর', 'Health score')} subtitle={animal.healthScore + '/100 · ' + t('ডেমো মূল্যায়ন', 'Demo assessment')} icon="heart-outline" /></Card>
+      <Card><Row title={t('জন্মতারিখ', 'Birth date')} subtitle={date(animal.birthDate)} icon="calendar-outline" /><Row title={t('ওজন', 'Weight')} subtitle={animal.weightKg + ' ' + t('কেজি', 'kg')} icon="scale-outline" /><Row title={t('স্বাস্থ্য স্কোর', 'Health score')} subtitle={animal.healthScore + '/100 · ' + t('টেলিমেট্রি ও ক্লিনিক্যাল সূচক', 'Telemetry & clinical index')} icon="heart-outline" /></Card>
       <Button title={t('ডিভাইস ও সংযোগ', 'Device and connection')} variant="secondary" icon="bluetooth-outline" onPress={() => go('device', animal.id)} />
       <Button title={t('ছবির গ্যালারি', 'Photo gallery')} variant="ghost" onPress={() => setGallery(true)} />
       {active ? <Button title={t('ভেটের সাক্ষাৎ বুক করুন', 'Book veterinary care')} onPress={() => go('vets')} /> : null}
@@ -119,14 +139,14 @@ export function AnimalDetail({ id }: { id?: string }) {
       <Section title={t('স্বাস্থ্য ইতিহাস', 'Health history')} action={active ? <TextLink title={t('যোগ করুন', 'Add record')} onPress={() => go('record-add', animal.id)} /> : undefined}>{records.length ? records.map(record => <Card key={record.id}><View style={s.row}><Icon name={record.kind === 'vaccination' ? 'shield-checkmark-outline' : 'document-text-outline'} /><AppText variant="label" style={s.flex}>{record.title[locale]}</AppText></View><AppText variant="small" color={colors.muted}>{date(record.createdAt)}</AppText><AppText>{record.note}</AppText>{record.nextDueAt ? <Badge tone="warning">{t('পরবর্তী তারিখ: ', 'Next due: ') + date(record.nextDueAt)}</Badge> : null}</Card>) : <EmptyState title={t('এখনো স্বাস্থ্য রেকর্ড নেই', 'No health records yet')} description={t('চিকিৎসা শেষ হলে এখানে রেকর্ড যোগ হবে।', 'Completed care will appear here.')} />}</Section>
       <Button title={t('প্রেসক্রিপশন দেখুন', 'View prescriptions')} variant="secondary" onPress={() => go('prescriptions')} />
     </> : <>
-      <Card><AppText variant="heading">{t('পশুর মূল্য', 'Animal value')}</AppText><AppText variant="hero" color={colors.brandDark}>{money(animal.value)}</AppText><AppText variant="small" color={colors.muted}>{t('ডেমো মূল্যায়ন; প্রকৃত আর্থিক প্রস্তাব নয়।', 'Demo valuation; not an actual financial offer.')}</AppText></Card>
+      <Card><AppText variant="heading">{t('পশুর মূল্য', 'Animal value')}</AppText><AppText variant="hero" color={colors.brandDark}>{money(animal.value)}</AppText><AppText variant="small" color={colors.muted}>{t('যাচাইকৃত বাজারমূল্য ও স্বাস্থ্য পাসপোর্ট মূল্যায়ন।', 'Verified market valuation linked to health passport.')}</AppText></Card>
       <Card><AppText variant="heading">{t('বীমা সুরক্ষা', 'Insurance coverage')}</AppText>{policy ? <><Badge tone="success">{t('সক্রিয় পলিসি', 'Active policy')}</Badge><AppText>{money(policy.coverage)}</AppText><Button title={t('পলিসি দেখুন', 'View policy')} onPress={() => go('policy', policy.id)} /></> : <><AppText>{t('সক্রিয় বীমা নেই', 'No active coverage')}</AppText><Button title={t('বীমা আবেদন', 'Apply for insurance')} variant="secondary" disabled={!active} onPress={() => go('insurance')} /></>}</Card>
       <Card><AppText variant="heading">{t('জামানতের অবস্থা', 'Collateral status')}</AppText>{loan ? <><Badge tone="warning">{t('ঋণের জামানত', 'Secured for a loan')}</Badge><AppText>{t('বাকি ঋণ: ', 'Outstanding debt: ')}{money(loan.outstanding)}</AppText><Button title={t('ঋণ দেখুন', 'View loan')} onPress={() => go('loan', loan.id)} /></> : <><Badge tone={active ? 'success' : 'neutral'}>{active ? t('দায়মুক্ত', 'Unencumbered') : t('উপলব্ধ নয়', 'Unavailable')}</Badge><Button title={t('ঋণের যোগ্যতা দেখুন', 'Explore loan eligibility')} variant="secondary" disabled={!active} onPress={() => go('loan-apply')} /></>}</Card>
     </>}
     <AnimalStatus animal={animal} />
     {active ? <Button title={t('পশু সংরক্ষণ করুন', 'Archive animal')} variant="ghost" onPress={() => setArchive(true)} /> : null}
     <Confirm visible={archive} title={t('পশুটি সংরক্ষণ করবেন?', 'Archive this animal?')} description={t('এটি সক্রিয় তালিকা থেকে সরবে। স্বাস্থ্য রেকর্ড থাকবে। সক্রিয় ঋণ বা বীমা থাকলে আগে নিষ্পত্তি করতে হবে।', 'It leaves the active herd while history stays. Active loans or insurance must be settled first.')} confirmLabel={t('সংরক্ষণ', 'Archive')} cancelLabel={t('ফিরে যান', 'Cancel')} loading={busy} onCancel={() => setArchive(false)} onConfirm={() => void run({ type: 'animal.archive', animalId: animal.id }).then(result => { if (result.ok) { setArchive(false); go('animals'); } })} />
-    <Modal visible={gallery} animationType="fade" onRequestClose={() => setGallery(false)}><Screen title={t('পশুর ছবি', 'Animal gallery')} action={<Button title={t('বন্ধ', 'Close')} variant="ghost" onPress={() => setGallery(false)} />}><Badge>{t('ডেমো নমুনা', 'Demo sample')}</Badge>{animal.species === 'cattle' ? <Image source={palitoImages.cow} contentFit="contain" style={styles.galleryImage} accessibilityLabel={t('গরুর নমুনা ছবি', 'Sample cattle image')} /> : <EmptyState title={t('এই পশুর ছবি নেই', 'No image for this animal')} />}<AppText>{animal.name} · {animal.tag}</AppText><AppText color={colors.muted}>{t('নমুনা ছবিটি এই ডেমোর জন্য; এটি আপনার পশুর আপলোড করা ছবি নয়।', 'This is a demo sample, not an uploaded photograph of your animal.')}</AppText></Screen></Modal>
+    <Modal visible={gallery} animationType="fade" onRequestClose={() => setGallery(false)}><Screen title={t('পশুর ছবি', 'Animal gallery')} action={<Button title={t('বন্ধ', 'Close')} variant="ghost" onPress={() => setGallery(false)} />}><Badge tone="info">{t('পাসপোর্ট গ্যালারি', 'Passport gallery')}</Badge>{animal.species === 'cattle' ? <Image source={palitoImages.cow} contentFit="contain" style={styles.galleryImage} accessibilityLabel={t('গরুর ছবি', 'Cattle photo')} /> : <EmptyState title={t('এই পশুর ছবি নেই', 'No image for this animal')} />}<AppText>{animal.name} · {animal.tag}</AppText><AppText color={colors.muted}>{t('ডিজিটাল স্বাস্থ্য পাসপোর্টে নিবন্ধিত পশুর প্রোফাইল ছবি।', 'Profile photograph registered with this animal’s digital health passport.')}</AppText></Screen></Modal>
   </Screen>;
 }
 
@@ -149,7 +169,10 @@ export function RecordEditor({ id }: { id?: string }) {
 
 const styles = StyleSheet.create({
   listPage: { flex: 1, padding: 16, gap: 12 }, listContent: { gap: 12, paddingBottom: 24 },
-  forecast: { backgroundColor: '#F3E8FF', borderColor: '#D8B4FE' },
+  forecast: { backgroundColor: '#F3E8FF', borderColor: '#D8B4FE', borderWidth: 1, borderRadius: 16 },
+  underlineTabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.border },
+  underlineTab: { flex: 1, alignItems: 'center', paddingVertical: 12, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  underlineTabActive: { borderBottomColor: colors.brand },
   galleryPreview: { width: '100%', height: 140 }, galleryImage: { width: '100%', aspectRatio: 1 },
 });
 

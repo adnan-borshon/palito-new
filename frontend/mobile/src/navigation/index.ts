@@ -9,9 +9,9 @@ export const roleNames: Record<Role, Localized> = {
 export interface NavItem { screen: string; label: Localized; icon: IconName; }
 const home: NavItem = { screen: 'home', label: { bn: 'হোম', en: 'Home' }, icon: 'home-outline' };
 const profile: NavItem = { screen: 'profile', label: { bn: 'প্রোফাইল', en: 'Profile' }, icon: 'person-outline' };
-const animals: NavItem = { screen: 'animals', label: { bn: 'পশু', en: 'Animals' }, icon: 'paw-outline' };
+const animals: NavItem = { screen: 'animals', label: { bn: 'আমার প্রাণী', en: 'My Animals' }, icon: 'paw-outline' };
 export const roleTabs: Record<Role, NavItem[]> = {
-  farmer: [home, animals, { screen: 'ai', label: { bn: 'পালিত AI', en: 'Palito AI' }, icon: 'scan-outline' }, { screen: 'wallet', label: { bn: 'ওয়ালেট', en: 'Wallet' }, icon: 'wallet-outline' }, profile],
+  farmer: [home, animals, { screen: 'ai', label: { bn: 'স্ক্যান / AI', en: 'Scan / AI' }, icon: 'scan-outline' }, { screen: 'wallet', label: { bn: 'ওয়ালেট', en: 'Wallet' }, icon: 'wallet-outline' }, profile],
   vet: [home, { screen: 'appointments', label: { bn: 'সাক্ষাৎ', en: 'Visits' }, icon: 'calendar-outline' }, animals, { screen: 'reviews', label: { bn: 'পর্যালোচনা', en: 'Reviews' }, icon: 'shield-checkmark-outline' }, profile],
   bank: [home, { screen: 'applications', label: { bn: 'আবেদন', en: 'Applications' }, icon: 'document-text-outline' }, { screen: 'loans', label: { bn: 'ঋণ', en: 'Loans' }, icon: 'cash-outline' }, { screen: 'notifications', label: { bn: 'বার্তা', en: 'Alerts' }, icon: 'notifications-outline' }, profile],
   insurer: [home, { screen: 'applications', label: { bn: 'আবেদন', en: 'Applications' }, icon: 'document-text-outline' }, { screen: 'claims', label: { bn: 'দাবি', en: 'Claims' }, icon: 'shield-checkmark-outline' }, { screen: 'policies', label: { bn: 'পলিসি', en: 'Policies' }, icon: 'documents-outline' }, profile],

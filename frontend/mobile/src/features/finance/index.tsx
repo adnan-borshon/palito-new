@@ -58,7 +58,7 @@ function BankHomeScreen() {
     <Screen testID="bank-home" title={t('ব্যাংক পোর্টাল', 'Bank workspace')}>
       <FinanceHero
         icon="business-outline"
-        eyebrow={t('পদ্মা ব্যাংক ডেমো পোর্টফোলিও', 'Padma Bank demo portfolio')}
+        eyebrow={t('পদ্মা ব্যাংক পোর্টফোলিও', 'Padma Bank portfolio')}
         title={money(outstandingTotal)}
         detail={`${t('সক্রিয় বকেয়া', 'Active outstanding')} · ${t('বীমা সমন্বয়', 'Collateral settled')}: ${money(settledTotal)}`}
       />
@@ -233,7 +233,7 @@ function InsurerHomeScreen() {
     <Screen title={t('বীমা পোর্টাল', 'Insurer workspace')} testID="insurer-home">
       <FinanceHero
         icon="shield-checkmark-outline"
-        eyebrow={t('সুরক্ষা বীমা ডেমো পোর্টফোলিও', 'Suraksha Insurance demo portfolio')}
+        eyebrow={t('সুরক্ষা বীমা পোর্টফোলিও', 'Suraksha Insurance portfolio')}
         title={money(totalCoverage)}
         detail={`${t('সক্রিয় কভারেজ', 'Active coverage')} · ${activePolicies.length} ${t('টি পলিসি', 'policies')}`}
       />

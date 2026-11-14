@@ -24,7 +24,8 @@ export function Meta({ label, value }: { label: string; value: string | number }
 }
 export function DemoNotice({ bn, en }: { bn?: string; en?: string }) {
   const { t } = useDemo();
-  return <Card style={s.notice}><AppText variant="small" color={colors.brandDark}>{t(bn ?? 'এটি একটি স্থানীয় ডেমো। বাস্তব সেবা বা লেনদেন হচ্ছে না।', en ?? 'This is a local demo. No real service or transaction is taking place.')}</AppText></Card>;
+  if (!bn && !en) return null;
+  return <Card style={s.notice}><AppText variant="small" color={colors.brandDark}>{t(bn ?? '', en ?? '')}</AppText></Card>;
 }
 export function Missing({ title }: { title?: string }) {
   const { t, role } = useDemo();

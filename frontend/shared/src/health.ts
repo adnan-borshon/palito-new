@@ -31,7 +31,7 @@ export function handleHealth(state: DemoState, command: DemoCommand): { id?: str
       const farm = state.farms.find(item => item.ownerId === user.id); assertDomain(farm, 'not_found');
       const id = nextId(state, 'animal');
       state.animals.push({ ...command.animal, id, ownerId: user.id, farmId: farm.id, tag: `PL-${state.revision + 1005}`, healthScore: 80, status: 'healthy', registeredAt: state.now });
-      state.records.push({ id: nextId(state, 'record'), animalId: id, kind: 'registration', title: bilingual('স্বাস্থ্য পাসপোর্ট তৈরি', 'Health passport created'), note: 'ডেমো নিবন্ধন / Demo registration', createdAt: state.now });
+      state.records.push({ id: nextId(state, 'record'), animalId: id, kind: 'registration', title: bilingual('স্বাস্থ্য পাসপোর্ট তৈরি', 'Health passport created'), note: 'প্রাথমিক স্বাস্থ্য ও পরিচয় নিবন্ধন সম্পন্ন / Initial health & identity registration completed', createdAt: state.now });
       return { id };
     }
     case 'animal.update': {
@@ -71,16 +71,16 @@ export function handleHealth(state: DemoState, command: DemoCommand): { id?: str
     }
     case 'device.disconnect': {
       const device = findById(state.devices, command.deviceId); activeAnimal(state, device.animalId); assertDomain(device.connected, 'invalid_transition'); device.connected = false;
-      const id = nextId(state, 'alert'); state.alerts.push({ id, animalId: device.animalId, kind: 'disconnected', severity: 'warning', title: bilingual('ডিভাইসের সংযোগ নেই', 'Device disconnected'), message: bilingual('ব্যাটারি ও কলারের সংযোগ পরীক্ষা করুন। এটি ডেমো সতর্কতা।', 'Check the collar connection and battery. This is a demo alert.'), createdAt: state.now, status: 'open' });
-      notify(state, actor(state).id, bilingual('ডিভাইস পরীক্ষা করুন', 'Check your device'), bilingual('নতুন তথ্য আসছে না।', 'New readings are unavailable.'), 'devices', device.id); return { id };
+      const id = nextId(state, 'alert'); state.alerts.push({ id, animalId: device.animalId, kind: 'disconnected', severity: 'warning', title: bilingual('ডিভাইসের সংযোগ বিচ্ছিন্ন', 'Device disconnected'), message: bilingual('ব্যাটারি ও কলারের সংযোগ পরীক্ষা করুন।', 'Check the collar connection and battery level.'), createdAt: state.now, status: 'open' });
+      notify(state, actor(state).id, bilingual('ডিভাইস পরীক্ষা করুন', 'Check your device'), bilingual('সেন্সর থেকে নতুন তথ্য আসছে না।', 'New sensor readings are currently unavailable.'), 'devices', device.id); return { id };
     }
     case 'alert.simulate': {
       const animal = activeAnimal(state, command.animalId);
       assertDomain(['temperature', 'heart_rate', 'inactivity', 'disconnected', 'emergency'].includes(command.kind) && ['info', 'warning', 'critical'].includes(command.severity));
       assertDomain(!state.alerts.some(item => item.animalId === animal.id && item.kind === command.kind && ['open', 'escalated'].includes(item.status)), 'duplicate');
       const id = nextId(state, 'alert'); const emergency = command.kind === 'emergency';
-      const title = emergency ? bilingual('জরুরি সহায়তা · ডেমো', 'Emergency assistance · demo') : bilingual('স্বাস্থ্যের পরিবর্তন · ডেমো', 'Health change · demo');
-      state.alerts.push({ id, animalId: animal.id, kind: command.kind, severity: emergency ? 'critical' : command.severity, title, message: bilingual('নমুনা সংকেত। পশুচিকিৎসকের সঙ্গে যোগাযোগ করুন।', 'Sample signal. Contact a veterinarian for assessment.'), createdAt: state.now, status: 'open' });
+      const title = emergency ? bilingual('জরুরি ভেটেরিনারি সহায়তা', 'Emergency veterinary alert') : bilingual('স্বাস্থ্য সূচকে পরিবর্তন', 'Health indicator alert');
+      state.alerts.push({ id, animalId: animal.id, kind: command.kind, severity: emergency ? 'critical' : command.severity, title, message: bilingual('সেন্সর রিডিংয়ে অস্বাভাবিকতা দেখা গেছে। দ্রুত পশুচিকিৎসকের পরামর্শ নিন।', 'Abnormal sensor reading detected. Contact a veterinarian for clinical assessment.'), createdAt: state.now, status: 'open' });
       animal.status = emergency ? 'critical' : 'attention'; if (command.kind === 'inactivity') animal.productionDrop = true;
       const device = state.devices.find(item => item.animalId === animal.id);
       if (device && device.connected && command.kind !== 'disconnected') device.readings.push({ at: state.now, temperature: 40.2, heartRate: 100, activity: 20 });
@@ -88,7 +88,7 @@ export function handleHealth(state: DemoState, command: DemoCommand): { id?: str
       if (emergency) {
         const vet = state.users.find(item => item.role === 'vet' && item.available && item.status === 'active');
         if (vet) {
-          const appointmentId = nextId(state, 'appointment'); state.appointments.push({ id: appointmentId, farmerId: animal.ownerId, animalId: animal.id, vetId: vet.id, alertId: id, scheduledAt: state.now, mode: 'visit', priority: 'emergency', reason: 'জরুরি ডেমো ডিসপ্যাচ / Simulated emergency dispatch', status: 'requested', createdAt: state.now });
+          const appointmentId = nextId(state, 'appointment'); state.appointments.push({ id: appointmentId, farmerId: animal.ownerId, animalId: animal.id, vetId: vet.id, alertId: id, scheduledAt: state.now, mode: 'visit', priority: 'emergency', reason: 'জরুরি খামার পরিদর্শন অনুরোধ / Emergency farm visit dispatch', status: 'requested', createdAt: state.now });
           state.alerts[state.alerts.length - 1].appointmentId = appointmentId;
           notify(state, vet.id, title, bilingual('জরুরি অনুরোধ পর্যালোচনা করুন।', 'Review the emergency request.'), 'appointments', appointmentId);
         }
@@ -140,12 +140,12 @@ export function handleHealth(state: DemoState, command: DemoCommand): { id?: str
       for (const medicine of command.medicines) assertDomain(hasText(medicine.name, 1, 120) && hasText(medicine.dose, 1, 100) && hasText(medicine.frequency, 1, 100) && Number.isInteger(medicine.days) && medicine.days > 0 && medicine.days <= 90);
       const id = nextId(state, 'prescription'); state.prescriptions.push({ id, appointmentId: appointment.id, animalId: appointment.animalId, farmerId: appointment.farmerId, vetId: vet.id, diagnosis: command.diagnosis, advice: command.advice, medicines: command.medicines, createdAt: state.now });
       appointment.status = 'completed'; appointment.consultationNote = command.diagnosis;
-      state.records.push({ id: nextId(state, 'record'), animalId: appointment.animalId, vetId: vet.id, appointmentId: appointment.id, kind: 'treatment', title: bilingual('পশুচিকিৎসকের পরামর্শ · ডেমো', 'Veterinary consultation · demo'), note: `${command.diagnosis}\n${command.advice}`, createdAt: state.now });
+      state.records.push({ id: nextId(state, 'record'), animalId: appointment.animalId, vetId: vet.id, appointmentId: appointment.id, kind: 'treatment', title: bilingual('পশুচিকিৎসকের পরামর্শ ও চিকিৎসা', 'Veterinary consultation & treatment'), note: `${command.diagnosis}\n${command.advice}`, createdAt: state.now });
       for (const medicine of command.medicines) state.reminders.push({ id: nextId(state, 'reminder'), prescriptionId: id, animalId: appointment.animalId, medicine: medicine.name, time: '08:00', takenDates: [], enabled: true });
       if (appointment.alertId) findById(state.alerts, appointment.alertId).status = 'resolved';
       const animal = findById(state.animals, appointment.animalId); if (!['deceased', 'sold'].includes(animal.status)) animal.status = 'attention';
       notify(state, appointment.farmerId, bilingual('পরামর্শ সম্পন্ন', 'Consultation complete'), bilingual('প্রেসক্রিপশন ও স্বাস্থ্য রেকর্ড আপডেট হয়েছে।', 'Your prescription and health record have been updated.'), 'prescriptions', id);
-      for (const policy of state.policies.filter(item => item.animalId === animal.id && item.status === 'active')) notify(state, policy.insurerId, bilingual('প্রতিরোধমূলক যত্নের রেকর্ড', 'Preventive care recorded'), bilingual('ডেমো স্বাস্থ্য রেকর্ড আপডেট হয়েছে; কোনো বাস্তব বোনাস যোগ হয়নি।', 'The demo health record was updated; no real bonus was awarded.'), 'policies', policy.id);
+      for (const policy of state.policies.filter(item => item.animalId === animal.id && item.status === 'active')) notify(state, policy.insurerId, bilingual('প্রতিরোধমূলক যত্নের রেকর্ড', 'Preventive care recorded'), bilingual('প্রাণীর ডিজিটাল স্বাস্থ্য পাসপোর্টে নতুন চিকিৎসা রেকর্ড যুক্ত হয়েছে।', 'A new clinical treatment record has been added to the animal health passport.'), 'policies', policy.id);
       return { id };
     }
     case 'reminder.toggle':

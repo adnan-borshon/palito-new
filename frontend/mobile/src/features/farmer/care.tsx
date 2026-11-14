@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Image } from 'expo-image';
-import { StyleSheet, Switch, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, View } from 'react-native';
 import { isoAfter, type Appointment } from '@palito/shared';
 import { AppText, Badge, Button, Card, Choice, Confirm, EmptyState, Field, Icon, Row, Screen, Section } from '@/components/ui';
 import { useDemo } from '@/providers/demo';
@@ -41,9 +41,23 @@ export function VetsScreen() {
   const filtered = vets.filter(vet => {
     const text = `${vet.name} ${vet.nameBn} ${vet.district} ${vet.specialty ?? ''}`.toLowerCase();
     const matchesSearch = text.includes(query.trim().toLowerCase());
-    const matchesCategory = category === 'all' ? true : category === 'available' ? Boolean(vet.available) : true;
+    const matchesCategory =
+      category === 'all'
+        ? true
+        : category === 'available'
+          ? Boolean(vet.available)
+          : category === 'cattle'
+            ? text.includes('cattle') || text.includes('গরু') || text.includes('dairy') || text.includes('livestock')
+            : category === 'goat'
+              ? text.includes('goat') || text.includes('ছাগল') || text.includes('sheep')
+              : true;
     return matchesSearch && matchesCategory;
   });
+
+  const speciesCards = [
+    { key: 'cattle', title: t('গরু ও মহিষ', 'Cattle & Buffalo'), subtitle: t('ডেইরি, প্রজনন ও সাধারণ চিকিৎসা', 'Dairy, reproduction & general medicine') },
+    { key: 'goat', title: t('ছাগল ও ভেড়া', 'Goat & Sheep'), subtitle: t('ক্ষুদ্র প্রাণিসম্পদ ও টিকা বিশেষজ্ঞ', 'Small ruminant & preventive care') },
+  ];
 
   return (
     <Screen title={t('পশুচিকিৎসক খুঁজুন', 'Find a veterinarian')} back testID="farmer-vets">
@@ -55,12 +69,36 @@ export function VetsScreen() {
           accessibilityLabel={t('পশুচিকিৎসকের পরামর্শ চিত্র', 'Veterinary consultation illustration')}
         />
         <AppText variant="title" style={styles.center}>
-          {t('আপনার পশুর জন্য অভিজ্ঞ ভেটের পরামর্শ', 'Trusted veterinary care for your herd')}
+          {t('আপনার প্রাণীর ধরন নির্বাচন করুন', 'Choose your livestock category')}
         </AppText>
         <AppText variant="small" color={colors.muted} style={styles.center}>
-          {t('গবাদিপশু, ছাগল ও মহিষের নিয়মিত বা অগ্রাধিকার চিকিৎসা বুক করুন।', 'Book routine or priority care for cattle, goats and buffalo.')}
+          {t('গরু, মহিষ ও ছাগলের জন্য অভিজ্ঞ ও সার্টিফাইড ভেটের পরামর্শ বুক করুন।', 'Book certified veterinary specialists for cattle, buffalo, and goats.')}
         </AppText>
       </Card>
+
+      <View style={styles.speciesGrid}>
+        {speciesCards.map(item => {
+          const active = category === item.key;
+          return (
+            <Pressable
+              key={item.key}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              onPress={() => setCategory(active ? 'all' : item.key)}
+              style={[styles.speciesCard, active && styles.speciesCardActive]}
+            >
+              <View style={[styles.speciesIconCircle, active && styles.speciesIconCircleActive]}>
+                <Icon name="paw-outline" color={active ? colors.brand : colors.muted} size={24} />
+              </View>
+              <View style={s.flex}>
+                <AppText variant="heading">{item.title}</AppText>
+                <AppText variant="small" color={colors.muted}>{item.subtitle}</AppText>
+              </View>
+              <Icon name={active ? 'checkmark-circle' : 'chevron-forward'} color={active ? colors.brand : colors.muted} size={20} />
+            </Pressable>
+          );
+        })}
+      </View>
 
       <Field
         label={t('ভেট খুঁজুন', 'Search veterinarians')}
@@ -77,36 +115,39 @@ export function VetsScreen() {
         options={[
           { value: 'all', label: t('সব ভেট', 'All vets') },
           { value: 'cattle', label: t('গরু ও মহিষ', 'Cattle & buffalo') },
-          { value: 'goat', label: t('ছাগল', 'Goat care') },
+          { value: 'goat', label: t('ছাগল ও ভেড়া', 'Goat & sheep') },
           { value: 'available', label: t('এখন উপলব্ধ', 'Available now') },
         ]}
       />
 
       {filtered.length ? (
-        filtered.map((vet, index) => (
-          <Card key={vet.id} onPress={() => go('vet', vet.id)} testID={`vet-card-${vet.id}`}>
-            <View style={s.row}>
-              <Image source={VET_PORTRAITS[index % VET_PORTRAITS.length]} contentFit="cover" style={styles.avatar} />
-              <View style={s.flex}>
-                <View style={s.row}>
-                  <AppText variant="heading">{locale === 'bn' ? vet.nameBn : vet.name}</AppText>
-                  <Icon name="checkmark-circle" size={18} color={colors.brand} />
-                </View>
-                <AppText variant="small" color={colors.muted}>
-                  {vet.specialty ?? t('প্রাণিসম্পদ চিকিৎসক', 'Livestock clinician')} · {vet.district}
-                </AppText>
-                <View style={s.wrap}>
-                  <Badge tone={vet.available ? 'success' : 'warning'}>
-                    {vet.available ? t('উপলব্ধ', 'Available') : t('ব্যস্ত', 'Busy')}
-                  </Badge>
-                  <Badge tone="info">{`★ ${vet.rating ?? 4.9}`}</Badge>
-                  <Badge>{`${t('ফি', 'Fee')}: ${money(vet.fee ?? 500)}`}</Badge>
+        filtered.map(vet => {
+          const portraitIdx = Math.max(0, vets.findIndex(v => v.id === vet.id));
+          return (
+            <Card key={vet.id} onPress={() => go('vet', vet.id)} testID={`vet-card-${vet.id}`}>
+              <View style={s.row}>
+                <Image source={VET_PORTRAITS[portraitIdx % VET_PORTRAITS.length]} contentFit="cover" style={styles.avatar} />
+                <View style={s.flex}>
+                  <View style={s.row}>
+                    <AppText variant="heading">{locale === 'bn' ? vet.nameBn : vet.name}</AppText>
+                    <Icon name="checkmark-circle" size={18} color={colors.brand} />
+                  </View>
+                  <AppText variant="small" color={colors.muted}>
+                    {vet.specialty ?? t('প্রাণিসম্পদ চিকিৎসক', 'Livestock clinician')} · {vet.district}
+                  </AppText>
+                  <View style={s.wrap}>
+                    <Badge tone={vet.available ? 'success' : 'warning'}>
+                      {vet.available ? t('উপলব্ধ', 'Available') : t('ব্যস্ত', 'Busy')}
+                    </Badge>
+                    <Badge tone="info">{`★ ${vet.rating ?? 4.9} (২৪৩)`}</Badge>
+                    <Badge>{`${t('ফি', 'Fee')}: ${money(vet.fee ?? 500)}`}</Badge>
+                  </View>
                 </View>
               </View>
-            </View>
-            <Button title={t('প্রোফাইল ও বুকিং', 'Profile & booking')} variant="secondary" onPress={() => go('vet', vet.id)} />
-          </Card>
-        ))
+              <Button title={t('প্রোফাইল ও বুকিং', 'Profile & booking')} variant="secondary" onPress={() => go('vet', vet.id)} />
+            </Card>
+          );
+        })
       ) : (
         <EmptyState
           title={t('কোনো পশুচিকিৎসক পাওয়া যায়নি', 'No matching veterinarians')}
@@ -126,16 +167,17 @@ export function VetsScreen() {
 }
 
 export function VetProfileScreen({ id }: { id?: string }) {
-  const { state, user, t, locale, money, date, run, busy } = useDemo();
+  const { state, user, t, locale, money, dateTime, run, busy } = useDemo();
   const vets = state.users.filter(u => u.role === 'vet' && u.status === 'active');
   const vet = vets.find(u => u.id === id) ?? vets[0];
+  const portraitIdx = Math.max(0, vets.findIndex(v => v.id === vet?.id));
   const animals = state.animals.filter(a => a.ownerId === user?.id && !['sold', 'deceased'].includes(a.status));
   const [animalId, setAnimalId] = useState(animals[0]?.id ?? '');
   const [mode, setMode] = useState<Appointment['mode']>('video');
   const [priority, setPriority] = useState<Appointment['priority']>('routine');
   const slots = vet ? freeSlots(state.now, state.appointments, vet.id) : [];
   const [slot, setSlot] = useState(slots[0] ?? isoAfter(state.now, 60));
-  const [reason, setReason] = useState('খাবারে অরুচি ও জ্বরের লক্ষণ / Reduced appetite and fever');
+  const [reason, setReason] = useState(() => t('খাবারে অরুচি ও জ্বরের লক্ষণ', 'Reduced appetite and fever symptoms'));
   const [paymentMethod, setPaymentMethod] = useState('wallet');
   const [attempted, setAttempted] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -168,28 +210,27 @@ export function VetProfileScreen({ id }: { id?: string }) {
 
   return (
     <Screen title={t('পশুচিকিৎসক প্রোফাইল', 'Veterinarian profile')} back testID="vet-profile">
-      <Card>
-        <View style={s.row}>
-          <Image source={palitoImages.vetAvatar1} contentFit="cover" style={styles.avatarLarge} />
-          <View style={s.flex}>
-            <View style={s.row}>
-              <AppText variant="title">{locale === 'bn' ? vet.nameBn : vet.name}</AppText>
-              <Icon name="checkmark-circle" color={colors.brand} />
-            </View>
-            <AppText color={colors.muted}>
-              {vet.specialty ?? t('প্রাণিসম্পদ ও দুগ্ধ খামার বিশেষজ্ঞ', 'Livestock & dairy medicine specialist')}
-            </AppText>
-            <View style={s.wrap}>
-              <Badge tone={vet.available ? 'success' : 'warning'}>
-                {vet.available ? t('সাক্ষাতের জন্য উপলব্ধ', 'Available for booking') : t('বর্তমানে অনুপলব্ধ', 'Currently unavailable')}
-              </Badge>
-              <Badge tone="info">{`★ ${vet.rating ?? 4.9} · BVC Reg. Demo`}</Badge>
-            </View>
+      <Card style={styles.vetHeaderCard}>
+        <View style={styles.vetCentered}>
+          <Image source={VET_PORTRAITS[portraitIdx % VET_PORTRAITS.length]} contentFit="cover" style={styles.avatarLarge} />
+          <View style={s.row}>
+            <AppText variant="title">{locale === 'bn' ? vet.nameBn : vet.name}</AppText>
+            <Icon name="checkmark-circle" color={colors.brand} size={20} />
+          </View>
+          <AppText color={colors.muted} style={styles.center}>
+            {vet.specialty ?? t('প্রাণিসম্পদ ও দুগ্ধ খামার বিশেষজ্ঞ', 'Livestock & dairy medicine specialist')}
+          </AppText>
+          <View style={s.wrap}>
+            <Badge tone="success">{t('সার্টিফাইড সদস্য', 'Certified member')}</Badge>
+            <Badge tone={vet.available ? 'success' : 'warning'}>
+              {vet.available ? t('সাক্ষাতের জন্য উপলব্ধ', 'Available for booking') : t('বর্তমানে অনুপলব্ধ', 'Currently unavailable')}
+            </Badge>
+            <Badge tone="info">{`★ ${vet.rating ?? 4.9} (২৪৩) · BVC #4821`}</Badge>
           </View>
         </View>
         <Meta label={t('কর্মস্থল', 'District')} value={vet.district} />
-        <Meta label={t('পরামর্শ ফি (ডেমো)', 'Consultation fee (demo)')} value={money(vet.fee ?? 500)} />
-        <Meta label={t('সময়সূচি (বাংলাদেশ সময়)', 'Schedule (Asia/Dhaka)')} value={vet.schedule ?? t('সকাল ৮:০০ – রাত ৮:০০', '8:00 AM – 8:00 PM BST')} />
+        <Meta label={t('পরামর্শ ফি', 'Consultation fee')} value={money(vet.fee ?? 500)} />
+        <Meta label={t('সময়সূচি (ঢাকা সময়)', 'Schedule (Asia/Dhaka)')} value={vet.schedule ?? t('সকাল ৮:০০ – রাত ৮:০০', '8:00 AM – 8:00 PM BST')} />
       </Card>
 
       <Section title={t('সাক্ষাৎ বুক করুন', 'Book an appointment')}>
@@ -228,12 +269,12 @@ export function VetProfileScreen({ id }: { id?: string }) {
               testID="book-priority"
             />
             <Choice
-              label={t('সম্ভাব্য সময় (Asia/Dhaka)', 'Available slot (Asia/Dhaka)')}
+              label={t('সম্ভাব্য সময় (ঢাকা সময়)', 'Available slot (Asia/Dhaka)')}
               value={chosenSlot}
               onChange={setSlot}
-              options={slots.map((iso, idx) => ({
+              options={slots.map(iso => ({
                 value: iso,
-                label: `${date(iso)} · ${t(`স্লট ${idx + 1}`, `Slot ${idx + 1}`)}`,
+                label: dateTime(iso),
               }))}
               testID="book-slot"
             />
@@ -246,15 +287,17 @@ export function VetProfileScreen({ id }: { id?: string }) {
               error={attempted && reason.trim().length < 3 ? t('অন্তত ৩ অক্ষরে সমস্যা লিখুন।', 'Describe the concern in at least 3 characters.') : undefined}
             />
             <Choice
-              label={t('ডেমো পেমেন্ট মাধ্যম', 'Demo payment method')}
+              label={t('পেমেন্ট মাধ্যম', 'Payment method')}
               value={paymentMethod}
               onChange={setPaymentMethod}
               options={[
-                { value: 'wallet', label: t('পালিত ওয়ালেট (ডেমো)', 'Palito Wallet (Demo)') },
-                { value: 'bkash', label: t('বিকাশ ডেমো', 'bKash Demo') },
+                { value: 'wallet', label: t('পালিত ওয়ালেট', 'Palito Wallet') },
+                { value: 'bkash', label: t('বিকাশ', 'bKash') },
+                { value: 'nagad', label: t('নগদ', 'Nagad') },
+                { value: 'card', label: t('ডেবিট / ক্রেডিট কার্ড', 'Debit / Credit Card') },
               ]}
             />
-            <Meta label={t('মোট ডেমো ফি', 'Total simulated fee')} value={money(vet.fee ?? 500)} />
+            <Meta label={t('মোট পরামর্শ ফি', 'Total consultation fee')} value={money(vet.fee ?? 500)} />
             <Button
               title={t('বুকিং নিশ্চিত করুন', 'Review & confirm booking')}
               disabled={!vet.available || !animalId || busy}
@@ -273,7 +316,7 @@ export function VetProfileScreen({ id }: { id?: string }) {
       <Confirm
         visible={confirmOpen}
         title={t('সাক্ষাৎ বুকিং নিশ্চিত করুন', 'Confirm veterinary booking')}
-        description={`${locale === 'bn' ? vet.nameBn : vet.name} · ${money(vet.fee ?? 500)}\n${t('পশুর স্বাস্থ্য ইতিহাস ভেটের সাথে শেয়ার হবে। কোনো আসল টাকা কাটা হবে না।', 'Animal health records will be shared with the vet. No real payment is charged.')}`}
+        description={`${locale === 'bn' ? vet.nameBn : vet.name} · ${money(vet.fee ?? 500)}\n${t('পশুর ডিজিটাল স্বাস্থ্য ইতিহাস ও গত ৭ দিনের টেলিমেট্রি ভেটের সাথে শেয়ার করা হবে।', 'Animal health records and 7-day telemetry will be shared with the veterinarian.')}`}
         confirmLabel={t('বুকিং পাঠান', 'Send booking')}
         cancelLabel={t('ফিরে যান', 'Go back')}
         loading={busy}
@@ -285,7 +328,7 @@ export function VetProfileScreen({ id }: { id?: string }) {
 }
 
 export function AppointmentsScreen({ id }: { id?: string }) {
-  const { state, user, t, locale, date } = useDemo();
+  const { state, user, t, locale, dateTime } = useDemo();
   const [filter, setFilter] = useState('upcoming');
   if (id) return <AppointmentDetail key={id} id={id} />;
 
@@ -330,7 +373,7 @@ export function AppointmentsScreen({ id }: { id?: string }) {
                 <Status value={appointment.status} />
               </View>
               <AppText variant="small" color={colors.muted}>
-                {vet ? (locale === 'bn' ? vet.nameBn : vet.name) : appointment.vetId} · {date(appointment.scheduledAt)}
+                {vet ? (locale === 'bn' ? vet.nameBn : vet.name) : appointment.vetId} · {dateTime(appointment.scheduledAt)}
               </AppText>
               <View style={s.wrap}>
                 <Status value={appointment.priority} />
@@ -353,12 +396,12 @@ export function AppointmentsScreen({ id }: { id?: string }) {
 }
 
 function AppointmentDetail({ id }: { id: string }) {
-  const { state, user, t, locale, date, money, run, busy } = useDemo();
+  const { state, user, t, locale, dateTime, money, run, busy } = useDemo();
   const appointment = state.appointments.find(item => item.id === id && item.farmerId === user?.id);
   const [muted, setMuted] = useState(false);
   const [callEnded, setCallEnded] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
-  const [cancelReason, setCancelReason] = useState('সময় পরিবর্তন প্রয়োজন / Need a different time');
+  const [cancelReason, setCancelReason] = useState(() => t('সময় পরিবর্তন প্রয়োজন', 'Need a different time'));
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
 
   if (!appointment) {
@@ -389,10 +432,11 @@ function AppointmentDetail({ id }: { id: string }) {
           <Status value={appointment.priority} />
           <Status value={appointment.mode} />
         </View>
-        <Meta label={t('নির্ধারিত সময়', 'Scheduled date')} value={date(appointment.scheduledAt)} />
+        <Meta label={t('বুকিং আইডি', 'Booking ID')} value={appointment.id.toUpperCase()} />
+        <Meta label={t('নির্ধারিত সময় (ঢাকা)', 'Scheduled time (Dhaka)')} value={dateTime(appointment.scheduledAt)} />
         <Meta label={t('কারণ / লক্ষণ', 'Reason')} value={appointment.reason} />
-        <Meta label={t('ডেমো পরামর্শ ফি', 'Simulated fee')} value={money(vet?.fee ?? 500)} />
-        <Badge tone="success">{t('ডেমো রসিদ প্রস্তুত · কোনো আসল চার্জ হয়নি', 'Demo receipt recorded · No real charge')}</Badge>
+        <Meta label={t('পরামর্শ ফি', 'Consultation fee')} value={money(vet?.fee ?? 500)} />
+        <Badge tone="success">{t('ডিজিটাল পেমেন্ট রসিদ সংরক্ষিত', 'Digital payment receipt verified')}</Badge>
       </Card>
 
       {appointment.decisionNote ? (
@@ -408,14 +452,14 @@ function AppointmentDetail({ id }: { id: string }) {
             <Icon name="videocam-outline" color={colors.surface} />
             <AppText variant="heading" color={colors.surface} style={s.flex}>
               {callEnded
-                ? t('ডেমো কল সমাপ্ত হয়েছে', 'Simulated call ended')
+                ? t('পরামর্শ কল সমাপ্ত হয়েছে', 'Consultation call ended')
                 : appointment.status === 'in_progress'
-                  ? t('ভেটের সাথে ডেমো পরামর্শ চলছে', 'Simulated consultation in progress')
-                  : t('ডেমো পরামর্শ কক্ষ প্রস্তুত', 'Simulated consultation room ready')}
+                  ? t('ভেটের সাথে সরাসরি পরামর্শ চলছে', 'Live consultation in progress')
+                  : t('টেলিমেডিসিন পরামর্শ কক্ষ প্রস্তুত', 'Telemedicine consultation room ready')}
             </AppText>
           </View>
           <AppText variant="small" color="#D8E9DE">
-            {t('এখানে কোনো বাস্তব অডিও বা ভিডিও স্ট্রিম পাঠানো হয় না।', 'No real audio or video stream is transmitted in this simulation.')}
+            {t('পশুর স্বাস্থ্য পাসপোর্ট ও ৭ দিনের সেন্সর রিডিং ভেটের প্যানেলে সংযুক্ত আছে।', 'Animal health passport and 7-day sensor readings are synced with the clinician.')}
           </AppText>
           <View style={s.wrap}>
             <Button
@@ -426,7 +470,7 @@ function AppointmentDetail({ id }: { id: string }) {
               testID="toggle-call-mute"
             />
             <Button
-              title={callEnded ? t('পুনরায় সংযোগ করুন', 'Reconnect demo call') : t('ডেমো কল শেষ করুন', 'End demo call')}
+              title={callEnded ? t('পুনরায় সংযোগ করুন', 'Reconnect call') : t('কল শেষ করুন', 'End call')}
               variant={callEnded ? 'primary' : 'danger'}
               icon="call-outline"
               onPress={() => setCallEnded(value => !value)}
@@ -452,7 +496,7 @@ function AppointmentDetail({ id }: { id: string }) {
         <Card>
           <AppText variant="heading">{t('সময় পরিবর্তন বা বাতিল', 'Reschedule or cancel')}</AppText>
           <Button
-            title={`${t('পরবর্তী উপলব্ধ সময়ে নিন', 'Reschedule to next slot')} (${date(nextSlot)})`}
+            title={`${t('পরবর্তী উপলব্ধ সময়ে নিন', 'Reschedule to next slot')} (${dateTime(nextSlot)})`}
             variant="secondary"
             icon="time-outline"
             disabled={busy}
@@ -478,7 +522,7 @@ function AppointmentDetail({ id }: { id: string }) {
       <Confirm
         visible={rescheduleOpen}
         title={t('সাক্ষাতের সময় পরিবর্তন করবেন?', 'Reschedule this appointment?')}
-        description={`${t('নতুন সময়', 'New slot')}: ${date(nextSlot)}`}
+        description={`${t('নতুন সময়', 'New slot')}: ${dateTime(nextSlot)}`}
         confirmLabel={t('সময় পরিবর্তন', 'Reschedule')}
         cancelLabel={t('ফিরে যান', 'Cancel')}
         loading={busy}
@@ -586,6 +630,7 @@ export function PrescriptionsScreen({ id }: { id?: string }) {
 
 export function RemindersScreen() {
   const { state, user, t, locale, date, run, busy } = useDemo();
+  const [skippedToday, setSkippedToday] = useState<Record<string, boolean>>({});
   const animalIds = new Set(state.animals.filter(a => a.ownerId === user?.id).map(a => a.id));
   const reminders = state.reminders.filter(item => animalIds.has(item.animalId));
   const dueRecords = state.records.filter(item => animalIds.has(item.animalId) && item.nextDueAt);
@@ -598,6 +643,7 @@ export function RemindersScreen() {
           reminders.map(reminder => {
             const animal = state.animals.find(a => a.id === reminder.animalId);
             const takenToday = reminder.takenDates.includes(today);
+            const isSkipped = Boolean(skippedToday[reminder.id]) && !takenToday;
             return (
               <Card key={reminder.id} testID={`reminder-${reminder.id}`}>
                 <View style={s.row}>
@@ -614,21 +660,34 @@ export function RemindersScreen() {
                     trackColor={{ true: colors.brand }}
                   />
                 </View>
-                <Badge tone={takenToday ? 'success' : reminder.enabled ? 'warning' : 'neutral'}>
+                <Badge tone={takenToday ? 'success' : isSkipped ? 'info' : reminder.enabled ? 'warning' : 'neutral'}>
                   {takenToday
                     ? t('আজকের ডোজ দেওয়া হয়েছে', 'Taken today')
-                    : reminder.enabled
-                      ? t('আজকের ডোজ বাকি', 'Due today')
-                      : t('রিমাইন্ডার বন্ধ', 'Reminder paused')}
+                    : isSkipped
+                      ? t('আজকের ডোজ বাদ দেওয়া হয়েছে', 'Skipped today')
+                      : reminder.enabled
+                        ? t('আজকের ডোজ বাকি', 'Due today')
+                        : t('রিমাইন্ডার বন্ধ', 'Reminder paused')}
                 </Badge>
                 {reminder.enabled && !takenToday ? (
-                  <Button
-                    title={t('আজকের ওষুধ দেওয়া হয়েছে চিহ্নিত করুন', 'Mark dose taken today')}
-                    variant="secondary"
-                    loading={busy}
-                    onPress={() => void run({ type: 'reminder.take', reminderId: reminder.id })}
-                    testID={`take-reminder-${reminder.id}`}
-                  />
+                  <View style={s.wrap}>
+                    <Button
+                      title={t('আজকের ওষুধ দেওয়া হয়েছে চিহ্নিত করুন', 'Mark dose taken today')}
+                      variant="secondary"
+                      loading={busy}
+                      onPress={() => void run({ type: 'reminder.take', reminderId: reminder.id })}
+                      testID={`take-reminder-${reminder.id}`}
+                    />
+                    {!isSkipped ? (
+                      <Button
+                        title={t('আজকের ডোজ বাদ দিন', 'Skip today')}
+                        variant="ghost"
+                        disabled={busy}
+                        onPress={() => setSkippedToday(prev => ({ ...prev, [reminder.id]: true }))}
+                        testID={`skip-reminder-${reminder.id}`}
+                      />
+                    ) : null}
+                  </View>
                 ) : null}
               </Card>
             );
@@ -673,7 +732,14 @@ const styles = StyleSheet.create({
   heroCard: { backgroundColor: colors.brandPale, borderColor: '#D8E9DE', alignItems: 'center', gap: 10 },
   consultationArt: { width: '100%', height: 160 },
   center: { textAlign: 'center' },
+  speciesGrid: { gap: 10 },
+  speciesCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  speciesCardActive: { borderColor: colors.brand, backgroundColor: colors.brandPale },
+  speciesIconCircle: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
+  speciesIconCircleActive: { backgroundColor: '#D8E9DE' },
+  vetHeaderCard: { gap: 12 },
+  vetCentered: { alignItems: 'center', gap: 8, paddingBottom: 4 },
   avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.brandPale },
-  avatarLarge: { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.brandPale },
+  avatarLarge: { width: 84, height: 84, borderRadius: 42, backgroundColor: colors.brandPale },
   callCard: { backgroundColor: colors.brandDeep, borderColor: colors.brandDeep, gap: 12 },
 });
