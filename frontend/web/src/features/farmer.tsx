@@ -174,7 +174,7 @@ export function FarmerWebFeature({
 
   const insurers = state.users.filter((u) => u.role === 'insurer' && u.status === 'active');
   const [selectedInsurerId, setSelectedInsurerId] = useState<string>(
-    insurers[0]?.id ?? 'u-insurer-1',
+    insurers[0]?.id ?? 'insurer-suraksha',
   );
   const [coverageInput, setCoverageInput] = useState('120000');
   const [claimKind, setClaimKind] = useState<'illness' | 'death'>('illness');

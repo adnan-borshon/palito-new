@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { DemoStorage } from '@palito/shared';
+import { DEMO_IDS, type DemoStorage } from '@palito/shared';
 import { createPalitoWebClient } from '../lib/client.ts';
 import {
   canonicalSidebarScreen,
@@ -31,13 +31,14 @@ test('navigation helpers resolve common screens, sidebar aliases, and mobile han
   assert.equal(isCommonWebScreen('home'), false);
 
   // Bank aliases
-  assert.equal(canonicalSidebarScreen('bank', 'application'), 'home');
+  assert.equal(canonicalSidebarScreen('bank', 'applications'), 'applications');
+  assert.equal(canonicalSidebarScreen('bank', 'passport'), 'applications');
   assert.equal(canonicalSidebarScreen('bank', 'loan'), 'loans');
-  assert.equal(canonicalSidebarScreen('bank', 'passport'), 'home');
+  assert.equal(canonicalSidebarScreen('bank', 'settlements'), 'loans');
 
   // Vet aliases
-  assert.equal(canonicalSidebarScreen('vet', 'appointment'), 'home');
-  assert.equal(canonicalSidebarScreen('vet', 'emergency'), 'home');
+  assert.equal(canonicalSidebarScreen('vet', 'appointment'), 'appointments');
+  assert.equal(canonicalSidebarScreen('vet', 'emergency'), 'appointments');
   assert.equal(canonicalSidebarScreen('vet', 'animal'), 'animals');
   assert.equal(canonicalSidebarScreen('vet', 'passport'), 'animals');
   assert.equal(canonicalSidebarScreen('vet', 'claim'), 'reviews');
@@ -45,9 +46,9 @@ test('navigation helpers resolve common screens, sidebar aliases, and mobile han
   assert.equal(canonicalSidebarScreen('vet', 'schedule'), 'profile');
 
   // Insurer aliases
-  assert.equal(canonicalSidebarScreen('insurer', 'claim'), 'home');
-  assert.equal(canonicalSidebarScreen('insurer', 'review-overdue'), 'home');
-  assert.equal(canonicalSidebarScreen('insurer', 'policy'), 'applications');
+  assert.equal(canonicalSidebarScreen('insurer', 'claim'), 'claims');
+  assert.equal(canonicalSidebarScreen('insurer', 'review-overdue'), 'claims');
+  assert.equal(canonicalSidebarScreen('insurer', 'policy'), 'policies');
   assert.equal(canonicalSidebarScreen('insurer', 'passport'), 'applications');
 
   // Admin aliases
@@ -64,9 +65,9 @@ test('navigation helpers resolve common screens, sidebar aliases, and mobile han
   assert.equal(canonicalSidebarScreen('farmer', 'claim-apply'), 'wallet');
   assert.equal(canonicalSidebarScreen('farmer', 'order'), 'market');
 
-  assert.equal(webHref('bank', 'home'), '/bank');
+  assert.equal(webHref('bank', 'home'), '/bank/home');
   assert.equal(webHref('vet', 'claim', 'c-1'), '/vet/claim/c-1');
-  assert.equal(mobileDeepLink('farmer', 'animal', 'a-1'), 'palito://farmer/animal?id=a-1');
+  assert.equal(mobileDeepLink('farmer', 'animal', DEMO_IDS.healthy), `palito://farmer/animal?id=${DEMO_IDS.healthy}`);
 });
 
 test('web client executes end-to-end 5-role workflows with automatic requestId', async () => {
@@ -77,10 +78,10 @@ test('web client executes end-to-end 5-role workflows with automatic requestId',
   await client.hydrate();
 
   // 1. Farmer simulates emergency alert and books vet consultation
-  await client.execute({ type: 'auth.switch', userId: 'u-farmer-1' });
+  await client.execute({ type: 'auth.switch', userId: DEMO_IDS.farmer });
   const simRes = await client.execute({
     type: 'alert.simulate',
-    animalId: 'a-1',
+    animalId: DEMO_IDS.healthy,
     kind: 'emergency',
     severity: 'critical',
   });
@@ -95,8 +96,12 @@ test('web client executes end-to-end 5-role workflows with automatic requestId',
   );
 
   // 3. Switch to Vet, complete a consultation & submit clinical review
-  await client.execute({ type: 'auth.switch', userId: 'u-vet-1' });
-  const appt = client.getSnapshot().appointments.find((a) => a.vetId === 'u-vet-1');
+  await client.execute({ type: 'auth.switch', userId: DEMO_IDS.vet });
+  const appt = client
+    .getSnapshot()
+    .appointments.find(
+      (a) => a.vetId === DEMO_IDS.vet && ['requested', 'accepted'].includes(a.status),
+    );
   assert.ok(appt);
   if (appt.status === 'requested') {
     await client.execute({
@@ -120,10 +125,10 @@ test('web client executes end-to-end 5-role workflows with automatic requestId',
   assert.equal(rxRes.ok, true);
 
   // 4. Switch to Bank, approve & disburse submitted loan
-  await client.execute({ type: 'auth.switch', userId: 'u-bank-1' });
+  await client.execute({ type: 'auth.switch', userId: DEMO_IDS.bank });
   const submittedLoan = client
     .getSnapshot()
-    .loans.find((l) => l.bankId === 'u-bank-1' && l.status === 'submitted');
+    .loans.find((l) => l.bankId === DEMO_IDS.bank && l.status === 'submitted');
   if (submittedLoan) {
     const dec = await client.execute({
       type: 'loan.decide',
@@ -140,7 +145,7 @@ test('web client executes end-to-end 5-role workflows with automatic requestId',
   }
 
   // 5. Switch to Insurer, refer claim to vet -> vet reviews -> insurer approves & pays
-  await client.execute({ type: 'auth.switch', userId: 'u-insurer-1' });
+  await client.execute({ type: 'auth.switch', userId: DEMO_IDS.insurer });
   const openClaim = client
     .getSnapshot()
     .claims.find((c) => ['submitted', 'manual_review'].includes(c.status));
@@ -148,11 +153,11 @@ test('web client executes end-to-end 5-role workflows with automatic requestId',
   const referRes = await client.execute({
     type: 'claim.refer',
     claimId: openClaim.id,
-    vetId: 'u-vet-1',
+    vetId: DEMO_IDS.vet,
   });
   assert.equal(referRes.ok, true);
 
-  await client.execute({ type: 'auth.switch', userId: 'u-vet-1' });
+  await client.execute({ type: 'auth.switch', userId: DEMO_IDS.vet });
   const vetRev = await client.execute({
     type: 'claim.vetReview',
     claimId: openClaim.id,
@@ -160,7 +165,7 @@ test('web client executes end-to-end 5-role workflows with automatic requestId',
   });
   assert.equal(vetRev.ok, true);
 
-  await client.execute({ type: 'auth.switch', userId: 'u-insurer-1' });
+  await client.execute({ type: 'auth.switch', userId: DEMO_IDS.insurer });
   const claimDec = await client.execute({
     type: 'claim.decide',
     claimId: openClaim.id,
