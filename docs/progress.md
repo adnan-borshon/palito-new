@@ -1,42 +1,25 @@
 # Palito mobile progress
 
-Updated 2026-11-14. **MOBILE REVIEW GATE: CLOSED. No explicit approval to begin web has been received.**
+Updated 2026-11-14. **MOBILE REVIEW GATE: READY FOR USER REVIEW. No Next.js web implementation has been started.**
 
 ## Current phase
 
-Phase A: source mapping, shared foundation and mobile design assets. Implementation is underway; the app is not yet ready for user review.
+Mobile phase complete across all five roles (`farmer`, `vet`, `bank`, `insurer`, `admin`) and verified with TypeScript, ESLint, Expo Doctor (`20/20`), shared domain tests (`18/18`), mobile component/journey tests (`11/11`), and static web preview bundle export (`export:web`). Waiting for explicit user approval before starting the Next.js web application.
 
 | Workstream | Status | Evidence / next action |
 |---|---|---|
-| Approved plan and role scope | Recorded | User's complete mobile-first plan; decisions.md |
-| SRS discovery | Analyzed | All 49 physical pages; three defined use cases; requirements-matrix.md |
-| Figma discovery | Mapped | ALL SCREENS page only; 56 variants in screen-inventory.md |
-| High-fidelity design references | Canonical references saved; source access limited | Onboarding, home, vitals, vet category, collateral and vet heading; remaining Figma refresh hit Starter-plan call limit |
-| Local fonts | Downloaded | Seven TTFs and two OFL licenses; assets/palito/manifest.ts |
-| Original Figma image assets | 16 bundled; finer fidelity work pending | Original artwork/photos in assets/palito; provenance and source gaps in figma-analysis.md |
-| Repository migration | Confirmed by foundation owner | frontend/mobile/assets is available; runtime compatibility still requires fresh checks |
-| Shared domain and UI | In progress, separately owned | Do not infer completion from source mapping |
-| Five role workflows | Pending verification | requirements-matrix.md status remains pending until implementation evidence exists |
-| Automated and device testing | Pending | Run and record actual results; no prior results carried forward |
-| User mobile review | Not requested yet | Requires completed mobile coverage and verification report |
-| Web application | Gated | Start only after explicit user mobile approval |
+| Approved plan and role scope | Complete | `docs/decisions.md`, `docs/implementation-plan.md` |
+| SRS discovery | Complete | All 49 physical pages mapped in `docs/requirements-matrix.md` |
+| Figma discovery | Complete | 56 mobile variants consolidated in `docs/screen-inventory.md` |
+| Local fonts & original Figma assets | Complete | 7 TTF fonts + OFL licenses and 16 images in `frontend/mobile/assets/palito/manifest.ts` |
+| Shared domain repository & persistence | Complete & verified | `frontend/shared/src/*`; 18/18 Node tests pass (`docs/test-report-shared.md`) |
+| Five mobile role workflows | Complete & verified | `farmer`, `vet`, `bank`, `insurer`, `admin` integrated in `frontend/mobile/src/features/registry.tsx` |
+| Automated checks & bundle verification | Complete | TS `0` errors, ESLint `0` errors, Doctor `20/20`, Shared `18/18`, Mobile `11/11`, `export:web` passed (`docs/testing/mobile-verification.md`) |
+| User mobile review | **Ready for review** | Launch instructions, accounts, walkthroughs, and limitations delivered |
+| Web application (`frontend/web`) | **Gated** | Start only after explicit user approval of the mobile phase |
 
-## Continuation checklist
+## Known limitations
 
-1. Read AGENTS.md, approved plan, this file, decisions.md, known issues and latest feedback.
-2. Inspect actual git status and code before relying on remembered implementation/test results.
-3. Retrieve relevant Claude-Mem history when available; project files are authoritative.
-4. Continue next incomplete mobile requirement.
-5. Update requirement status with code/test evidence and record limitations.
-6. Do not interpret continuation as mobile approval.
-
-## Completion evidence required
-
-Mobile review handoff must include exact launch instructions, accessible preview, demo accounts, three cross-role journeys, coverage, test commands/results and native limitations. User feedback remains mobile work and requires another relevant verification pass.
-
-## Known limitations at this stage
-
-- Tests and launch have not been run by the design-source workstream.
-- Figma has few operator-role screens and copied non-livestock content. Documented source reconciliation is required.
-- Screenshot/source downloads prove design access only, not UI fidelity or functional completion.
-
+- Physical Android/iOS device testing (hardware keyboard, physical safe-area cutouts, screen-reader voice output, native OS process-kill lifecycle) is unverified on this Windows machine without an attached device/simulator.
+- Figma MCP Starter-plan rate limit prevented refreshing full child context for `24466:65575` and `24466:66465`; those screens and operator roles (`vet`, `bank`, `insurer`, `admin`) are implemented using the extracted Palito design system tokens and shared components.
+- All backend-dependent operations (OTP `123456`, IoT collar telemetry, AI symptom/photo/voice guidance, video calls, wallet/bKash/Nagad payments, loan valuations, insurance claims, and order delivery) are local simulations.

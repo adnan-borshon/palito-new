@@ -1,38 +1,60 @@
 # Palito
 
-Bangla-first livestock care frontend for farmers, veterinarians, banks, insurers and administrators. Built with Expo SDK 58, React Native, Expo Router and TypeScript. All authentication, AI, IoT, calls, financial transactions and delivery are simulations stored on this device.
+Bangla-first livestock care, veterinary, insurance, lending, and administration frontend for **Farmer**, **Veterinarian**, **Bank**, **Insurer**, and **Administrator** roles.
 
-**Mobile is in implementation.** Complete and test all mobile workflows, obtain the user's review, address feedback, and wait for explicit approval before starting the web application. The Expo browser output is only a mobile preview.
+- `frontend/mobile`: Complete Expo SDK 58 + React Native 0.88 + Expo Router + TypeScript mobile application across all five roles.
+- `frontend/shared`: Portable TypeScript domain engine, validation, Bangla/English localization, deterministic fixtures, and versioned local storage repository.
+- `frontend/web`: Reserved for the Next.js App Router web application (gated until mobile review approval).
+- `backend`: Intentionally empty placeholder. All authentication, AI, IoT, calls, payments, insurance, loans, and deliveries are clearly labeled local demonstrations.
 
 ## Run locally
 
-Use Node 24 LTS (verified installation: 24.22.3) and npm. From the repository root:
+Use **Node 24 LTS** (`24.22.3` pinned in `.nvmrc` and `.node-version`). On Windows PowerShell with `nvm-windows`:
 
-```sh
+```powershell
+$env:Path = "$env:NVM_HOME\v24.22.3;" + $env:Path
 npm install
 npm start
 ```
 
-The Expo terminal offers a QR code for a compatible Expo Go/development client. Use `npm run android` with a configured Android device, or `npm run ios` on macOS with a configured simulator. Native builds have not yet been verified in this Windows environment.
+| Root command | Purpose |
+|---|---|
+| `npm start` | Start the Expo development server (`frontend/mobile`) |
+| `npm run web` | Open the Expo mobile preview in the browser |
+| `npm run android` | Launch on a connected Android device or configured emulator |
+| `npm run ios` | Launch on an iOS simulator (requires macOS) |
+| `npm run typecheck` | Run TypeScript `--noEmit` across `@palito/mobile` and `@palito/shared` |
+| `npm run lint` | Run `expo lint` on the mobile workspace |
+| `npm run test` | Run all shared and mobile automated test suites |
+| `npm run test:shared` | Run the 18 shared domain & journey tests (`node --test`) |
+| `npm run test:mobile` | Run the 11 Jest + React Native Testing Library mobile tests |
+| `npm run doctor` | Run `npx expo-doctor` diagnostics (`20/20` checks) |
+| `npm run export:web` | Build the static mobile preview bundle in `frontend/mobile/dist/` |
 
-```sh
-npm run web          # mobile UI browser preview
-npm run typecheck
-npm run lint
-npm run test:shared
-npm run test:mobile
-npm run doctor
-npm run export:web   # static mobile preview bundle
-```
+## Seeded demo accounts & OTP
 
-Choose a demo role on the sign-in screen, request the simulated code, and enter **123456**. No SMS is sent. Related workflows share the same local data when switching accounts. Full demo controls and walkthroughs will be documented with the completed mobile review package.
+On the sign-in screen (`/login`), tap any role row (or enter its phone number), tap **Get verification code**, and enter the demo OTP **`123456`**. Once signed in, you can switch roles at any time via **Profile → Demo controls (`/[role]/demo`)** while keeping the same local records.
 
-## Repository
+| Role | Name (BN / EN) | Phone | Default ID |
+|---|---|---|---|
+| **Farmer** | রহিম উদ্দিন / Rahim Uddin | `+8801712345678` | `farmer-rahim` |
+| **Farmer (2nd)** | সালমা বেগম / Salma Begum | `+8801812345678` | `farmer-salma` |
+| **Veterinarian** | ডা. ফারহানা আহমেদ / Dr. Farhana Ahmed | `+8801912345678` | `vet-farhana` |
+| **Bank** | পদ্মা ব্যাংক ডেমো / Padma Bank Demo | `+8801612345678` | `bank-padma` |
+| **Insurer** | সুরক্ষা বীমা ডেমো / Suraksha Insurance Demo | `+8801512345678` | `insurer-suraksha` |
+| **Administrator** | পালিত অ্যাডমিন / Palito Admin | `+8801312345678` | `admin-palito` |
 
-- `frontend/mobile/`: native app, route files under `src/app`, features outside routes.
-- `frontend/shared/`: types, fixtures, repository, validation and tests.
-- `frontend/web/`: reserved until explicit mobile approval.
-- `backend/`: intentionally empty.
-- `docs/`: SRS, implementation plan, requirements/design records and test evidence.
+## Cross-role walkthroughs
 
-Start with [the implementation plan](docs/implementation-plan.md), [shared contract](docs/shared-contract.md), [design system](docs/design-system.md) and [foundation verification](docs/testing/foundation.md). Project files are local on this PC. Downloading dependencies does not upload this project.
+1. **UC-001 (Health anomaly → Priority vet care → Prescription & reminder):**
+   - Sign in as **Farmer** → open **Review alert** on Home (`alert-temperature` for Moti, `PL-1002`) → tap **Book priority visit** (or advance the demo clock by 4 hours in Demo Controls to trigger escalation).
+   - Switch to **Veterinarian** → open the appointment from **Visits** → review Moti's 7-day vitals and health history → tap **Accept appointment** → **Start consultation** → complete the diagnosis and medicine prescription.
+   - Switch to **Farmer** → check **Prescriptions** and **Medication reminders** to mark today's dose taken; switch to **Insurer** → check **Notifications** for the preventive care record.
+2. **UC-002 (Insurance enrollment → Claim evidence → Review → Debt-first payout):**
+   - As **Farmer**, open **Wallet → Submit an insurance claim** on Shyamoli (`PL-1003`, insured for `90,000 BDT` and securing `loan-active` with `32,000 BDT` outstanding debt). Attach the sample photo and sample GPS/time evidence and submit.
+   - Switch to **Insurer** → open the claim in **Claims** → run **Demo automatic review** (or refer to the **Veterinarian** for clinical assessment) → tap **Simulate payout**.
+   - Verify that `32,000 BDT` settles the bank loan (`loan-active` becomes `settled`), `58,000 BDT` credits the farmer's wallet, and Shyamoli's passport records the settled death claim.
+3. **UC-003 (Collateral selection → 70% LTV cap → Bank review & disbursement → Repayment & grace):**
+   - As **Farmer**, open **Wallet → Apply for a farm loan** → select Lali (`PL-1001`, value `140,000 BDT`, 70% cap `98,000 BDT`) or Moti (`PL-1002`, health score `66`, adjusted valuation `88,000 BDT`, 70% cap `61,600 BDT` at `15%` sample rate) → generate the offer and accept terms.
+   - Switch to **Bank** → open **Applications** → inspect the linked health passport, approve the loan, and tap **Simulate disbursement**.
+   - Switch to **Farmer** to make a partial or full repayment, or inspect **Bank → Loan portfolio (Production drop / Grace)** to grant a repayment grace period.
