@@ -25,23 +25,37 @@ export function BankWebFeature({
   screen: string;
   id?: string;
 }) {
-  const { state, locale, t, money, date, dateTime, run, busy, openMobileHandoff } =
+  const { state, locale, t, money, date, dateTime, run, busy, openMobileHandoff, user } =
     useWebApp();
 
-  const [tab, setTab] = useState<'underwriting' | 'portfolio' | 'settlements'>(
-    screen === 'loans' ? 'portfolio' : 'underwriting',
+  const myLoans = useMemo(
+    () => state.loans.filter((l) => !user?.id || user.role !== 'bank' || l.bankId === user.id),
+    [state.loans, user?.id, user?.role],
+  );
+
+  const [tab, setTab] = useState<'underwriting' | 'portfolio' | 'settlements' | 'passport'>(
+    screen === 'loans'
+      ? 'portfolio'
+      : screen === 'settlements'
+        ? 'settlements'
+        : screen === 'passport'
+          ? 'passport'
+          : 'underwriting',
   );
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLoanId, setSelectedLoanId] = useState<string>(
-    id ?? state.loans[0]?.id ?? '',
+    screen !== 'passport' ? (id ?? myLoans[0]?.id ?? '') : (myLoans[0]?.id ?? ''),
+  );
+  const [selectedPassportAnimalId, setSelectedPassportAnimalId] = useState<string>(
+    screen === 'passport' && id ? id : '',
   );
   const [decisionNote, setDecisionNote] = useState('');
   const [graceDays, setGraceDays] = useState('14');
   const [graceNote, setGraceNote] = useState('Seasonal feed & milk collection cycle extension');
 
   const loans = useMemo(() => {
-    return state.loans.filter((loan) => {
+    return myLoans.filter((loan) => {
       if (statusFilter !== 'all' && loan.status !== statusFilter) return false;
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase();
@@ -56,13 +70,17 @@ export function BankWebFeature({
         farmer?.nameBn.includes(q)
       );
     });
-  }, [state.loans, state.animals, state.users, statusFilter, searchQuery]);
+  }, [myLoans, state.animals, state.users, statusFilter, searchQuery]);
 
   const activeLoan =
-    state.loans.find((l) => l.id === selectedLoanId) ?? loans[0] ?? state.loans[0];
+    myLoans.find((l) => l.id === selectedLoanId) ?? loans[0] ?? myLoans[0];
   const collateralAnimal = activeLoan
     ? state.animals.find((a) => a.id === activeLoan.animalId)
     : undefined;
+  const passportAnimal =
+    state.animals.find((a) => a.id === selectedPassportAnimalId) ??
+    collateralAnimal ??
+    state.animals[0];
   const borrower = activeLoan
     ? state.users.find((u) => u.id === activeLoan.farmerId)
     : undefined;
@@ -80,13 +98,19 @@ export function BankWebFeature({
   const animalRecords = collateralAnimal
     ? state.records.filter((r) => r.animalId === collateralAnimal.id)
     : [];
+  const loanPayments = activeLoan
+    ? state.payments.filter((p) => p.referenceId === activeLoan.id)
+    : [];
 
-  const submittedCount = state.loans.filter((l) => l.status === 'submitted').length;
-  const activeBookTotal = state.loans
+  const submittedCount = myLoans.filter((l) => l.status === 'submitted').length;
+  const activeBookTotal = myLoans
     .filter((l) => ['active', 'approved'].includes(l.status))
     .reduce((sum, l) => sum + l.outstanding, 0);
   const settledClaims = state.claims.filter(
-    (c) => c.status === 'paid' && (c.debtSettlement ?? 0) > 0,
+    (c) =>
+      c.status === 'paid' &&
+      (c.debtSettlement ?? 0) > 0 &&
+      myLoans.some((l) => l.animalId === c.animalId),
   );
   const totalDebtSettled = settledClaims.reduce(
     (sum, c) => sum + (c.debtSettlement ?? 0),
@@ -144,8 +168,8 @@ export function BankWebFeature({
           <WebIcon name="shield-check" className="w-5 h-5 text-[#15803D] shrink-0" />
           <span>
             {t(
-              'উচ্চ স্বাস্থ্য স্কোর (৮৫+) ও সক্রিয় আইওটি কলারযুক্ত প্রাণীর ক্ষেত্রে অগ্রাধিকারমূলক ৯% বার্ষিক সুদের হার প্রযোজ্য।',
-              'Livestock with verified Health Score 85+ and active IoT telemetry qualify for the preferential 9% annual interest tier.',
+              'স্বাস্থ্য স্কোর ৭৫+ প্রাণীর জন্য ১০% বার্ষিক সুদ (সর্বোচ্চ ৬০% LTV); ৭৫-এর নিচে হলে ৮০% সমন্বিত মূল্যায়ন ও ১৫% সুদ প্রযোজ্য।',
+              'Livestock with verified Health Score 75+ qualify for the 10% annual rate (up to 60% LTV); scores below 75 use 80% adjusted valuation at 15% APR.',
             )}
           </span>
         </div>
@@ -175,18 +199,23 @@ export function BankWebFeature({
           {
             id: 'underwriting',
             label: t('আন্ডাররাইটিং ও জামানত যাচাই কিউ', 'Underwriting & Collateral Queue'),
-            count: state.loans.length,
+            count: myLoans.length,
           },
           {
             id: 'portfolio',
             label: t('সক্রিয় ঋণ ও কিস্তি সূচি টেবিল', 'Loan Portfolio & Grace Schedule'),
-            count: state.loans.filter((l) => ['active', 'approved', 'paid'].includes(l.status))
+            count: myLoans.filter((l) => ['active', 'approved', 'paid'].includes(l.status))
               .length,
           },
           {
             id: 'settlements',
             label: t('বীমা দাবি থেকে ঋণ সমন্বয় (UC-002)', 'Collateral Insurance Settlements'),
             count: settledClaims.length,
+          },
+          {
+            id: 'passport',
+            label: t('ডিজিটাল স্বাস্থ্য পাসপোর্ট', 'Collateral Health Passport'),
+            count: state.animals.length,
           },
         ]}
       />
@@ -450,6 +479,16 @@ export function BankWebFeature({
                             {t('বীমাকৃত জামানত', 'Insured Collateral')}
                           </Badge>
                         ) : null}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedPassportAnimalId(collateralAnimal.id);
+                            setTab('passport');
+                          }}
+                        >
+                          {t('সম্পূর্ণ পাসপোর্ট দেখুন', 'Open Full Passport')}
+                        </Button>
                       </div>
                     </div>
 
@@ -579,48 +618,63 @@ export function BankWebFeature({
                   ) : null}
 
                   {activeLoan.status === 'active' ? (
-                    <div className="flex flex-col gap-3">
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
-                        <Field
-                          label={t('গ্রেস পিরিয়ড (দিন)', 'Grace Extension (Days)')}
-                          type="number"
-                          value={graceDays}
-                          onChange={(e) => setGraceDays(e.target.value)}
-                        />
-                        <div className="sm:col-span-2">
+                    collateralAnimal?.productionDrop && !activeLoan.graceUntil ? (
+                      <div className="flex flex-col gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
                           <Field
-                            label={t('মেয়াদ বৃদ্ধির কারণ', 'Grace Period Reason')}
-                            value={graceNote}
-                            onChange={(e) => setGraceNote(e.target.value)}
+                            label={t('গ্রেস পিরিয়ড (দিন)', 'Grace Extension (Days)')}
+                            type="number"
+                            value={graceDays}
+                            onChange={(e) => setGraceDays(e.target.value)}
                           />
+                          <div className="sm:col-span-2">
+                            <Field
+                              label={t('মেয়াদ বৃদ্ধির কারণ', 'Grace Period Reason')}
+                              value={graceNote}
+                              onChange={(e) => setGraceNote(e.target.value)}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-xs text-[#64748B] tabular-nums">
+                            {activeLoan.dueAt
+                              ? `${t('পরবর্তী কিস্তির তারিখ:', 'Due Date:')} ${date(activeLoan.dueAt)}`
+                              : ''}
+                          </span>
+                          <Button
+                            variant="secondary"
+                            icon="clock"
+                            disabled={busy}
+                            onClick={() =>
+                              void run({
+                                type: 'loan.grace',
+                                loanId: activeLoan.id,
+                                days: Math.max(1, Number(graceDays) || 14),
+                                note: graceNote,
+                              })
+                            }
+                          >
+                            {t('গ্রেস পিরিয়ড মঞ্জুর করুন (UC-003)', 'Grant Grace Period (UC-003)')}
+                          </Button>
                         </div>
                       </div>
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="text-xs text-[#64748B] tabular-nums">
-                          {activeLoan.dueAt
-                            ? `${t('পরবর্তী কিস্তির তারিখ:', 'Due Date:')} ${date(activeLoan.dueAt)}`
-                            : ''}
-                          {activeLoan.graceUntil
-                            ? ` · ${t('গ্রেস মেয়াদ:', 'Grace Until:')} ${date(activeLoan.graceUntil)}`
-                            : ''}
-                        </span>
-                        <Button
-                          variant="secondary"
-                          icon="clock"
-                          disabled={busy}
-                          onClick={() =>
-                            void run({
-                              type: 'loan.grace',
-                              loanId: activeLoan.id,
-                              days: Math.max(1, Number(graceDays) || 14),
-                              note: graceNote,
-                            })
-                          }
-                        >
-                          {t('গ্রেস পিরিয়ড মঞ্জুর করুন', 'Grant Grace Period')}
-                        </Button>
+                    ) : (
+                      <div className="rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] p-3 text-xs text-[#475569]">
+                        {activeLoan.graceUntil ? (
+                          <span>
+                            {t('গ্রেস পিরিয়ড ইতিমধ্যে সক্রিয় — মেয়াদ:', 'Grace period active until:')}{' '}
+                            <strong>{date(activeLoan.graceUntil)}</strong>
+                          </span>
+                        ) : (
+                          <span>
+                            {t(
+                              'কিস্তি বিরতি (UC-003) শুধুমাত্র তখনই প্রযোজ্য যখন জামানত প্রাণীর যাচাইকৃত অসুস্থতা বা দুধ উৎপাদন হ্রাস (productionDrop) শনাক্ত হয়।',
+                              'Installment grace extension (UC-003) is unlocked only when verified illness or milk production drop (productionDrop) is active on the collateral animal.',
+                            )}
+                          </span>
+                        )}
                       </div>
-                    </div>
+                    )
                   ) : null}
 
                   {['offered', 'paid', 'settled', 'rejected'].includes(activeLoan.status) ? (
@@ -628,6 +682,32 @@ export function BankWebFeature({
                       {t('বর্তমান অবস্থা:', 'Current file status:')}{' '}
                       <strong className="text-[#1F2937]">{activeLoan.status}</strong>
                       {activeLoan.decisionNote ? ` — ${activeLoan.decisionNote}` : ''}
+                    </div>
+                  ) : null}
+
+                  {loanPayments.length > 0 ? (
+                    <div className="border-t border-[#E2E8F0] pt-3 flex flex-col gap-2">
+                      <div className="text-xs font-bold uppercase tracking-wider text-[#64748B]">
+                        {t('ঋণ লেনদেন ও পরিশোধ খতিয়ান', 'Loan Disbursement & Repayment Ledger')}
+                      </div>
+                      <div className="divide-y divide-[#E2E8F0] rounded-[10px] border border-[#E2E8F0] bg-white">
+                        {loanPayments.map((pmt) => (
+                          <div
+                            key={pmt.id}
+                            className="flex items-center justify-between px-3 py-2 text-xs tabular-nums"
+                          >
+                            <div>
+                              <span className="font-semibold text-[#1F2937]">{pmt.kind}</span>
+                              <span className="text-[#64748B] ml-2">
+                                {pmt.direction.toUpperCase()} · {pmt.id}
+                              </span>
+                            </div>
+                            <div className="font-bold text-[#0F602D]">
+                              {money(pmt.amount)} · {date(pmt.createdAt)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   ) : null}
                 </Card>
@@ -644,7 +724,7 @@ export function BankWebFeature({
               {t('সক্রিয় ঋণ পোর্টফোলিও ও পরিশোধ সূচি', 'Active Loan Book & Repayment Schedule')}
             </h2>
             <Badge tone="brand" className="tabular-nums">
-              {state.loans.length} {t('টি ফাইল', 'Files')}
+              {myLoans.length} {t('টি ফাইল', 'Files')}
             </Badge>
           </div>
           <div
@@ -666,7 +746,7 @@ export function BankWebFeature({
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E2E8F0]">
-                {state.loans.map((loan) => {
+                {myLoans.map((loan) => {
                   const farmer = state.users.find((u) => u.id === loan.farmerId);
                   const animal = state.animals.find((a) => a.id === loan.animalId);
                   return (
@@ -791,6 +871,109 @@ export function BankWebFeature({
               })}
             </div>
           )}
+        </Card>
+      ) : null}
+
+      {tab === 'passport' ? (
+        <Card className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-bold text-[#1F2937]">
+                {t('জামানত প্রাণীর ডিজিটাল স্বাস্থ্য পাসপোর্ট', 'Collateral Animal Digital Health Passport')}
+              </h2>
+              <p className="text-xs text-[#64748B]">
+                {t(
+                  'প্রাণীর ক্লিনিক্যাল ইতিহাস, ৭-দিনের আইওটি টেলিমেট্রি এবং ভ্যাকসিনেশন রেকর্ড যাচাই করুন।',
+                  'Inspect complete clinical history, 7-day IoT telemetry, and verified vaccination records.',
+                )}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {state.animals.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => setSelectedPassportAnimalId(a.id)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold cursor-pointer ${
+                    passportAnimal?.id === a.id
+                      ? 'bg-[#15803D] text-white'
+                      : 'border border-[#E2E8F0] bg-[#F8FAFC] text-[#475569]'
+                  }`}
+                >
+                  {a.name} ({a.tag})
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {passportAnimal ? (
+            <div className="flex flex-col gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 rounded-[14px] border border-[#E2E8F0] bg-[#F8FAFC] p-4">
+                <div>
+                  <div className="text-base font-bold text-[#1F2937]">
+                    {passportAnimal.name} ({passportAnimal.tag})
+                  </div>
+                  <div className="text-xs text-[#64748B]">
+                    {passportAnimal.breed} · {passportAnimal.sex} · {passportAnimal.weightKg} kg
+                  </div>
+                  <div className="text-sm font-bold text-[#0F602D] mt-1 tabular-nums">
+                    {t('বাজারমূল্য:', 'Valuation:')} {money(passportAnimal.value)}
+                  </div>
+                </div>
+                <div className="md:col-span-2 flex flex-col justify-center gap-2">
+                  <HealthScoreBar
+                    score={passportAnimal.healthScore}
+                    label={t('ক্লিনিক্যাল স্বাস্থ্য স্কোর', 'Clinical Health Score')}
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <Badge
+                      tone={
+                        state.records.some(
+                          (r) => r.animalId === passportAnimal.id && r.kind === 'vaccination',
+                        )
+                          ? 'success'
+                          : 'warning'
+                      }
+                    >
+                      {state.records.some(
+                        (r) => r.animalId === passportAnimal.id && r.kind === 'vaccination',
+                      )
+                        ? t('টিকাপ্রাপ্ত', 'Vaccinated')
+                        : t('টিকা বাকি', 'Unvaccinated')}
+                    </Badge>
+                    {passportAnimal.productionDrop ? (
+                      <Badge tone="danger">
+                        {t('দুধ উৎপাদন হ্রাস শনাক্ত (UC-003)', 'Milk Production Drop Verified (UC-003)')}
+                      </Badge>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <h3 className="text-sm font-bold text-[#1F2937]">
+                  {t('চিকিৎসা ও টিকাদান খতিয়ান', 'Clinical & Vaccination Records')}
+                </h3>
+                <div className="divide-y divide-[#E2E8F0] rounded-[12px] border border-[#E2E8F0]">
+                  {state.records
+                    .filter((r) => r.animalId === passportAnimal.id)
+                    .map((rec) => (
+                      <div key={rec.id} className="p-3 flex items-start justify-between gap-3 text-xs">
+                        <div>
+                          <div className="font-bold text-[#1F2937]">
+                            {rec.title[locale]} ({rec.kind})
+                          </div>
+                          <div className="text-[#475569] mt-0.5">{rec.note}</div>
+                        </div>
+                        <div className="text-[#64748B] tabular-nums shrink-0">
+                          {date(rec.createdAt)}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </div>
+          ) : null}
         </Card>
       ) : null}
     </div>

@@ -17,15 +17,21 @@ import {
   toneForStatus,
 } from '@/components/ui.tsx';
 
-export function AdminWebFeature({ screen }: { screen: string }) {
-  const { state, locale, t, money, dateTime, run, busy } = useWebApp();
+export function AdminWebFeature({
+  screen,
+  id,
+}: {
+  screen: string;
+  id?: string;
+}) {
+  const { state, locale, t, money, dateTime, run, busy, user } = useWebApp();
 
   const initialTab =
-    screen === 'users'
+    screen === 'users' || screen === 'user'
       ? 'users'
-      : screen === 'content'
+      : screen === 'content' || screen === 'article'
         ? 'cms'
-        : screen === 'reports'
+        : screen === 'reports' || screen === 'audit'
           ? 'reports'
           : 'overview';
   const [tab, setTab] = useState<'overview' | 'users' | 'cms' | 'reports'>(initialTab);
@@ -36,7 +42,7 @@ export function AdminWebFeature({ screen }: { screen: string }) {
 
   // CMS state
   const [editingId, setEditingId] = useState<string | undefined>(
-    state.content[0]?.id,
+    (screen === 'content' || screen === 'article') && id ? id : state.content[0]?.id,
   );
   const selectedArticle = state.content.find((c) => c.id === editingId);
   const [titleBn, setTitleBn] = useState(
@@ -234,6 +240,33 @@ export function AdminWebFeature({ screen }: { screen: string }) {
                   ),
                 )}
               </div>
+              <div className="flex flex-wrap gap-2 pt-2">
+                <Button
+                  variant={state.settings.offline ? 'danger' : 'outline'}
+                  size="sm"
+                  disabled={busy}
+                  onClick={() =>
+                    void run({
+                      type: 'demo.offline',
+                      offline: !state.settings.offline,
+                    })
+                  }
+                >
+                  {state.settings.offline
+                    ? t('অফলাইন সক্রিয় — অনলাইন করুন', 'Offline Active — Go Online')
+                    : t('অফলাইন মোড সিমুলেট করুন', 'Simulate Offline Mode')}
+                </Button>
+                <Button
+                  variant={state.settings.failNext ? 'danger' : 'outline'}
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => void run({ type: 'demo.failNext' })}
+                >
+                  {state.settings.failNext
+                    ? t('পরবর্তী অ্যাকশন ব্যর্থ হবে (সক্রিয়)', 'Fail Next Action Armed')
+                    : t('পরবর্তী অ্যাকশন রিট্রাই টেস্ট', 'Test Retry on Next Action')}
+                </Button>
+              </div>
             </div>
           </Card>
 
@@ -325,60 +358,99 @@ export function AdminWebFeature({ screen }: { screen: string }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E2E8F0]">
-                {filteredUsers.map((account) => (
-                  <tr key={account.id} className="hover:bg-[#F8FAFC]">
-                    <th className="px-5 py-3.5 font-semibold text-[#1F2937]">
-                      <div>{locale === 'bn' ? account.nameBn : account.name}</div>
-                      <div className="text-xs font-normal text-[#64748B]">ID: {account.id}</div>
-                    </th>
-                    <td className="px-4 py-3.5 tabular-nums">
-                      <div>{account.phone}</div>
-                      <div className="text-xs text-[#64748B]">{account.district}</div>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <select
-                        aria-label={`Role for ${account.name}`}
-                        value={account.role}
-                        disabled={busy}
-                        onChange={(e) =>
-                          void run({
-                            type: 'admin.userRole',
-                            userId: account.id,
-                            role: e.target.value as Role,
-                          })
-                        }
-                        className="rounded-[8px] border border-[#E2E8F0] bg-white px-2.5 py-1 text-xs font-semibold text-[#1F2937]"
-                      >
-                        {(['farmer', 'vet', 'bank', 'insurer', 'admin'] as Role[]).map((r) => (
-                          <option key={r} value={r}>
-                            {roleNames[r][locale]}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <Badge tone={toneForStatus(account.status)}>{account.status}</Badge>
-                    </td>
-                    <td className="px-5 py-3.5 text-right">
-                      <Button
-                        variant={account.status === 'active' ? 'outline' : 'primary'}
-                        size="sm"
-                        disabled={busy}
-                        onClick={() =>
-                          void run({
-                            type: 'admin.userStatus',
-                            userId: account.id,
-                            status: account.status === 'active' ? 'suspended' : 'active',
-                          })
-                        }
-                      >
-                        {account.status === 'active'
-                          ? t('স্থগিত করুন', 'Suspend')
-                          : t('সক্রিয় করুন', 'Activate')}
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
+                {filteredUsers.map((account) => {
+                  const isSelf = account.id === user?.id;
+                  const hasLinkedRecords =
+                    state.farms.some((f) => f.ownerId === account.id) ||
+                    state.animals.some((a) => a.ownerId === account.id) ||
+                    state.appointments.some(
+                      (a) => a.farmerId === account.id || a.vetId === account.id,
+                    ) ||
+                    state.prescriptions.some(
+                      (p) => p.farmerId === account.id || p.vetId === account.id,
+                    ) ||
+                    state.policies.some(
+                      (p) => p.farmerId === account.id || p.insurerId === account.id,
+                    ) ||
+                    state.claims.some(
+                      (c) =>
+                        c.farmerId === account.id ||
+                        c.insurerId === account.id ||
+                        c.vetId === account.id,
+                    ) ||
+                    state.loans.some(
+                      (l) => l.farmerId === account.id || l.bankId === account.id,
+                    ) ||
+                    state.orders.some((o) => o.farmerId === account.id) ||
+                    state.payments.some((p) => p.userId === account.id);
+                  return (
+                    <tr key={account.id} className="hover:bg-[#F8FAFC]">
+                      <th className="px-5 py-3.5 font-semibold text-[#1F2937]">
+                        <div>{locale === 'bn' ? account.nameBn : account.name}</div>
+                        <div className="text-xs font-normal text-[#64748B]">ID: {account.id}</div>
+                      </th>
+                      <td className="px-4 py-3.5 tabular-nums">
+                        <div>{account.phone}</div>
+                        <div className="text-xs text-[#64748B]">{account.district}</div>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <div className="flex flex-col gap-1">
+                          <select
+                            aria-label={`Role for ${account.name}`}
+                            value={account.role}
+                            disabled={busy || isSelf || hasLinkedRecords}
+                            onChange={(e) =>
+                              void run({
+                                type: 'admin.userRole',
+                                userId: account.id,
+                                role: e.target.value as Role,
+                              })
+                            }
+                            className="rounded-[8px] border border-[#E2E8F0] bg-white px-2.5 py-1 text-xs font-semibold text-[#1F2937] disabled:bg-[#F8FAFC] disabled:text-[#94A3B8]"
+                          >
+                            {(['farmer', 'vet', 'bank', 'insurer', 'admin'] as Role[]).map((r) => (
+                              <option key={r} value={r}>
+                                {roleNames[r][locale]}
+                              </option>
+                            ))}
+                          </select>
+                          {isSelf ? (
+                            <span className="text-[11px] text-[#64748B]">
+                              {t('বর্তমান অ্যাডমিন', 'Current admin')}
+                            </span>
+                          ) : hasLinkedRecords ? (
+                            <span className="text-[11px] text-[#64748B]">
+                              {t('রোল লকড (সংযুক্ত রেকর্ড রয়েছে)', 'Role locked (linked records)')}
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <Badge tone={toneForStatus(account.status)}>{account.status}</Badge>
+                      </td>
+                      <td className="px-5 py-3.5 text-right">
+                        <Button
+                          variant={account.status === 'active' ? 'outline' : 'primary'}
+                          size="sm"
+                          disabled={busy || isSelf}
+                          onClick={() =>
+                            void run({
+                              type: 'admin.userStatus',
+                              userId: account.id,
+                              status: account.status === 'active' ? 'suspended' : 'active',
+                            })
+                          }
+                        >
+                          {isSelf
+                            ? t('নিজ অ্যাকাউন্ট', 'Self')
+                            : account.status === 'active'
+                              ? t('স্থগিত করুন', 'Suspend')
+                              : t('সক্রিয় করুন', 'Activate')}
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -511,7 +583,120 @@ export function AdminWebFeature({ screen }: { screen: string }) {
       ) : null}
 
       {tab === 'reports' ? (
-        <Card className="p-0 overflow-hidden">
+        <div className="flex flex-col gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Card className="flex flex-col gap-3">
+              <h3 className="text-base font-bold text-[#1F2937]">
+                {t('গবাদিপশু ও ভেটেরিনারি রিপোর্ট সারাংশ', 'Livestock & Veterinary Summary')}
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs tabular-nums">
+                <div className="rounded-[10px] border border-[#E2E8F0] p-3">
+                  <span className="text-[#64748B] block">{t('নিবন্ধিত খামার', 'Farms')}</span>
+                  <strong className="text-base text-[#1F2937]">{state.farms.length}</strong>
+                </div>
+                <div className="rounded-[10px] border border-[#E2E8F0] p-3">
+                  <span className="text-[#64748B] block">{t('নিবন্ধিত প্রাণী', 'Animals')}</span>
+                  <strong className="text-base text-[#0F602D]">{state.animals.length}</strong>
+                </div>
+                <div className="rounded-[10px] border border-[#E2E8F0] p-3">
+                  <span className="text-[#64748B] block">{t('সক্রিয় কলার', 'Connected Collars')}</span>
+                  <strong className="text-base text-[#15803D]">
+                    {state.devices.filter((d) => d.connected).length}/{state.devices.length}
+                  </strong>
+                </div>
+                <div className="rounded-[10px] border border-[#E2E8F0] p-3">
+                  <span className="text-[#64748B] block">{t('প্রেসক্রিপশন', 'Prescriptions')}</span>
+                  <strong className="text-base text-[#1F2937]">{state.prescriptions.length}</strong>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="flex flex-col gap-3">
+              <h3 className="text-base font-bold text-[#1F2937]">
+                {t('বীমা, ব্যাংক ঋণ ও ই-কমার্স সারাংশ', 'Insurance, Lending & Commerce Summary')}
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs tabular-nums">
+                <div className="rounded-[10px] border border-[#E2E8F0] p-3">
+                  <span className="text-[#64748B] block">{t('সক্রিয় পলিসি', 'Active Policies')}</span>
+                  <strong className="text-base text-[#15803D]">
+                    {state.policies.filter((p) => p.status === 'active').length}
+                  </strong>
+                </div>
+                <div className="rounded-[10px] border border-[#E2E8F0] p-3">
+                  <span className="text-[#64748B] block">{t('পরিশোধিত দাবি', 'Paid Claims')}</span>
+                  <strong className="text-base text-[#0F602D]">
+                    {state.claims.filter((c) => c.status === 'paid').length}
+                  </strong>
+                </div>
+                <div className="rounded-[10px] border border-[#E2E8F0] p-3">
+                  <span className="text-[#64748B] block">{t('সক্রিয়/সমন্বিত ঋণ', 'Active/Settled Loans')}</span>
+                  <strong className="text-base text-[#1F2937]">
+                    {state.loans.filter((l) => ['active', 'settled', 'paid'].includes(l.status)).length}
+                  </strong>
+                </div>
+                <div className="rounded-[10px] border border-[#E2E8F0] p-3">
+                  <span className="text-[#64748B] block">{t('মোট অর্ডার মূল্য', 'Order GMV')}</span>
+                  <strong className="text-base text-[#0F602D]">
+                    {money(state.orders.reduce((s, o) => s + o.total, 0))}
+                  </strong>
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          <Card className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-[#1F2937]">
+                  {t('মার্কেটপ্লেস অর্ডার ডেলিভারি ও ফুলফিলমেন্ট (order.advance)', 'Marketplace Order Fulfillment & Delivery Progression')}
+                </h3>
+                <p className="text-xs text-[#64748B]">
+                  {t(
+                    'অ্যাডমিন প্যানেল থেকে খামারিদের অর্ডারের ডেলিভারি ধাপ অগ্রসর করুন (Placed → Confirmed → Shipped → Delivered)।',
+                    'Advance farmer marketplace orders through fulfillment stages (Placed → Confirmed → Shipped → Delivered).',
+                  )}
+                </p>
+              </div>
+              <Badge tone="brand">{state.orders.length}</Badge>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {state.orders.map((ord) => {
+                const farmer = state.users.find((u) => u.id === ord.farmerId);
+                const canAdvance = ['placed', 'confirmed', 'shipped'].includes(ord.status);
+                return (
+                  <div
+                    key={ord.id}
+                    className="rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] p-3.5 flex items-center justify-between gap-3"
+                  >
+                    <div>
+                      <div className="text-sm font-bold text-[#1F2937]">
+                        Order {ord.id} · {money(ord.total)}
+                      </div>
+                      <div className="text-xs text-[#64748B]">
+                        {farmer ? (locale === 'bn' ? farmer.nameBn : farmer.name) : ord.farmerId} ·{' '}
+                        {ord.address}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge tone={toneForStatus(ord.status)}>{ord.status}</Badge>
+                      {canAdvance ? (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          disabled={busy}
+                          onClick={() => void run({ type: 'order.advance', orderId: ord.id })}
+                        >
+                          {t('পরবর্তী ধাপ', 'Advance Stage')}
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+
+          <Card className="p-0 overflow-hidden">
           <div className="p-5 border-b border-[#E2E8F0] flex flex-wrap items-end justify-between gap-4">
             <div>
               <h2 className="text-base font-bold text-[#1F2937]">
@@ -579,7 +764,8 @@ export function AdminWebFeature({ screen }: { screen: string }) {
               </tbody>
             </table>
           </div>
-        </Card>
+          </Card>
+        </div>
       ) : null}
     </div>
   );

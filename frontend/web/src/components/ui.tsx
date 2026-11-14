@@ -321,29 +321,43 @@ export function Field({
   label,
   hint,
   error,
+  hintAbove = false,
   className = '',
   ...props
 }: InputHTMLAttributes<HTMLInputElement> & {
   label: string;
   hint?: string;
   error?: string;
+  hintAbove?: boolean;
 }) {
   const id = useId();
   const inputId = props.id ?? id;
+  const descId = error || hint ? `${inputId}-desc` : undefined;
   return (
     <div className={`flex flex-col gap-1.5 ${className}`}>
       <label htmlFor={inputId} className="text-sm font-semibold text-[#1F2937]">
         {label}
       </label>
+      {hintAbove && hint && !error ? (
+        <p id={descId} className="text-xs text-[#64748B]">
+          {hint}
+        </p>
+      ) : null}
       <input
         id={inputId}
+        aria-describedby={props['aria-describedby'] ?? descId}
+        aria-invalid={error ? true : props['aria-invalid']}
         className="w-full rounded-[10px] border border-[#E2E8F0] bg-white px-3.5 py-2 text-sm text-[#1F2937] placeholder:text-[#94A3B8] focus:border-[#15803D]"
         {...props}
       />
       {error ? (
-        <span className="text-xs font-medium text-[#BE123C]">{error}</span>
-      ) : hint ? (
-        <span className="text-xs text-[#64748B]">{hint}</span>
+        <span id={descId} role="alert" className="text-xs font-medium text-[#BE123C]">
+          {error}
+        </span>
+      ) : !hintAbove && hint ? (
+        <span id={descId} className="text-xs text-[#64748B]">
+          {hint}
+        </span>
       ) : null}
     </div>
   );
@@ -421,8 +435,25 @@ export function TabsBar<T extends string>({
   onChange: (id: T) => void;
   ariaLabel: string;
 }) {
+  const listRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const selectedEl = listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]');
+    selectedEl?.scrollIntoView?.({
+      block: 'nearest',
+      inline: 'nearest',
+      container: 'nearest',
+    } as ScrollIntoViewOptions);
+  }, [active]);
+
   return (
-    <div role="tablist" aria-label={ariaLabel} className="palito-tablist">
+    <div
+      ref={listRef}
+      role="tablist"
+      aria-label={ariaLabel}
+      {...({ focusgroup: 'tablist nomemory' } as Record<string, unknown>)}
+      className="palito-tablist"
+    >
       {tabs.map((tab) => {
         const selected = tab.id === active;
         return (
@@ -431,6 +462,7 @@ export function TabsBar<T extends string>({
             type="button"
             role="tab"
             aria-selected={selected}
+            {...(selected ? ({ focusgroupstart: '' } as Record<string, unknown>) : {})}
             onClick={() => onChange(tab.id)}
             className="palito-tab inline-flex items-center gap-2"
           >

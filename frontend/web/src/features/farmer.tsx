@@ -48,27 +48,51 @@ export function FarmerWebFeature({
   const { state, user, locale, t, money, date, dateTime, run, busy, openMobileHandoff } =
     useWebApp();
 
-  const mappedInitial: FarmerSection =
-    screen === 'animals' || screen === 'farm'
-      ? 'animals'
-      : screen === 'devices' || screen === 'vitals' || screen === 'alerts'
-        ? 'devices'
-        : screen === 'care' ||
-            screen === 'vets' ||
-            screen === 'appointments' ||
-            screen === 'emergency' ||
-            screen === 'prescriptions' ||
-            screen === 'reminders'
-          ? 'care'
-          : screen === 'ai'
-            ? 'ai'
-            : screen === 'wallet' || screen === 'loans' || screen === 'insurance'
-              ? 'wallet'
-              : screen === 'market' || screen === 'orders'
-                ? 'market'
-                : screen === 'education'
-                  ? 'education'
-                  : 'home';
+  const mappedInitial: FarmerSection = [
+    'animals',
+    'animal',
+    'animal-add',
+    'animal-edit',
+    'record-add',
+    'farm',
+  ].includes(screen)
+    ? 'animals'
+    : ['devices', 'device', 'vitals', 'alerts', 'alert'].includes(screen)
+      ? 'devices'
+      : [
+            'care',
+            'vets',
+            'vet',
+            'book',
+            'appointments',
+            'appointment',
+            'emergency',
+            'prescriptions',
+            'prescription',
+            'reminders',
+          ].includes(screen)
+        ? 'care'
+        : screen === 'ai'
+          ? 'ai'
+          : [
+                'wallet',
+                'loans',
+                'loan',
+                'loan-apply',
+                'insurance',
+                'insurance-apply',
+                'policy',
+                'policies',
+                'claims',
+                'claim',
+                'claim-apply',
+              ].includes(screen)
+            ? 'wallet'
+            : ['market', 'shop', 'orders', 'order'].includes(screen)
+              ? 'market'
+              : ['education', 'article'].includes(screen)
+                ? 'education'
+                : 'home';
 
   const [section, setSection] = useState<FarmerSection>(mappedInitial);
 
@@ -84,14 +108,15 @@ export function FarmerWebFeature({
   const myPrescriptions = state.prescriptions.filter((p) => p.farmerId === user?.id);
   const myReminders = state.reminders.filter((r) => myAnimalIds.has(r.animalId));
   const myOrders = state.orders.filter((o) => o.farmerId === user?.id);
+  const myPayments = state.payments.filter((p) => p.userId === user?.id);
   const walletBalance = user ? demoBalance(state, user.id) : 0;
 
   // Animal & Passport state
   const [selectedAnimalId, setSelectedAnimalId] = useState<string>(
-    id ?? myAnimals[0]?.id ?? '',
+    (mappedInitial === 'animals' && id ? id : undefined) ?? myAnimals[0]?.id ?? '',
   );
   const [passportSubTab, setPassportSubTab] = useState<'overview' | 'records' | 'gallery'>(
-    'overview',
+    screen === 'record-add' ? 'records' : 'overview',
   );
   const [animalName, setAnimalName] = useState('রূপা / Rupa');
   const [animalSpecies, setAnimalSpecies] = useState<Animal['species']>('cattle');
@@ -101,15 +126,22 @@ export function FarmerWebFeature({
   const [animalWeight, setAnimalWeight] = useState('340');
   const [animalValue, setAnimalValue] = useState('140000');
 
-  const [recKind, setRecKind] = useState<HealthRecord['kind']>('vaccination');
-  const [recTitleBn, setRecTitleBn] = useState('এফএমডি বুস্টার টিকা');
-  const [recTitleEn, setRecTitleEn] = useState('FMD Booster Vaccination');
-  const [recNote, setRecNote] = useState('Administered on schedule; no adverse reaction.');
+  const [editAnimalName, setEditAnimalName] = useState('');
+  const [editAnimalBreed, setEditAnimalBreed] = useState('');
+  const [editAnimalWeight, setEditAnimalWeight] = useState('');
+  const [editAnimalValue, setEditAnimalValue] = useState('');
+
+  const [recKind, setRecKind] = useState<HealthRecord['kind']>('checkup');
+  const [recTitleBn, setRecTitleBn] = useState('নিয়মিত স্বাস্থ্য পর্যবেক্ষণ');
+  const [recTitleEn, setRecTitleEn] = useState('Routine Owner Health Check');
+  const [recNote, setRecNote] = useState('Normal appetite and rumination observed.');
+  const [recNextDueAt, setRecNextDueAt] = useState('');
 
   // IoT & Vitals state
   const [collarSerial, setCollarSerial] = useState('PLT-CLR-908');
   const [simKind, setSimKind] = useState<HealthAlert['kind']>('temperature');
   const [simSeverity, setSimSeverity] = useState<Severity>('critical');
+  const [selectedAlertId, setSelectedAlertId] = useState<string>('');
 
   // Vet Care & Reminders state
   const vets = state.users.filter((u) => u.role === 'vet' && u.status === 'active');
@@ -124,6 +156,8 @@ export function FarmerWebFeature({
     'Elevated collar temperature and reduced morning feed intake.',
   );
   const [skippedIds, setSkippedIds] = useState<string[]>([]);
+  const [micMuted, setMicMuted] = useState(false);
+  const [callEnded, setCallEnded] = useState(false);
 
   // AI Scan state
   const [aiMode, setAiMode] = useState<AIMessage['mode']>('text');
@@ -138,13 +172,18 @@ export function FarmerWebFeature({
   const [loanRepaySource, setLoanRepaySource] = useState('Daily milk collection revenue');
   const [repayInput, setRepayInput] = useState('5000');
 
-  const insurers = state.users.filter((u) => u.role === 'insurer');
+  const insurers = state.users.filter((u) => u.role === 'insurer' && u.status === 'active');
+  const [selectedInsurerId, setSelectedInsurerId] = useState<string>(
+    insurers[0]?.id ?? 'u-insurer-1',
+  );
   const [coverageInput, setCoverageInput] = useState('120000');
   const [claimKind, setClaimKind] = useState<'illness' | 'death'>('illness');
   const [claimAmount, setClaimAmount] = useState('25000');
   const [claimDesc, setClaimDesc] = useState(
     'Acute fever verified by collar telemetry and treated by veterinarian.',
   );
+  const [claimPhoto, setClaimPhoto] = useState(true);
+  const [claimLocation, setClaimLocation] = useState(true);
 
   // Marketplace state
   const [deliveryAddress, setDeliveryAddress] = useState(
@@ -728,6 +767,67 @@ export function FarmerWebFeature({
                               )}
                         </p>
                       </div>
+
+                      {/* Full Animal Profile Update Form (animal.update) */}
+                      <div className="rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] p-4 flex flex-col gap-3">
+                        <div className="text-sm font-bold text-[#1F2937]">
+                          {t('প্রাণীর তথ্য সম্পাদনা করুন (animal.update)', 'Edit Selected Animal Profile')}
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                          <Field
+                            label={t('নাম', 'Name')}
+                            value={editAnimalName || activeAnimal.name}
+                            onChange={(e) => setEditAnimalName(e.target.value)}
+                          />
+                          <Field
+                            label={t('জাত (Breed)', 'Breed')}
+                            value={editAnimalBreed || activeAnimal.breed}
+                            onChange={(e) => setEditAnimalBreed(e.target.value)}
+                          />
+                          <Field
+                            label={t('ওজন (কেজি)', 'Weight (kg)')}
+                            type="number"
+                            value={editAnimalWeight || String(activeAnimal.weightKg)}
+                            onChange={(e) => setEditAnimalWeight(e.target.value)}
+                          />
+                          <Field
+                            label={t('বাজারমূল্য (৳)', 'Valuation (BDT)')}
+                            type="number"
+                            value={editAnimalValue || String(activeAnimal.value)}
+                            onChange={(e) => setEditAnimalValue(e.target.value)}
+                          />
+                        </div>
+                        <div className="flex justify-end">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            icon="check"
+                            disabled={busy}
+                            onClick={() =>
+                              void run({
+                                type: 'animal.update',
+                                animalId: activeAnimal.id,
+                                animal: {
+                                  name: (editAnimalName || activeAnimal.name).trim(),
+                                  breed: (editAnimalBreed || activeAnimal.breed).trim(),
+                                  weightKg: Math.max(
+                                    5,
+                                    Number(editAnimalWeight || activeAnimal.weightKg) ||
+                                      activeAnimal.weightKg,
+                                  ),
+                                  value: Math.max(
+                                    1000,
+                                    Number(editAnimalValue || activeAnimal.value) ||
+                                      activeAnimal.value,
+                                  ),
+                                },
+                              })
+                            }
+                          >
+                            {t('প্রাণীর তথ্য হালনাগাদ করুন', 'Save Animal Profile')}
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   ) : null}
 
@@ -744,6 +844,11 @@ export function FarmerWebFeature({
                                 {rec.title[locale]}
                               </div>
                               <div className="text-xs text-[#475569]">{rec.note}</div>
+                              {rec.nextDueAt ? (
+                                <div className="text-[11px] font-semibold text-[#0F602D] mt-0.5">
+                                  {t('পরবর্তী তারিখ:', 'Next Due:')} {date(rec.nextDueAt)}
+                                </div>
+                              ) : null}
                             </div>
                             <div className="text-right shrink-0">
                               <Badge tone="brand">{rec.kind}</Badge>
@@ -757,9 +862,12 @@ export function FarmerWebFeature({
 
                       <div className="border-t border-[#E2E8F0] pt-4 flex flex-col gap-3">
                         <div className="text-sm font-bold text-[#1F2937]">
-                          {t('নতুন টিকা বা চিকিৎসা রেকর্ড যুক্ত করুন', 'Add Vaccination or Health Record')}
+                          {t(
+                            'স্বাস্থ্য পর্যবেক্ষণ রেকর্ড যুক্ত করুন (ভ্যাকসিনেশন পশুচিকিৎসক কর্তৃক নিবন্ধিত হয়)',
+                            'Log Owner Health Check Record (Vaccinations are logged by Veterinarians)',
+                          )}
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                           <SelectField
                             label={t('ধরন', 'Type')}
                             value={recKind}
@@ -767,9 +875,8 @@ export function FarmerWebFeature({
                               setRecKind(e.target.value as HealthRecord['kind'])
                             }
                             options={[
-                              { value: 'vaccination', label: t('টিকা', 'Vaccination') },
-                              { value: 'checkup', label: t('চেকআপ', 'Checkup') },
-                              { value: 'treatment', label: t('চিকিৎসা', 'Treatment') },
+                              { value: 'checkup', label: t('চেকআপ (Checkup)', 'Checkup') },
+                              { value: 'registration', label: t('নিবন্ধন (Registration)', 'Registration') },
                             ]}
                           />
                           <Field
@@ -781,6 +888,12 @@ export function FarmerWebFeature({
                             label={t('শিরোনাম (EN)', 'Title (EN)')}
                             value={recTitleEn}
                             onChange={(e) => setRecTitleEn(e.target.value)}
+                          />
+                          <Field
+                            label={t('পরবর্তী নির্ধারিত তারিখ (ঐচ্ছিক)', 'Next Due Date (Optional)')}
+                            type="date"
+                            value={recNextDueAt}
+                            onChange={(e) => setRecNextDueAt(e.target.value)}
                           />
                         </div>
                         <Field
@@ -801,6 +914,7 @@ export function FarmerWebFeature({
                                 kind: recKind,
                                 title: { bn: recTitleBn, en: recTitleEn },
                                 note: recNote,
+                                nextDueAt: recNextDueAt.trim() || undefined,
                               })
                             }
                           >
@@ -929,6 +1043,8 @@ export function FarmerWebFeature({
                     { value: 'temperature', label: t('উচ্চ তাপমাত্রা', 'Fever / Temp') },
                     { value: 'heart_rate', label: t('হৃদস্পন্দন', 'Heart Rate') },
                     { value: 'inactivity', label: t('নিষ্ক্রিয়তা', 'Inactivity') },
+                    { value: 'disconnected', label: t('কলার সংযোগ বিচ্ছিন্ন', 'Collar Disconnected') },
+                    { value: 'emergency', label: t('জরুরি অসুস্থতা (Emergency)', 'Acute Emergency') },
                   ]}
                 />
                 <SelectField
@@ -982,6 +1098,27 @@ export function FarmerWebFeature({
                 </div>
               </div>
 
+              {!activeDevice?.connected ||
+              (activeDevice &&
+                Date.parse(state.now) - Date.parse(activeDevice.lastSeenAt) >
+                  4 * 3_600_000) ? (
+                <div className="rounded-[10px] border border-[#FDE68A] bg-[#FFFBEB] p-3 text-xs font-semibold text-[#92400E]">
+                  {t(
+                    'সতর্কতা: আইওটি কলার অফলাইন বা দীর্ঘ সময় সিঙ্ক হয়নি (Stale Telemetry)। কলার সংযোগ ও ব্যাটারি পরীক্ষা করুন।',
+                    'Warning: IoT collar is disconnected or telemetry is stale (>4h since last sync). Check collar battery and pairing.',
+                  )}
+                </div>
+              ) : null}
+
+              {activeAnimal?.productionDrop ? (
+                <div className="rounded-[10px] border border-[#FECDD3] bg-[#FFF1F2] p-3 text-xs font-semibold text-[#BE123C]">
+                  {t(
+                    'দুধ উৎপাদন হ্রাস শনাক্ত (productionDrop): ব্যাংক কিস্তি বিরতি (UC-003) ও জরুরি চিকিৎসার জন্য উপযুক্ত।',
+                    'Verified Milk Yield Drop Detected (productionDrop): Eligible for bank loan grace period (UC-003) and priority care.',
+                  )}
+                </div>
+              ) : null}
+
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
                 {dailyVitals.map((v) => (
                   <div
@@ -1022,7 +1159,7 @@ export function FarmerWebFeature({
                         {dateTime(al.createdAt)}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       {al.status === 'open' ? (
                         <Button
                           variant="secondary"
@@ -1035,10 +1172,23 @@ export function FarmerWebFeature({
                           {t('সতর্কতা গ্রহণ করুন', 'Acknowledge')}
                         </Button>
                       ) : null}
+                      {al.kind === 'emergency' ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSection('wallet')}
+                        >
+                          {t('জরুরি চিকিৎসা ঋণ', 'Emergency Medical Loan Options')}
+                        </Button>
+                      ) : null}
                       <Button
                         variant="primary"
                         size="sm"
-                        onClick={() => setSection('care')}
+                        onClick={() => {
+                          setSelectedAnimalId(al.animalId);
+                          setSelectedAlertId(al.id);
+                          setSection('care');
+                        }}
                       >
                         {t('ভেট বুক করুন', 'Book Vet')}
                       </Button>
@@ -1170,6 +1320,7 @@ export function FarmerWebFeature({
                       type: 'appointment.book',
                       animalId: activeAnimal.id,
                       vetId: selectedVetId,
+                      alertId: selectedAlertId || undefined,
                       scheduledAt: new Date(Date.parse(state.now) + 3_600_000).toISOString(),
                       mode: apptMode,
                       priority: apptPriority,
@@ -1183,18 +1334,33 @@ export function FarmerWebFeature({
                   variant="danger"
                   icon="phone"
                   disabled={busy || !activeAnimal || !selectedVetId}
-                  onClick={() =>
-                    activeAnimal &&
-                    void run({
+                  onClick={async () => {
+                    if (!activeAnimal) return;
+                    const existingEmergency = myAlerts.find(
+                      (a) =>
+                        a.animalId === activeAnimal.id &&
+                        a.kind === 'emergency' &&
+                        a.status !== 'resolved',
+                    );
+                    if (!existingEmergency) {
+                      await run({
+                        type: 'alert.simulate',
+                        animalId: activeAnimal.id,
+                        kind: 'emergency',
+                        severity: 'critical',
+                      });
+                    }
+                    await run({
                       type: 'appointment.book',
                       animalId: activeAnimal.id,
                       vetId: selectedVetId,
+                      alertId: existingEmergency?.id,
                       scheduledAt: state.now,
                       mode: 'video',
                       priority: 'emergency',
                       reason: 'Emergency dispatch notice: acute distress & fever',
-                    })
-                  }
+                    });
+                  }}
                 >
                   {t('১-ক্লিক জরুরি ভেট ডিসপ্যাচ', '1-Click Emergency Dispatch')}
                 </Button>
@@ -1205,58 +1371,99 @@ export function FarmerWebFeature({
           <div className="lg:col-span-6 flex flex-col gap-4">
             <Card className="flex flex-col gap-3">
               <h3 className="text-base font-bold text-[#1F2937]">
-                {t('আমার অ্যাপয়েন্টমেন্ট তালিকা', 'My Appointments')} ({myAppointments.length})
+                {t('আমার অ্যাপয়েন্টমেন্ট ও টেলিমেডিসিন রুম', 'My Appointments & Telemedicine Room')} ({myAppointments.length})
               </h3>
               {myAppointments.map((appt) => {
                 const an = myAnimals.find((a) => a.id === appt.animalId);
+                const receipt = myPayments.find((p) => p.referenceId === appt.id);
                 return (
                   <div
                     key={appt.id}
-                    className="rounded-[12px] border border-[#E2E8F0] p-3.5 flex flex-wrap items-center justify-between gap-2"
+                    className="rounded-[12px] border border-[#E2E8F0] p-3.5 flex flex-col gap-2.5"
                   >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-[#1F2937]">
-                          {an?.name} ({an?.tag})
-                        </span>
-                        <Badge tone={toneForStatus(appt.status)}>{appt.status}</Badge>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-[#1F2937]">
+                            {an?.name} ({an?.tag})
+                          </span>
+                          <Badge tone={toneForStatus(appt.status)}>{appt.status}</Badge>
+                          {receipt ? (
+                            <Badge tone="success">
+                              {t('ফি পরিশোধিত', 'Fee Paid')} ({receipt.id})
+                            </Badge>
+                          ) : null}
+                        </div>
+                        <div className="text-xs text-[#64748B] tabular-nums">
+                          {dateTime(appt.scheduledAt)} · {appt.mode}
+                        </div>
                       </div>
-                      <div className="text-xs text-[#64748B] tabular-nums">
-                        {dateTime(appt.scheduledAt)} · {appt.mode}
-                      </div>
+                      {['requested', 'accepted'].includes(appt.status) ? (
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={busy}
+                            onClick={() =>
+                              void run({
+                                type: 'appointment.reschedule',
+                                appointmentId: appt.id,
+                                scheduledAt: new Date(
+                                  Date.parse(appt.scheduledAt) + 86_400_000,
+                                ).toISOString(),
+                              })
+                            }
+                          >
+                            {t('সময় পরিবর্তন', 'Reschedule')}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={busy}
+                            onClick={() =>
+                              void run({
+                                type: 'appointment.cancel',
+                                appointmentId: appt.id,
+                                reason: 'Cancelled by farmer',
+                              })
+                            }
+                          >
+                            {t('বাতিল', 'Cancel')}
+                          </Button>
+                        </div>
+                      ) : null}
                     </div>
-                    {['requested', 'accepted'].includes(appt.status) ? (
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={busy}
-                          onClick={() =>
-                            void run({
-                              type: 'appointment.reschedule',
-                              appointmentId: appt.id,
-                              scheduledAt: new Date(
-                                Date.parse(appt.scheduledAt) + 86_400_000,
-                              ).toISOString(),
-                            })
-                          }
-                        >
-                          {t('সময় পরিবর্তন', 'Reschedule')}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={busy}
-                          onClick={() =>
-                            void run({
-                              type: 'appointment.cancel',
-                              appointmentId: appt.id,
-                              reason: 'Cancelled by farmer',
-                            })
-                          }
-                        >
-                          {t('বাতিল', 'Cancel')}
-                        </Button>
+
+                    {['accepted', 'in_progress'].includes(appt.status) ? (
+                      <div className="rounded-[10px] border border-[#D8E9DE] bg-[#EBF4EE]/65 p-3 flex flex-wrap items-center justify-between gap-2">
+                        <div className="text-xs text-[#0A401E]">
+                          <strong className="block">
+                            {callEnded
+                              ? t('টেলিমেডিসিন কল বিরতিতে রয়েছে', 'Telemedicine Call Paused')
+                              : t('লাইভ টেলিমেডিসিন কনসালটেশন রুম সক্রিয়', 'Live Telemedicine Room Connected')}
+                          </strong>
+                          <span>
+                            {micMuted
+                              ? t('মাইক্রোফোন মিউট করা আছে', 'Microphone Muted')
+                              : t('অডিও ও কলার টেলিমেট্রি স্ট্রিম সক্রিয়', 'Audio & live collar telemetry stream active')}
+                          </span>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setMicMuted((m) => !m)}
+                          >
+                            {micMuted ? t('আনমিউট করুন', 'Unmute Mic') : t('মিউট করুন', 'Mute Mic')}
+                          </Button>
+                          <Button
+                            variant={callEnded ? 'primary' : 'danger'}
+                            size="sm"
+                            onClick={() => setCallEnded((c) => !c)}
+                          >
+                            {callEnded ? t('পুনরায় যুক্ত হোন', 'Reconnect Call') : t('কল শেষ করুন', 'End Call')}
+                          </Button>
+                        </div>
                       </div>
                     ) : null}
                   </div>
@@ -1266,8 +1473,28 @@ export function FarmerWebFeature({
 
             <Card className="flex flex-col gap-3">
               <h3 className="text-base font-bold text-[#1F2937]">
-                {t('ডিজিটাল প্রেসক্রিপশন ও ওষুধ রিমাইন্ডার', 'Prescriptions & Medication Reminders')}
+                {t('ডিজিটাল প্রেসক্রিপশন, টিকা ও ওষুধ রিমাইন্ডার', 'Prescriptions, Upcoming Checkups & Medication Reminders')}
               </h3>
+              {state.records
+                .filter((r) => myAnimalIds.has(r.animalId) && Boolean(r.nextDueAt))
+                .map((dueRec) => {
+                  const dueAnimal = myAnimals.find((a) => a.id === dueRec.animalId);
+                  return (
+                    <div
+                      key={dueRec.id}
+                      className="rounded-[10px] border border-[#FDE68A] bg-[#FFFBEB] p-3 flex items-center justify-between gap-2 text-xs"
+                    >
+                      <div>
+                        <span className="font-bold text-[#92400E]">
+                          {dueAnimal?.name}: {dueRec.title[locale]}
+                        </span>
+                      </div>
+                      <Badge tone="warning">
+                        {t('পরবর্তী তারিখ:', 'Due:')} {date(dueRec.nextDueAt!)}
+                      </Badge>
+                    </div>
+                  );
+                })}
               {myPrescriptions.map((rx) => (
                 <div
                   key={rx.id}
@@ -1534,6 +1761,15 @@ export function FarmerWebFeature({
                 {t('ঋণ প্রস্তাব তৈরি করুন', 'Generate Loan Offer')}
               </Button>
 
+              <div className="border-t border-[#E2E8F0] pt-3 flex flex-col gap-2.5">
+                <Field
+                  label={t('কিস্তি পরিশোধের পরিমাণ (৳)', 'Custom Installment Repayment Amount (BDT)')}
+                  type="number"
+                  value={repayInput}
+                  onChange={(e) => setRepayInput(e.target.value)}
+                />
+              </div>
+
               {myLoans.map((l) => (
                 <div
                   key={l.id}
@@ -1548,9 +1784,10 @@ export function FarmerWebFeature({
                     </div>
                     <div className="text-xs text-[#64748B] tabular-nums">
                       {t('বকেয়া:', 'Outstanding:')} {money(l.outstanding)} · {l.annualRate}%
+                      {l.graceUntil ? ` · ${t('গ্রেস মেয়াদ:', 'Grace Until:')} ${date(l.graceUntil)}` : ''}
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     {l.status === 'offered' ? (
                       <Button
                         variant="primary"
@@ -1564,23 +1801,39 @@ export function FarmerWebFeature({
                       </Button>
                     ) : null}
                     {l.status === 'active' && l.outstanding > 0 ? (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        disabled={busy}
-                        onClick={() =>
-                          void run({
-                            type: 'loan.repay',
-                            loanId: l.id,
-                            amount: Math.min(
-                              l.outstanding,
-                              Math.max(500, Number(repayInput) || 5000),
-                            ),
-                          })
-                        }
-                      >
-                        {t(`কিস্তি পরিশোধ (${money(Number(repayInput) || 5000)})`, 'Pay Installment')}
-                      </Button>
+                      <>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          disabled={busy}
+                          onClick={() =>
+                            void run({
+                              type: 'loan.repay',
+                              loanId: l.id,
+                              amount: Math.min(
+                                l.outstanding,
+                                Math.max(500, Number(repayInput) || 5000),
+                              ),
+                            })
+                          }
+                        >
+                          {t(`কিস্তি পরিশোধ (${money(Number(repayInput) || 5000)})`, 'Pay Installment')}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={busy}
+                          onClick={() =>
+                            void run({
+                              type: 'loan.repay',
+                              loanId: l.id,
+                              amount: l.outstanding,
+                            })
+                          }
+                        >
+                          {t('সম্পূর্ণ বকেয়া পরিশোধ', 'Pay Full Balance')}
+                        </Button>
+                      </>
                     ) : null}
                   </div>
                 </div>
@@ -1594,7 +1847,16 @@ export function FarmerWebFeature({
               <h3 className="text-base font-bold text-[#1F2937]">
                 {t('প্রাণী বীমা ও দাবি দাখিল (UC-002)', 'Livestock Insurance & Claims')}
               </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                <SelectField
+                  label={t('বীমা প্রতিষ্ঠান নির্বাচন করুন', 'Select Insurer')}
+                  value={selectedInsurerId}
+                  onChange={(e) => setSelectedInsurerId(e.target.value)}
+                  options={insurers.map((ins) => ({
+                    value: ins.id,
+                    label: locale === 'bn' ? ins.nameBn : ins.name,
+                  }))}
+                />
                 <Field
                   label={t('বীমা কভারেজ পরিমাণ (৳)', 'Coverage Amount (BDT)')}
                   type="number"
@@ -1604,14 +1866,14 @@ export function FarmerWebFeature({
                 <Button
                   variant="primary"
                   icon="shield-check"
-                  disabled={busy || !activeAnimal || !insurers[0]}
+                  disabled={busy || !activeAnimal || !selectedInsurerId}
                   onClick={() =>
                     activeAnimal &&
-                    insurers[0] &&
+                    selectedInsurerId &&
                     void run({
                       type: 'policy.apply',
                       animalId: activeAnimal.id,
-                      insurerId: insurers[0].id,
+                      insurerId: selectedInsurerId,
                       coverage: Math.max(10000, Number(coverageInput) || 100000),
                     })
                   }
@@ -1670,6 +1932,26 @@ export function FarmerWebFeature({
                         value={claimDesc}
                         onChange={(e) => setClaimDesc(e.target.value)}
                       />
+                      <div className="flex flex-wrap gap-4 text-xs font-semibold text-[#475569] py-1">
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={claimPhoto}
+                            onChange={(e) => setClaimPhoto(e.target.checked)}
+                            className="accent-[#15803D]"
+                          />
+                          {t('ইয়ার-ট্যাগ ছবি সংযুক্ত (Photo)', 'Attach Ear-Tag Photo')}
+                        </label>
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={claimLocation}
+                            onChange={(e) => setClaimLocation(e.target.checked)}
+                            className="accent-[#15803D]"
+                          />
+                          {t('জিপিএস লোকেশন সংযুক্ত (GPS)', 'Attach GPS Coordinates')}
+                        </label>
+                      </div>
                       <Button
                         variant="secondary"
                         size="sm"
@@ -1684,8 +1966,8 @@ export function FarmerWebFeature({
                               Math.max(1000, Number(claimAmount) || 20000),
                             ),
                             evidence: {
-                              photo: true,
-                              location: true,
+                              photo: claimPhoto,
+                              location: claimLocation,
                               description: claimDesc,
                               capturedAt: state.now,
                               latitude: 24.3396,
@@ -1719,6 +2001,32 @@ export function FarmerWebFeature({
                   ))}
                 </div>
               ) : null}
+
+              {myPayments.length > 0 ? (
+                <div className="border-t border-[#E2E8F0] pt-3 flex flex-col gap-2">
+                  <span className="text-xs font-bold text-[#64748B]">
+                    {t('ওয়ালেট লেনদেন ও পেমেন্ট রশিদ খতিয়ান', 'Wallet Transactions & Payment Receipts')}
+                  </span>
+                  <div className="divide-y divide-[#E2E8F0] rounded-[10px] border border-[#E2E8F0] bg-white">
+                    {myPayments.slice(0, 8).map((pmt) => (
+                      <div
+                        key={pmt.id}
+                        className="flex items-center justify-between px-3 py-2 text-xs tabular-nums"
+                      >
+                        <div>
+                          <span className="font-semibold text-[#1F2937]">{pmt.kind}</span>
+                          <span className="text-[#64748B] ml-2">
+                            {pmt.direction.toUpperCase()} · {pmt.id}
+                          </span>
+                        </div>
+                        <span className="font-bold text-[#0F602D]">
+                          {money(pmt.amount)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </Card>
           </div>
         </div>
@@ -1731,13 +2039,21 @@ export function FarmerWebFeature({
             {state.products.map((prod) => {
               const inCart =
                 myCart.find((c) => c.productId === prod.id)?.quantity ?? 0;
+              const hasValidPrescription = myPrescriptions.some(
+                (p) => p.medicines.length > 0,
+              );
+              const rxLocked = prod.requiresPrescription && !hasValidPrescription;
               return (
                 <Card key={prod.id} className="flex flex-col justify-between gap-3">
                   <div>
                     <div className="flex items-center justify-between gap-2">
                       <Badge tone="brand">{prod.category}</Badge>
                       {prod.requiresPrescription ? (
-                        <Badge tone="warning">{t('প্রেসক্রিপশন আবশ্যক', 'Rx Required')}</Badge>
+                        <Badge tone={rxLocked ? 'danger' : 'warning'}>
+                          {rxLocked
+                            ? t('প্রেসক্রিপশন ছাড়া লকড', 'Rx Required (Locked)')
+                            : t('প্রেসক্রিপশন যাচাইকৃত', 'Rx Verified')}
+                        </Badge>
                       ) : null}
                     </div>
                     <h4 className="text-base font-bold text-[#1F2937] mt-2">
@@ -1771,7 +2087,7 @@ export function FarmerWebFeature({
                       <Button
                         variant="primary"
                         size="sm"
-                        disabled={busy}
+                        disabled={busy || rxLocked || prod.stock <= inCart}
                         onClick={() =>
                           void run({
                             type: 'cart.set',
@@ -1824,8 +2140,20 @@ export function FarmerWebFeature({
                         {dateTime(ord.createdAt)}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <Badge tone={toneForStatus(ord.status)}>{ord.status}</Badge>
+                      {['placed', 'confirmed'].includes(ord.status) ? (
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          disabled={busy}
+                          onClick={() =>
+                            void run({ type: 'order.cancel', orderId: ord.id })
+                          }
+                        >
+                          {t('বাতিল ও রিফান্ড', 'Cancel & Refund')}
+                        </Button>
+                      ) : null}
                       {!['delivered', 'cancelled'].includes(ord.status) ? (
                         <Button
                           variant="outline"

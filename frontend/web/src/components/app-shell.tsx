@@ -5,7 +5,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { DEMO_ACCOUNTS, type DemoScenario, type Role } from '@palito/shared';
 import { useWebApp } from '@/providers/web-provider.tsx';
-import { mobileDeepLink, roleNames, roleNavItems, roleSubtitles, webHref } from '@/navigation.ts';
+import {
+  canonicalSidebarScreen,
+  mobileDeepLink,
+  roleNames,
+  roleNavItems,
+  roleSubtitles,
+  webHref,
+} from '@/navigation.ts';
 import { Badge, Button, ModalDialog, WebIcon } from '@/components/ui.tsx';
 
 export function AppShell({
@@ -44,10 +51,14 @@ export function AppShell({
     (item) => item.userId === user?.id && !item.read,
   ).length;
 
+  const highlightedScreen = canonicalSidebarScreen(role, activeScreen);
+
   function badgeCountFor(screen: string): number | undefined {
     if (screen === 'notifications') return unreadCount > 0 ? unreadCount : undefined;
     if (role === 'bank' && screen === 'applications') {
-      const c = state.loans.filter((l) => l.status === 'submitted').length;
+      const c = state.loans.filter(
+        (l) => (!user?.id || l.bankId === user.id) && l.status === 'submitted',
+      ).length;
       return c > 0 ? c : undefined;
     }
     if (role === 'vet' && screen === 'appointments') {
@@ -57,16 +68,22 @@ export function AppShell({
       return c > 0 ? c : undefined;
     }
     if (role === 'vet' && screen === 'reviews') {
-      const c = state.claims.filter((cl) => cl.status === 'vet_review').length;
+      const c = state.claims.filter(
+        (cl) => (!user?.id || cl.vetId === user.id) && cl.status === 'vet_review',
+      ).length;
       return c > 0 ? c : undefined;
     }
     if (role === 'insurer' && screen === 'applications') {
-      const c = state.policies.filter((p) => p.status === 'submitted').length;
+      const c = state.policies.filter(
+        (p) => (!user?.id || p.insurerId === user.id) && p.status === 'submitted',
+      ).length;
       return c > 0 ? c : undefined;
     }
     if (role === 'insurer' && screen === 'claims') {
-      const c = state.claims.filter((cl) =>
-        ['submitted', 'manual_review', 'vet_review', 'approved'].includes(cl.status),
+      const c = state.claims.filter(
+        (cl) =>
+          (!user?.id || cl.insurerId === user.id) &&
+          ['submitted', 'manual_review', 'vet_review', 'approved'].includes(cl.status),
       ).length;
       return c > 0 ? c : undefined;
     }
@@ -139,7 +156,8 @@ export function AppShell({
             className="flex lg:flex-col gap-1 overflow-x-auto pb-1 lg:pb-0"
           >
             {navItems.map((item) => {
-              const isActive = activeScreen === item.screen;
+              const isActive =
+                activeScreen === item.screen || highlightedScreen === item.screen;
               const badgeCount = badgeCountFor(item.screen);
               return (
                 <Link
@@ -358,7 +376,10 @@ export function AppShell({
       >
         <div className="flex flex-col gap-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {DEMO_ACCOUNTS.map((account) => {
+            {(state.users.filter((a) => a.status === 'active').length
+              ? state.users.filter((a) => a.status === 'active')
+              : DEMO_ACCOUNTS
+            ).map((account) => {
               const isCurrent = user?.id === account.id;
               const isFirstForRole = !seenRoles.has(account.role);
               seenRoles.add(account.role);
@@ -415,6 +436,14 @@ export function AppShell({
                 variant="outline"
                 size="sm"
                 icon="clock"
+                onClick={() => void run({ type: 'demo.advanceTime', hours: 24 })}
+              >
+                {t('+২৪ ঘণ্টা', '+24 Hours')}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                icon="clock"
                 onClick={() => void run({ type: 'demo.advanceTime', hours: 24 * 7 })}
               >
                 {t('+৭ দিন (দাবি ফলোআপ)', '+7 Days (Claim SLA)')}
@@ -431,17 +460,28 @@ export function AppShell({
                   ? t('অনলাইনে ফিরুন', 'Go Online')
                   : t('অফলাইন পরীক্ষা', 'Test Offline Mode')}
               </Button>
-              {(['normal', 'health', 'insurance', 'lending'] as DemoScenario[]).map((scen) => (
-                <Button
-                  key={scen}
-                  variant="ghost"
-                  size="sm"
-                  icon="refresh"
-                  onClick={() => void run({ type: 'demo.reset', scenario: scen })}
-                >
-                  {t(`রিসেট: ${scen}`, `Preset: ${scen}`)}
-                </Button>
-              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                icon="alert"
+                disabled={busy}
+                onClick={() => void run({ type: 'demo.failNext' })}
+              >
+                {t('পরের অ্যাকশন ব্যর্থতা পরীক্ষা', 'Test Retry on Next Action')}
+              </Button>
+              {(['normal', 'health', 'insurance', 'lending', 'empty'] as DemoScenario[]).map(
+                (scen) => (
+                  <Button
+                    key={scen}
+                    variant="ghost"
+                    size="sm"
+                    icon="refresh"
+                    onClick={() => void run({ type: 'demo.reset', scenario: scen })}
+                  >
+                    {t(`রিসেট: ${scen}`, `Preset: ${scen}`)}
+                  </Button>
+                ),
+              )}
             </div>
           </div>
         </div>

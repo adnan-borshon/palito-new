@@ -1,7 +1,8 @@
 'use client';
 
 import type { Role } from '@palito/shared';
-import { COMMON_WEB_SCREENS, CommonWebFeature } from './common.tsx';
+import { isCommonWebScreen } from '@/navigation.ts';
+import { CommonWebFeature } from './common.tsx';
 import { BankWebFeature } from './bank.tsx';
 import { VetWebFeature } from './vet.tsx';
 import { AdminWebFeature } from './admin.tsx';
@@ -17,8 +18,8 @@ export function WebFeatureRegistry({
   screen: string;
   id?: string;
 }) {
-  if ((COMMON_WEB_SCREENS as readonly string[]).includes(screen)) {
-    return <CommonWebFeature screen={screen} />;
+  if (isCommonWebScreen(screen)) {
+    return <CommonWebFeature screen={screen} id={id} />;
   }
 
   switch (role) {
@@ -27,7 +28,7 @@ export function WebFeatureRegistry({
     case 'vet':
       return <VetWebFeature screen={screen} id={id} />;
     case 'admin':
-      return <AdminWebFeature screen={screen} />;
+      return <AdminWebFeature screen={screen} id={id} />;
     case 'insurer':
       return <InsurerWebFeature screen={screen} id={id} />;
     case 'farmer':

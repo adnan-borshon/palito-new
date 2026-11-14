@@ -25,18 +25,32 @@ export function InsurerWebFeature({
   screen: string;
   id?: string;
 }) {
-  const { state, locale, t, money, date, dateTime, run, busy, openMobileHandoff } =
+  const { state, locale, t, money, date, dateTime, run, busy, openMobileHandoff, user } =
     useWebApp();
 
+  const myClaims = state.claims.filter(
+    (c) => !user?.id || user.role !== 'insurer' || c.insurerId === user.id,
+  );
+  const myPolicies = state.policies.filter(
+    (p) => !user?.id || user.role !== 'insurer' || p.insurerId === user.id,
+  );
+
   const initialTab =
-    screen === 'applications' || screen === 'policies' ? 'policies' : 'claims';
-  const [tab, setTab] = useState<'claims' | 'policies'>(initialTab);
+    screen === 'applications' || screen === 'policies' || screen === 'policy'
+      ? 'policies'
+      : screen === 'passport'
+        ? 'passport'
+        : 'claims';
+  const [tab, setTab] = useState<'claims' | 'policies' | 'passport'>(initialTab);
 
   const [selectedClaimId, setSelectedClaimId] = useState<string>(
-    id ?? state.claims[0]?.id ?? '',
+    initialTab === 'claims' && id ? id : (myClaims[0]?.id ?? ''),
   );
   const [selectedPolicyId, setSelectedPolicyId] = useState<string>(
-    id ?? state.policies[0]?.id ?? '',
+    initialTab === 'policies' && id ? id : (myPolicies[0]?.id ?? ''),
+  );
+  const [selectedPassportAnimalId, setSelectedPassportAnimalId] = useState<string>(
+    initialTab === 'passport' && id ? id : '',
   );
   const vets = state.users.filter((u) => u.role === 'vet' && u.status === 'active');
   const [referVetId, setReferVetId] = useState<string>(vets[0]?.id ?? '');
@@ -48,7 +62,7 @@ export function InsurerWebFeature({
   );
 
   const activeClaim =
-    state.claims.find((c) => c.id === selectedClaimId) ?? state.claims[0];
+    myClaims.find((c) => c.id === selectedClaimId) ?? myClaims[0];
   const claimAnimal = activeClaim
     ? state.animals.find((a) => a.id === activeClaim.animalId)
     : undefined;
@@ -73,21 +87,26 @@ export function InsurerWebFeature({
     : 0;
 
   const activePolicy =
-    state.policies.find((p) => p.id === selectedPolicyId) ?? state.policies[0];
+    myPolicies.find((p) => p.id === selectedPolicyId) ?? myPolicies[0];
   const policyAnimal = activePolicy
     ? state.animals.find((a) => a.id === activePolicy.animalId)
     : undefined;
   const policyFarmer = activePolicy
     ? state.users.find((u) => u.id === activePolicy.farmerId)
     : undefined;
+  const passportAnimal =
+    state.animals.find((a) => a.id === selectedPassportAnimalId) ??
+    policyAnimal ??
+    claimAnimal ??
+    state.animals[0];
 
-  const totalCoverage = state.policies
+  const totalCoverage = myPolicies
     .filter((p) => p.status === 'active')
     .reduce((sum, p) => sum + p.coverage, 0);
-  const pendingClaimsCount = state.claims.filter((c) =>
+  const pendingClaimsCount = myClaims.filter((c) =>
     ['submitted', 'manual_review', 'vet_review', 'approved'].includes(c.status),
   ).length;
-  const totalPaidClaims = state.claims
+  const totalPaidClaims = myClaims
     .filter((c) => c.status === 'paid')
     .reduce((sum, c) => sum + (c.payout ?? c.amount), 0);
 
@@ -104,13 +123,13 @@ export function InsurerWebFeature({
         <KpiCard
           label={t('সক্রিয় পলিসি কভারেজ', 'Active Policy Coverage')}
           value={money(totalCoverage)}
-          hint={`${state.policies.filter((p) => p.status === 'active').length} ${t('টি সক্রিয় পলিসি', 'active policies')}`}
+          hint={`${myPolicies.filter((p) => p.status === 'active').length} ${t('টি সক্রিয় পলিসি', 'active policies')}`}
           tone="brand"
           icon="landmark"
         />
         <KpiCard
           label={t('পলিসি আবেদন কিউ', 'Policy Applications')}
-          value={state.policies.filter((p) => p.status === 'submitted').length}
+          value={myPolicies.filter((p) => p.status === 'submitted').length}
           hint={t('আন্ডাররাইটিং সিদ্ধান্তের অপেক্ষায়', 'Awaiting underwriting decision')}
           tone="info"
           icon="file-check"
@@ -132,12 +151,17 @@ export function InsurerWebFeature({
           {
             id: 'claims',
             label: t('দাবি যাচাই, ভেট রেফারেল ও ডেট-ফার্স্ট পেআউট (UC-002)', 'Claims Verification & Debt-First Payouts'),
-            count: state.claims.length,
+            count: myClaims.length,
           },
           {
             id: 'policies',
             label: t('পলিসি আবেদন ও সক্রিয় পলিসি ডিরেক্টরি', 'Policy Underwriting & Active Policies'),
-            count: state.policies.length,
+            count: myPolicies.length,
+          },
+          {
+            id: 'passport',
+            label: t('ডিজিটাল স্বাস্থ্য পাসপোর্ট', 'Insured Animal Health Passport'),
+            count: state.animals.length,
           },
         ]}
       />
@@ -145,7 +169,7 @@ export function InsurerWebFeature({
       {tab === 'claims' ? (
         <SplitWorkbench
           masterTitle={t('বীমা দাবি ফাইল তালিকা', 'Insurance Claims Queue')}
-          masterCount={state.claims.length}
+          masterCount={myClaims.length}
           masterToolbar={
             <div className="flex justify-end">
               <Button
@@ -164,7 +188,7 @@ export function InsurerWebFeature({
               </Button>
             </div>
           }
-          masterList={state.claims.map((claim) => {
+          masterList={myClaims.map((claim) => {
             const animal = state.animals.find((a) => a.id === claim.animalId);
             const farmer = state.users.find((u) => u.id === claim.farmerId);
             const selected = activeClaim?.id === claim.id;
@@ -273,7 +297,12 @@ export function InsurerWebFeature({
                         {t('আইওটি কলার টেলিমেট্রি', 'IoT Biometric Evidence')}
                       </span>
                       <strong className="text-sm text-[#0F602D] block mt-0.5">
-                        {claimAnimal && hasIoTEvidence(state, claimAnimal.id, state.now)
+                        {claimAnimal &&
+                        hasIoTEvidence(
+                          state,
+                          claimAnimal.id,
+                          activeClaim.evidence.capturedAt ?? activeClaim.createdAt,
+                        )
                           ? t('স্বয়ংক্রিয় যাচাইকৃত', 'Telemetry Verified')
                           : t('ম্যানুয়াল পর্যালোচনা প্রয়োজন', 'Manual Review Required')}
                       </strong>
@@ -391,9 +420,17 @@ export function InsurerWebFeature({
                       </div>
                     ) : null}
 
-                    {['submitted', 'manual_review', 'vet_review'].includes(
-                      activeClaim.status,
-                    ) ? (
+                    {activeClaim.status === 'vet_review' ? (
+                      <div className="rounded-[12px] border border-[#BFDBFE] bg-[#EFF6FF] p-3.5 text-xs text-[#1E3A8A]">
+                        {t(
+                          'এই দাবিটি বর্তমানে রেফারকৃত পশুচিকিৎসকের ক্লিনিক্যাল মতামতের (claim.vetReview) অপেক্ষায় রয়েছে। মতামত জমা দেওয়ার পর চূড়ান্ত সিদ্ধান্ত সক্রিয় হবে।',
+                          'This claim is currently awaiting the referred veterinarian’s clinical opinion (claim.vetReview). Final decision controls unlock once the opinion is submitted.',
+                        )}
+                      </div>
+                    ) : null}
+
+                    {['submitted', 'manual_review'].includes(activeClaim.status) &&
+                    (!activeClaim.vetId || Boolean(activeClaim.vetOpinion)) ? (
                       <div className="flex flex-col gap-3">
                         <TextareaField
                           label={t('চূড়ান্ত দাবি সিদ্ধান্ত নোট', 'Claim Decision Note')}
@@ -471,8 +508,8 @@ export function InsurerWebFeature({
       {tab === 'policies' ? (
         <SplitWorkbench
           masterTitle={t('পলিসি আবেদন ও সক্রিয় পলিসি', 'Insurance Policies')}
-          masterCount={state.policies.length}
-          masterList={state.policies.map((pol) => {
+          masterCount={myPolicies.length}
+          masterList={myPolicies.map((pol) => {
             const animal = state.animals.find((a) => a.id === pol.animalId);
             const farmer = state.users.find((u) => u.id === pol.farmerId);
             const selected = activePolicy?.id === pol.id;
@@ -519,7 +556,21 @@ export function InsurerWebFeature({
                       Policy ID: {activePolicy.id} · {date(activePolicy.submittedAt)}
                     </p>
                   </div>
-                  <Badge tone={toneForStatus(activePolicy.status)}>{activePolicy.status}</Badge>
+                  <div className="flex items-center gap-2">
+                    {policyAnimal ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedPassportAnimalId(policyAnimal.id);
+                          setTab('passport');
+                        }}
+                      >
+                        {t('স্বাস্থ্য পাসপোর্ট দেখুন', 'Open Health Passport')}
+                      </Button>
+                    ) : null}
+                    <Badge tone={toneForStatus(activePolicy.status)}>{activePolicy.status}</Badge>
+                  </div>
                 </div>
 
                 {policyAnimal ? (
@@ -606,6 +657,110 @@ export function InsurerWebFeature({
             )
           }
         />
+      ) : null}
+
+      {tab === 'passport' ? (
+        <Card className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-bold text-[#1F2937]">
+                {t('বীমাকৃত প্রাণীর ডিজিটাল স্বাস্থ্য পাসপোর্ট', 'Insured Animal Digital Health Passport')}
+              </h2>
+              <p className="text-xs text-[#64748B]">
+                {t(
+                  'পলিসি আন্ডাররাইটিং ও দাবি যাচাইয়ের জন্য প্রাণীর সম্পূর্ণ ক্লিনিক্যাল পাসপোর্ট ও টিকার ইতিহাস।',
+                  'Full clinical history and vaccination records for policy underwriting and claim forensics.',
+                )}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {state.animals.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => setSelectedPassportAnimalId(a.id)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold cursor-pointer ${
+                    passportAnimal?.id === a.id
+                      ? 'bg-[#15803D] text-white'
+                      : 'border border-[#E2E8F0] bg-[#F8FAFC] text-[#475569]'
+                  }`}
+                >
+                  {a.name} ({a.tag})
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {passportAnimal ? (
+            <div className="flex flex-col gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 rounded-[14px] border border-[#E2E8F0] bg-[#F8FAFC] p-4">
+                <div>
+                  <div className="text-base font-bold text-[#1F2937]">
+                    {passportAnimal.name} ({passportAnimal.tag})
+                  </div>
+                  <div className="text-xs text-[#64748B]">
+                    {passportAnimal.breed} · {passportAnimal.sex} · {passportAnimal.weightKg} kg
+                  </div>
+                  <div className="text-sm font-bold text-[#0F602D] mt-1 tabular-nums">
+                    {t('বাজারমূল্য:', 'Valuation:')} {money(passportAnimal.value)}
+                  </div>
+                </div>
+                <div className="md:col-span-2 flex flex-col justify-center gap-2">
+                  <HealthScoreBar
+                    score={passportAnimal.healthScore}
+                    label={t('ক্লিনিক্যাল স্বাস্থ্য স্কোর', 'Clinical Health Score')}
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <Badge
+                      tone={
+                        state.records.some(
+                          (r) => r.animalId === passportAnimal.id && r.kind === 'vaccination',
+                        )
+                          ? 'success'
+                          : 'warning'
+                      }
+                    >
+                      {state.records.some(
+                        (r) => r.animalId === passportAnimal.id && r.kind === 'vaccination',
+                      )
+                        ? t('টিকাপ্রাপ্ত', 'Vaccinated')
+                        : t('টিকা বাকি', 'Unvaccinated')}
+                    </Badge>
+                    <Badge
+                      tone={
+                        hasIoTEvidence(state, passportAnimal.id, state.now)
+                          ? 'brand'
+                          : 'neutral'
+                      }
+                    >
+                      {hasIoTEvidence(state, passportAnimal.id, state.now)
+                        ? t('আইওটি টেলিমেট্রি যাচাইকৃত', 'IoT Telemetry Verified')
+                        : t('কলার অফলাইন', 'No Live Collar')}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              <div className="divide-y divide-[#E2E8F0] rounded-[12px] border border-[#E2E8F0]">
+                {state.records
+                  .filter((r) => r.animalId === passportAnimal.id)
+                  .map((rec) => (
+                    <div key={rec.id} className="p-3 flex items-start justify-between gap-3 text-xs">
+                      <div>
+                        <div className="font-bold text-[#1F2937]">
+                          {rec.title[locale]} ({rec.kind})
+                        </div>
+                        <div className="text-[#475569] mt-0.5">{rec.note}</div>
+                      </div>
+                      <div className="text-[#64748B] tabular-nums shrink-0">
+                        {date(rec.createdAt)}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          ) : null}
+        </Card>
       ) : null}
     </div>
   );

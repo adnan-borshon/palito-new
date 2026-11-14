@@ -2,6 +2,7 @@
   "name": "@palito/web",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "engines": {
     "node": "^24.3.0"
   },
@@ -10,7 +11,8 @@
     "build": "next build",
     "start": "next start --port 3000",
     "lint": "tsc --noEmit",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test src/__tests__/web-workflows.test.ts"
   },
   "dependencies": {
     "@palito/shared": "*",

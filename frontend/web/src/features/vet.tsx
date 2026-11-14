@@ -29,19 +29,64 @@ export function VetWebFeature({
   const { state, user, locale, t, money, date, dateTime, run, busy, openMobileHandoff } =
     useWebApp();
 
+  const myAppointments = useMemo(
+    () =>
+      state.appointments.filter(
+        (a) => !user?.id || user.role !== 'vet' || a.vetId === user.id,
+      ),
+    [state.appointments, user?.id, user?.role],
+  );
+  const myClaims = useMemo(
+    () =>
+      state.claims.filter(
+        (c) => !user?.id || user.role !== 'vet' || c.vetId === user.id,
+      ),
+    [state.claims, user?.id, user?.role],
+  );
+  const linkedAnimals = useMemo(() => {
+    if (!user?.id || user.role !== 'vet') return state.animals;
+    return state.animals.filter(
+      (animal) =>
+        state.appointments.some(
+          (a) =>
+            a.animalId === animal.id &&
+            a.vetId === user.id &&
+            !['rejected', 'cancelled'].includes(a.status),
+        ) ||
+        state.claims.some(
+          (c) =>
+            c.animalId === animal.id &&
+            c.vetId === user.id &&
+            c.status === 'vet_review',
+        ),
+    );
+  }, [state.animals, state.appointments, state.claims, user?.id, user?.role]);
+
   const initialTab =
-    screen === 'animals'
+    screen === 'animals' || screen === 'animal' || screen === 'passport'
       ? 'patients'
-      : screen === 'reviews'
+      : screen === 'reviews' ||
+          screen === 'claims' ||
+          screen === 'claim' ||
+          screen === 'review-overdue'
         ? 'claims'
-        : 'consultations';
-  const [tab, setTab] = useState<'consultations' | 'patients' | 'claims'>(initialTab);
+        : screen === 'emergency'
+          ? 'emergency'
+          : screen === 'schedule'
+            ? 'schedule'
+            : 'consultations';
+  const [tab, setTab] = useState<
+    'consultations' | 'patients' | 'claims' | 'emergency' | 'schedule'
+  >(initialTab);
 
   // Consultations state
   const [selectedApptId, setSelectedApptId] = useState<string>(
-    id ?? state.appointments[0]?.id ?? '',
+    initialTab === 'consultations' && id
+      ? id
+      : (myAppointments[0]?.id ?? state.appointments[0]?.id ?? ''),
   );
   const [decisionNote, setDecisionNote] = useState('');
+  const [rescheduleTime, setRescheduleTime] = useState('2026-04-20T15:00:00.000Z');
   const [diagnosis, setDiagnosis] = useState('Acute ruminal acidosis & mild pyrexia');
   const [advice, setAdvice] = useState(
     'Provide clean drinking water, oral buffer electrolytes, and monitor collar temperature every 6 hours.',
@@ -53,7 +98,9 @@ export function VetWebFeature({
 
   // Patient record state
   const [selectedAnimalId, setSelectedAnimalId] = useState<string>(
-    state.animals[0]?.id ?? '',
+    initialTab === 'patients' && id
+      ? id
+      : (linkedAnimals[0]?.id ?? state.animals[0]?.id ?? ''),
   );
   const [recKind, setRecKind] = useState<HealthRecord['kind']>('checkup');
   const [recTitleBn, setRecTitleBn] = useState('নিয়মিত স্বাস্থ্য পরীক্ষা');
@@ -61,21 +108,33 @@ export function VetWebFeature({
   const [recNote, setRecNote] = useState(
     'Normal auscultation, mucous membranes pink, appetite normal.',
   );
+  const [recNextDueAt, setRecNextDueAt] = useState('');
 
   // Claim review state
   const [selectedClaimId, setSelectedClaimId] = useState<string>(
-    state.claims.find((c) => c.status === 'vet_review')?.id ??
-      state.claims[0]?.id ??
-      '',
+    initialTab === 'claims' && id
+      ? id
+      : (myClaims.find((c) => c.status === 'vet_review')?.id ??
+        myClaims[0]?.id ??
+        state.claims[0]?.id ??
+        ''),
   );
   const [vetOpinion, setVetOpinion] = useState(
     'Clinical history and IoT collar telemetry corroborate acute onset prior to incident.',
   );
 
+  // Schedule state
+  const [scheduleSpecialty, setScheduleSpecialty] = useState(
+    user?.specialty ?? 'Dairy & Large Ruminant Medicine',
+  );
+  const [scheduleHours, setScheduleHours] = useState(
+    user?.schedule ?? 'Sat–Thu, 09:00 AM – 06:00 PM',
+  );
+  const [scheduleAvailable, setScheduleAvailable] = useState(user?.available ?? true);
+
   const escalatedAlerts = state.alerts.filter((a) =>
     ['open', 'escalated'].includes(a.status),
   );
-  const myAppointments = state.appointments;
   const activeAppt =
     myAppointments.find((a) => a.id === selectedApptId) ?? myAppointments[0];
   const apptAnimal = activeAppt
@@ -123,13 +182,19 @@ export function VetWebFeature({
   }, [apptDevice]);
 
   const activePatient =
-    state.animals.find((a) => a.id === selectedAnimalId) ?? state.animals[0];
+    linkedAnimals.find((a) => a.id === selectedAnimalId) ??
+    state.animals.find((a) => a.id === selectedAnimalId) ??
+    linkedAnimals[0] ??
+    state.animals[0];
   const patientRecords = activePatient
     ? state.records.filter((r) => r.animalId === activePatient.id)
     : [];
 
   const activeClaim =
-    state.claims.find((c) => c.id === selectedClaimId) ?? state.claims[0];
+    myClaims.find((c) => c.id === selectedClaimId) ??
+    state.claims.find((c) => c.id === selectedClaimId) ??
+    myClaims[0] ??
+    state.claims[0];
   const claimAnimal = activeClaim
     ? state.animals.find((a) => a.id === activeClaim.animalId)
     : undefined;
@@ -225,12 +290,21 @@ export function VetWebFeature({
           {
             id: 'patients',
             label: t('প্রাণী ডিরেক্টরি ও ক্লিনিক্যাল রেকর্ড', 'Patient Registry & Health Records'),
-            count: state.animals.length,
+            count: linkedAnimals.length,
           },
           {
             id: 'claims',
             label: t('বীমা দাবি ক্লিনিক্যাল যাচাই (UC-002)', 'Insurance Claim Clinical Reviews'),
-            count: state.claims.length,
+            count: myClaims.length,
+          },
+          {
+            id: 'emergency',
+            label: t('জরুরি ট্রায়াজ কিউ (UC-001)', 'Emergency Alert Triage (UC-001)'),
+            count: escalatedAlerts.length,
+          },
+          {
+            id: 'schedule',
+            label: t('চেম্বার সময়সূচি ও প্রাপ্যতা', 'Clinic Schedule & Availability'),
           },
         ]}
       />
@@ -470,6 +544,50 @@ export function VetWebFeature({
                     </div>
                   ) : null}
 
+                  {['requested', 'accepted'].includes(activeAppt.status) ? (
+                    <div className="flex flex-wrap items-end justify-between gap-3 rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] p-3.5">
+                      <div className="flex-1 min-w-[200px]">
+                        <Field
+                          label={t('সময় পরিবর্তন করুন (ISO / সময়)', 'Reschedule Time')}
+                          value={rescheduleTime}
+                          onChange={(e) => setRescheduleTime(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          icon="calendar"
+                          disabled={busy}
+                          onClick={() =>
+                            void run({
+                              type: 'appointment.reschedule',
+                              appointmentId: activeAppt.id,
+                              scheduledAt: rescheduleTime,
+                            })
+                          }
+                        >
+                          {t('সময় পরিবর্তন (Reschedule)', 'Reschedule')}
+                        </Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          icon="close"
+                          disabled={busy}
+                          onClick={() =>
+                            void run({
+                              type: 'appointment.cancel',
+                              appointmentId: activeAppt.id,
+                              reason: decisionNote.trim() || 'Cancelled by veterinarian',
+                            })
+                          }
+                        >
+                          {t('অ্যাপয়েন্টমেন্ট বাতিল', 'Cancel Appointment')}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+
                   {activeAppt.status === 'accepted' ? (
                     <div className="flex items-center justify-between gap-3 rounded-[12px] bg-[#EBF4EE] border border-[#D8E9DE] p-4">
                       <div>
@@ -653,9 +771,9 @@ export function VetWebFeature({
 
       {tab === 'patients' ? (
         <SplitWorkbench
-          masterTitle={t('নিবন্ধিত প্রাণী ডিরেক্টরি', 'Registered Patient Animals')}
-          masterCount={state.animals.length}
-          masterList={state.animals.map((animal) => {
+          masterTitle={t('নিবন্ধিত প্রাণী ডিরেক্টরি', 'Assigned Patient Animals')}
+          masterCount={linkedAnimals.length}
+          masterList={linkedAnimals.map((animal) => {
             const selected = activePatient?.id === animal.id;
             const owner = state.users.find((u) => u.id === animal.ownerId);
             return (
@@ -722,6 +840,11 @@ export function VetWebFeature({
                             {rec.title[locale]}
                           </div>
                           <div className="text-xs text-[#475569] mt-0.5">{rec.note}</div>
+                          {rec.nextDueAt ? (
+                            <div className="text-[11px] font-semibold text-[#0F602D] mt-0.5">
+                              {t('পরবর্তী তারিখ:', 'Next Due:')} {date(rec.nextDueAt)}
+                            </div>
+                          ) : null}
                         </div>
                         <div className="text-right shrink-0">
                           <Badge tone="brand">{rec.kind}</Badge>
@@ -738,7 +861,7 @@ export function VetWebFeature({
                   <h4 className="text-base font-bold text-[#1F2937]">
                     {t('নতুন ক্লিনিক্যাল রেকর্ড বা টিকা যোগ করুন', 'Log New Clinical or Vaccination Record')}
                   </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <SelectField
                       label={t('রেকর্ডের ধরন', 'Record Type')}
                       value={recKind}
@@ -759,6 +882,12 @@ export function VetWebFeature({
                       value={recTitleEn}
                       onChange={(e) => setRecTitleEn(e.target.value)}
                     />
+                    <Field
+                      label={t('পরবর্তী নির্ধারিত তারিখ (ঐচ্ছিক)', 'Next Due Date (Optional)')}
+                      type="date"
+                      value={recNextDueAt}
+                      onChange={(e) => setRecNextDueAt(e.target.value)}
+                    />
                   </div>
                   <TextareaField
                     label={t('ক্লিনিক্যাল নোট ও পর্যবেক্ষণ', 'Clinical Notes & Observations')}
@@ -777,6 +906,7 @@ export function VetWebFeature({
                           kind: recKind,
                           title: { bn: recTitleBn, en: recTitleEn },
                           note: recNote,
+                          nextDueAt: recNextDueAt.trim() || undefined,
                         })
                       }
                     >
@@ -793,8 +923,8 @@ export function VetWebFeature({
       {tab === 'claims' ? (
         <SplitWorkbench
           masterTitle={t('বীমা দাবি পর্যালোচনা তালিকা', 'Insurance Claims Referred for Vet Review')}
-          masterCount={state.claims.length}
-          masterList={state.claims.map((claim) => {
+          masterCount={myClaims.length}
+          masterList={myClaims.map((claim) => {
             const animal = state.animals.find((a) => a.id === claim.animalId);
             const selected = activeClaim?.id === claim.id;
             return (
@@ -859,7 +989,12 @@ export function VetWebFeature({
                       {t('আইওটি কলার টেলিমেট্রি', 'IoT Collar Telemetry')}
                     </span>
                     <strong className="text-sm text-[#0F602D]">
-                      {claimAnimal && hasIoTEvidence(state, claimAnimal.id, state.now)
+                      {claimAnimal &&
+                      hasIoTEvidence(
+                        state,
+                        claimAnimal.id,
+                        activeClaim.evidence.capturedAt ?? activeClaim.createdAt,
+                      )
                         ? t('যাচাইকৃত (Verified)', 'Verified')
                         : t('ম্যানুয়াল যাচাই', 'Manual Check')}
                     </strong>
@@ -911,6 +1046,146 @@ export function VetWebFeature({
             )
           }
         />
+      ) : null}
+
+      {tab === 'emergency' ? (
+        <Card className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-bold text-[#1F2937]">
+                {t('জরুরি সতর্কতা ও ৪-ঘণ্টা SLA ট্রায়াজ কিউ (UC-001)', 'Emergency Alert & 4-Hour SLA Triage Queue (UC-001)')}
+              </h2>
+              <p className="text-xs text-[#64748B]">
+                {t(
+                  '৪ ঘণ্টার মধ্যে সমাধান না হওয়া গুরুতর সতর্কতা স্বয়ংক্রিয়ভাবে এসকেলেট হয়।',
+                  'Critical collar alerts unresolved after 4 hours automatically escalate here for rapid clinical intervention.',
+                )}
+              </p>
+            </div>
+            <Badge tone={escalatedAlerts.length > 0 ? 'danger' : 'success'}>
+              {escalatedAlerts.length} {t('টি সক্রিয়', 'Active')}
+            </Badge>
+          </div>
+
+          {escalatedAlerts.length === 0 ? (
+            <EmptyWorkspaceState
+              title={t('কোনো জরুরি সতর্কতা নেই', 'No active emergency alerts')}
+              description={t(
+                'সকল নিবন্ধিত প্রাণীর কলার ভাইটালস স্বাভাবিক সীমার মধ্যে রয়েছে।',
+                'All monitored livestock vitals are currently within normal thresholds.',
+              )}
+            />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {escalatedAlerts.map((alert) => {
+                const animal = state.animals.find((a) => a.id === alert.animalId);
+                const linkedAppt = myAppointments.find((ap) => ap.alertId === alert.id);
+                return (
+                  <div
+                    key={alert.id}
+                    className="rounded-[14px] border border-[#FECDD3] bg-[#FFF1F2]/70 p-4 flex flex-col gap-3"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="text-sm font-bold text-[#BE123C]">
+                          {alert.title[locale]}
+                        </div>
+                        <div className="text-xs text-[#9F1239] mt-0.5">
+                          {animal ? `${animal.name} (${animal.tag})` : alert.animalId} ·{' '}
+                          {dateTime(alert.createdAt)}
+                        </div>
+                      </div>
+                      <Badge tone="danger">{alert.status}</Badge>
+                    </div>
+                    <p className="text-xs text-[#881337]">{alert.message[locale]}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {linkedAppt ? (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedApptId(linkedAppt.id);
+                            setTab('consultations');
+                          }}
+                        >
+                          {t('জরুরি সাক্ষাৎ খুলুন', 'Open Linked Consultation')}
+                        </Button>
+                      ) : null}
+                      {animal ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedAnimalId(animal.id);
+                            setTab('patients');
+                          }}
+                        >
+                          {t('প্রাণীর পাসপোর্ট দেখুন', 'Inspect Patient Passport')}
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+      ) : null}
+
+      {tab === 'schedule' ? (
+        <Card className="flex flex-col gap-4 max-w-2xl">
+          <div>
+            <h2 className="text-base font-bold text-[#1F2937]">
+              {t('চেম্বার সময়সূচি, বিশেষত্ব ও প্রাপ্যতা', 'Clinical Specialty, Schedule & Availability')}
+            </h2>
+            <p className="text-xs text-[#64748B]">
+              {t(
+                'খামারিরা পশুচিকিৎসক ডিরেক্টরিতে আপনার এই প্রাপ্যতা ও সময়সূচি দেখতে পাবেন।',
+                'Farmers see your live availability and clinic hours when booking consultations.',
+              )}
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field
+              label={t('বিশেষত্ব (Specialty)', 'Clinical Specialty')}
+              value={scheduleSpecialty}
+              onChange={(e) => setScheduleSpecialty(e.target.value)}
+            />
+            <Field
+              label={t('চেম্বার ও টেলিমেডিসিন সময়সূচি', 'Consultation Hours')}
+              value={scheduleHours}
+              onChange={(e) => setScheduleHours(e.target.value)}
+            />
+          </div>
+          <label className="flex items-center gap-2.5 text-sm font-semibold text-[#1F2937] cursor-pointer">
+            <input
+              type="checkbox"
+              checked={scheduleAvailable}
+              onChange={(e) => setScheduleAvailable(e.target.checked)}
+              className="h-4 w-4 accent-[#15803D]"
+            />
+            {t('নতুন সাক্ষাৎ ও জরুরি কলের জন্য উপলব্ধ (Available)', 'Available for new bookings & emergency dispatches')}
+          </label>
+          <div className="flex justify-end">
+            <Button
+              variant="primary"
+              icon="check"
+              disabled={busy}
+              onClick={() =>
+                void run({
+                  type: 'profile.update',
+                  name: user?.name ?? 'Dr. Farhana Rahman',
+                  district: user?.district ?? 'Sirajganj',
+                  specialty: scheduleSpecialty,
+                  schedule: scheduleHours,
+                  available: scheduleAvailable,
+                })
+              }
+            >
+              {t('সময়সূচি সংরক্ষণ করুন', 'Save Clinic Schedule')}
+            </Button>
+          </div>
+        </Card>
       ) : null}
     </div>
   );

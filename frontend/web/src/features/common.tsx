@@ -2,30 +2,48 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { DEMO_ACCOUNTS, type DemoScenario, type Role } from '@palito/shared';
 import { useWebApp } from '@/providers/web-provider.tsx';
-import { roleNames, webHref } from '@/navigation.ts';
+import { COMMON_WEB_SCREENS, roleNames, webHref } from '@/navigation.ts';
 import {
   Badge,
   Button,
   Card,
   EmptyWorkspaceState,
   Field,
+  TabsBar,
   TextareaField,
   WebIcon,
 } from '@/components/ui.tsx';
 
-export const COMMON_WEB_SCREENS = ['notifications', 'profile', 'support'] as const;
+export { COMMON_WEB_SCREENS };
 
-export function CommonWebFeature({ screen }: { screen: string }) {
-  if (screen === 'notifications') return <NotificationsWorkspace />;
+export function CommonWebFeature({
+  screen,
+  id,
+}: {
+  screen: string;
+  id?: string;
+}) {
+  if (screen === 'notifications') return <NotificationsWorkspace id={id} />;
   if (screen === 'support') return <SupportWorkspace />;
+  if (screen === 'demo') return <DemoControlsWorkspace />;
   return <ProfileWorkspace />;
 }
 
-function NotificationsWorkspace() {
+function NotificationsWorkspace({ id }: { id?: string }) {
   const { state, user, role, locale, t, dateTime, run, busy } = useWebApp();
-  const items = state.notifications.filter((n) => n.userId === user?.id);
-  const unread = items.filter((n) => !n.read).length;
+  const [filter, setFilter] = useState<'all' | 'unread'>('all');
+  const owned = state.notifications.filter((n) => n.userId === user?.id);
+  const unread = owned.filter((n) => !n.read).length;
+  const selected = id ? owned.find((n) => n.id === id) : undefined;
+  const items = selected
+    ? [selected]
+    : owned
+        .filter((n) => filter === 'all' || !n.read)
+        .slice()
+        .reverse();
 
   return (
     <div className="flex flex-col gap-5">
@@ -36,27 +54,49 @@ function NotificationsWorkspace() {
           </h1>
           <p className="text-sm text-[#64748B]">
             {t(
-              `মোট ${items.length}টি বিজ্ঞপ্তি · ${unread}টি অপঠিত`,
-              `${items.length} total notifications · ${unread} unread`,
+              `মোট ${owned.length}টি বিজ্ঞপ্তি · ${unread}টি অপঠিত`,
+              `${owned.length} total notifications · ${unread} unread`,
             )}
           </p>
         </div>
-        {unread > 0 ? (
-          <Button
-            variant="secondary"
-            size="sm"
-            icon="check"
-            disabled={busy}
-            onClick={() => void run({ type: 'notification.read' })}
-          >
-            {t('সব পঠিত হিসেবে চিহ্নিত করুন', 'Mark All as Read')}
-          </Button>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {selected && role ? (
+            <Link
+              href={webHref(role, 'notifications')}
+              className="rounded-[8px] border border-[#E2E8F0] bg-white px-3 py-1.5 text-xs font-semibold text-[#1F2937] hover:bg-[#F8FAFC]"
+            >
+              {t('সব বিজ্ঞপ্তি দেখুন', 'Show All Notifications')}
+            </Link>
+          ) : null}
+          {unread > 0 ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon="check"
+              disabled={busy}
+              onClick={() => void run({ type: 'notification.read' })}
+            >
+              {t('সব পঠিত হিসেবে চিহ্নিত করুন', 'Mark All as Read')}
+            </Button>
+          ) : null}
+        </div>
       </div>
+
+      {!selected ? (
+        <TabsBar
+          ariaLabel={t('বিজ্ঞপ্তি ফিল্টার', 'Notification filter')}
+          active={filter}
+          onChange={setFilter}
+          tabs={[
+            { id: 'all', label: t('সব বার্তা', 'All'), count: owned.length },
+            { id: 'unread', label: t('অপঠিত', 'Unread'), count: unread },
+          ]}
+        />
+      ) : null}
 
       {items.length === 0 ? (
         <EmptyWorkspaceState
-          title={t('কোনো বিজ্ঞপ্তি নেই', 'No notifications yet')}
+          title={t('কোনো বিজ্ঞপ্তি নেই', 'No notifications here')}
           description={t(
             'নতুন ঋণ সিদ্ধান্ত, পরামর্শ বা সতর্কতা এলে এখানে দেখা যাবে।',
             'Updates on loans, consultations, claims, and health alerts will appear here.',
@@ -64,63 +104,72 @@ function NotificationsWorkspace() {
         />
       ) : (
         <div className="flex flex-col gap-3">
-          {items.map((item) => (
-            <Card
-              key={item.id}
-              tinted={!item.read}
-              className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-            >
-              <div className="flex items-start gap-3">
-                <div
-                  className={`p-2.5 rounded-[10px] shrink-0 ${
-                    item.read
-                      ? 'bg-[#F8FAFC] text-[#64748B]'
-                      : 'bg-[#15803D] text-white'
-                  }`}
-                >
-                  <WebIcon name="bell" className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-[#1F2937]">
-                      {item.title[locale]}
-                    </span>
-                    {!item.read ? (
-                      <Badge tone="brand">{t('নতুন', 'New')}</Badge>
-                    ) : null}
+          {items.map((item) => {
+            const targetScreen =
+              item.screen === 'review-overdue' ? 'claim' : (item.screen ?? 'home');
+            return (
+              <Card
+                key={item.id}
+                tinted={!item.read}
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`p-2.5 rounded-[10px] shrink-0 ${
+                      item.read
+                        ? 'bg-[#F8FAFC] text-[#64748B]'
+                        : 'bg-[#15803D] text-white'
+                    }`}
+                  >
+                    <WebIcon name="bell" className="w-4 h-4" />
                   </div>
-                  <p className="text-sm text-[#475569] mt-0.5">{item.body[locale]}</p>
-                  <div className="text-xs text-[#64748B] mt-1 tabular-nums">
-                    {dateTime(item.createdAt)}
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-[#1F2937]">
+                        {item.title[locale]}
+                      </span>
+                      {!item.read ? (
+                        <Badge tone="brand">{t('নতুন', 'New')}</Badge>
+                      ) : null}
+                    </div>
+                    <p className="text-sm text-[#475569] mt-0.5">{item.body[locale]}</p>
+                    <div className="text-xs text-[#64748B] mt-1 tabular-nums">
+                      {dateTime(item.createdAt)}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="flex items-center gap-2 shrink-0">
-                {!item.read ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={busy}
-                    onClick={() =>
-                      void run({ type: 'notification.read', notificationId: item.id })
-                    }
-                  >
-                    {t('পঠিত', 'Mark Read')}
-                  </Button>
-                ) : null}
-                {role ? (
-                  <Link
-                    href={webHref(role, 'home')}
-                    className="inline-flex items-center gap-1 rounded-[8px] bg-[#EBF4EE] px-3 py-1.5 text-xs font-semibold text-[#0F602D] hover:bg-[#D8E9DE]"
-                  >
-                    <span>{t('ডেস্কে যান', 'Open Desk')}</span>
-                    <WebIcon name="chevron-right" className="w-3.5 h-3.5" />
-                  </Link>
-                ) : null}
-              </div>
-            </Card>
-          ))}
+                <div className="flex items-center gap-2 shrink-0">
+                  {!item.read ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={busy}
+                      onClick={() =>
+                        void run({ type: 'notification.read', notificationId: item.id })
+                      }
+                    >
+                      {t('পঠিত', 'Mark Read')}
+                    </Button>
+                  ) : null}
+                  {role ? (
+                    <Link
+                      href={webHref(role, targetScreen, item.entityId)}
+                      onClick={() => {
+                        if (!item.read) {
+                          void run({ type: 'notification.read', notificationId: item.id });
+                        }
+                      }}
+                      className="inline-flex items-center gap-1 rounded-[8px] bg-[#EBF4EE] px-3 py-1.5 text-xs font-semibold text-[#0F602D] hover:bg-[#D8E9DE]"
+                    >
+                      <span>{t('সংশ্লিষ্ট পাতায় যান', 'Open Record')}</span>
+                      <WebIcon name="chevron-right" className="w-3.5 h-3.5" />
+                    </Link>
+                  ) : null}
+                </div>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
@@ -349,8 +398,12 @@ function SupportWorkspace() {
           </div>
           <div className="text-sm text-[#1F2937] space-y-1.5 pt-2">
             <div>
-              <strong>{t('জরুরি ভেটেরিনারি হেল্পলাইন:', 'Emergency Vet Helpline:')}</strong>{' '}
-              <span className="tabular-nums">+880 9612-725486</span> (24/7)
+              <strong>{t('হেল্পলাইন:', 'Helpline:')}</strong>{' '}
+              <span className="tabular-nums">১৬২৬৩ / +880 9612-725486</span>
+            </div>
+            <div>
+              <strong>{t('সেবার সময়:', 'Service Hours:')}</strong>{' '}
+              {t('প্রতিদিন সকাল ৮টা – রাত ১০টা (ঢাকা সময়)', 'Daily 8:00 AM – 10:00 PM (Asia/Dhaka)')}
             </div>
             <div>
               <strong>{t('ব্যাংক ও বীমা ডেস্ক:', 'Bank & Insurance Desk:')}</strong>{' '}
@@ -361,7 +414,7 @@ function SupportWorkspace() {
               {t('বনানী, ঢাকা-১২১৩, বাংলাদেশ', 'Banani, Dhaka-1213, Bangladesh')}
             </div>
           </div>
-          <div className="pt-2">
+          <div className="pt-2 flex flex-wrap gap-2">
             <Button
               variant="secondary"
               size="sm"
@@ -372,7 +425,42 @@ function SupportWorkspace() {
             >
               {t('মোবাইল অ্যাপে সহায়তা খুলুন', 'Open Support in Mobile App')}
             </Button>
+            {role ? (
+              <Link
+                href={webHref(role, 'demo')}
+                className="inline-flex items-center gap-1.5 rounded-[8px] border border-[#E2E8F0] bg-white px-3 py-1.5 text-xs font-semibold text-[#1F2937] hover:bg-[#F8FAFC]"
+              >
+                {t('অ্যাকাউন্ট ও পরিবেশ ব্যবস্থাপনা', 'Account & Environment Switcher')}
+              </Link>
+            ) : null}
           </div>
+        </Card>
+
+        <Card className="flex flex-col gap-2">
+          <h2 className="text-sm font-bold text-[#1F2937]">
+            {t('কীভাবে শুরু করব?', 'How do I get started?')}
+          </h2>
+          <p className="text-xs text-[#475569]">
+            {t(
+              'খামারি হিসেবে খামার ও পশু নিবন্ধন করুন। পশুর ডিজিটাল স্বাস্থ্য পাসপোর্ট থেকে ভ্যাকসিন, আইওটি সেন্সর, টেলিমেডিসিন ও আর্থিক সেবার তথ্য এক জায়গায় পাবেন।',
+              'Register your farm and livestock to activate digital health passports linking vaccinations, IoT sensors, telemedicine, and financial services.',
+            )}
+          </p>
+        </Card>
+
+        <Card className="flex flex-col gap-2">
+          <h2 className="text-sm font-bold text-[#1F2937]">
+            {t(
+              'জরুরি পশুচিকিৎসা ও বীমা দাবি কীভাবে কাজ করে?',
+              'How do emergency care and insurance claims work?',
+            )}
+          </h2>
+          <p className="text-xs text-[#475569]">
+            {t(
+              'জরুরি লক্ষণ বা সেন্সর সতর্কতা দেখা দিলে সরাসরি ভেট ভিডিও পরামর্শ বা খামার পরিদর্শনের অনুরোধ পাঠাতে পারেন। বীমা দাবির ক্ষেত্রে ছবি, জিপিএস ও ৪৮ ঘণ্টার আইওটি তথ্য যাচাই করা হয়।',
+              'When urgent symptoms or sensor alerts arise, request a video consult or farm visit immediately. Insurance claims verify photos, GPS location, and 48-hour IoT telemetry.',
+            )}
+          </p>
         </Card>
       </div>
 
@@ -415,6 +503,171 @@ function SupportWorkspace() {
             </Button>
           </div>
         </Card>
+      </div>
+    </div>
+  );
+}
+
+function DemoControlsWorkspace() {
+  const router = useRouter();
+  const { state, user, locale, t, dateTime, run, busy } = useWebApp();
+  const activeAccounts = state.users.filter((a) => a.status === 'active');
+  const seenRoles = new Set<Role>();
+
+  async function switchAccount(userId: string, targetRole: Role) {
+    const res = await run({ type: 'auth.switch', userId });
+    if (res.ok) {
+      router.push(webHref(targetRole, 'home'));
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <Card tinted className="flex flex-col gap-2">
+        <h1 className="text-xl font-bold text-[#0A401E]">
+          {t('অ্যাকাউন্ট ও পরিবেশ ব্যবস্থাপনা', 'Account & Environment Switcher')}
+        </h1>
+        <p className="text-sm text-[#0F602D]">
+          {t(
+            'একই ব্রাউজারে বিভিন্ন ভূমিকার অ্যাকাউন্টে প্রবেশ করে সংশ্লিষ্ট প্যানেল ও অনুমোদন প্রবাহ পরীক্ষা করুন।',
+            'Switch between role accounts on this device to inspect each stakeholder workspace and approval workflow.',
+          )}
+        </p>
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <Card className="lg:col-span-6 flex flex-col gap-3">
+          <h2 className="text-base font-bold text-[#1F2937]">
+            {t('অ্যাকাউন্ট বদলান', 'Switch Account')}
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {(activeAccounts.length ? activeAccounts : DEMO_ACCOUNTS).map((account) => {
+              const isCurrent = account.id === user?.id;
+              const firstForRole = !seenRoles.has(account.role);
+              seenRoles.add(account.role);
+              return (
+                <button
+                  key={account.id}
+                  type="button"
+                  disabled={busy}
+                  data-testid={firstForRole ? `switch-${account.role}` : `switch-${account.id}`}
+                  onClick={() => void switchAccount(account.id, account.role)}
+                  className={`flex items-start justify-between gap-2 rounded-[12px] border p-3.5 text-left cursor-pointer ${
+                    isCurrent
+                      ? 'border-[#15803D] bg-[#EBF4EE]/70'
+                      : 'border-[#E2E8F0] bg-white hover:bg-[#F8FAFC]'
+                  }`}
+                >
+                  <div>
+                    <div className="text-sm font-bold text-[#1F2937]">
+                      {roleNames[account.role][locale]}
+                    </div>
+                    <div className="text-xs text-[#0F602D] font-semibold">
+                      {locale === 'bn' ? account.nameBn : account.name}
+                    </div>
+                    <div className="text-[11px] text-[#64748B] tabular-nums mt-0.5">
+                      {account.phone} · {account.district}
+                    </div>
+                  </div>
+                  {isCurrent ? <Badge tone="brand">{t('সক্রিয়', 'Active')}</Badge> : null}
+                </button>
+              );
+            })}
+          </div>
+        </Card>
+
+        <div className="lg:col-span-6 flex flex-col gap-4">
+          <Card className="flex flex-col gap-3">
+            <h2 className="text-base font-bold text-[#1F2937]">
+              {t('সংযোগ ও সিস্টেম সময় নিয়ন্ত্রণ', 'Connectivity & System Time Progression')}
+            </h2>
+            <p className="text-xs text-[#64748B]">
+              {t('বর্তমান সিস্টেম সময়:', 'Current system clock:')}{' '}
+              <strong className="text-[#1F2937] tabular-nums">{dateTime(state.now)}</strong>
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="primary"
+                size="sm"
+                icon="clock"
+                disabled={busy}
+                data-testid="advance-four-hours"
+                onClick={() => void run({ type: 'demo.advanceTime', hours: 4 })}
+              >
+                {t('৪ ঘণ্টা এগোন', 'Advance 4 Hours')}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon="clock"
+                disabled={busy}
+                onClick={() => void run({ type: 'demo.advanceTime', hours: 24 })}
+              >
+                {t('১ দিন এগোন', 'Advance 1 Day')}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon="clock"
+                disabled={busy}
+                onClick={() => void run({ type: 'demo.advanceTime', hours: 24 * 7 })}
+              >
+                {t('৭ দিন এগোন', 'Advance 7 Days')}
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-2 pt-2 border-t border-[#E2E8F0]">
+              <Button
+                variant={state.settings.offline ? 'danger' : 'outline'}
+                size="sm"
+                icon="radio"
+                disabled={busy}
+                onClick={() =>
+                  void run({ type: 'demo.offline', offline: !state.settings.offline })
+                }
+              >
+                {state.settings.offline
+                  ? t('অফলাইন মোড সক্রিয় (অনলাইনে ফিরুন)', 'Offline Active (Go Online)')
+                  : t('অফলাইন মোড চালু করুন', 'Enable Offline Mode')}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                icon="alert"
+                disabled={busy}
+                data-testid="fail-next"
+                onClick={() => void run({ type: 'demo.failNext' })}
+              >
+                {t(
+                  'পরের অনুরোধে ত্রুটি পরীক্ষা করুন',
+                  'Test Network Retry on Next Action',
+                )}
+              </Button>
+            </div>
+          </Card>
+
+          <Card className="flex flex-col gap-3">
+            <h2 className="text-base font-bold text-[#1F2937]">
+              {t('ডেটা প্রিসেট ও রিসেট', 'Data Presets & Reset')}
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              {(['normal', 'health', 'insurance', 'lending', 'empty'] as DemoScenario[]).map(
+                (scen) => (
+                  <Button
+                    key={scen}
+                    variant={state.settings.scenario === scen ? 'primary' : 'outline'}
+                    size="sm"
+                    icon="refresh"
+                    disabled={busy}
+                    data-testid={scen === state.settings.scenario ? 'reset-demo' : `preset-${scen}`}
+                    onClick={() => void run({ type: 'demo.reset', scenario: scen })}
+                  >
+                    {t(`রিসেট: ${scen}`, `Reset Preset: ${scen}`)}
+                  </Button>
+                ),
+              )}
+            </div>
+          </Card>
+        </div>
       </div>
     </div>
   );

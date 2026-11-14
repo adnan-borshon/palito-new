@@ -98,3 +98,94 @@ export function mobileDeepLink(role: Role, screen = 'home', id?: string): string
 export function isRole(value: unknown): value is Role {
   return typeof value === 'string' && Object.hasOwn(roleNames, value);
 }
+
+export const COMMON_WEB_SCREENS = [
+  'notifications',
+  'profile',
+  'profile-edit',
+  'settings',
+  'support',
+  'demo',
+] as const;
+
+export type CommonWebScreen = (typeof COMMON_WEB_SCREENS)[number];
+
+export function isCommonWebScreen(screen: string): screen is CommonWebScreen {
+  return (COMMON_WEB_SCREENS as readonly string[]).includes(screen);
+}
+
+/**
+ * Maps any Mobile or Notification screen name to its canonical sidebar screen
+ * so active navigation highlights and deep links work identically across platforms.
+ */
+export function canonicalSidebarScreen(role: Role, screen: string): string {
+  if (screen === 'profile-edit' || screen === 'settings') return 'profile';
+  if (screen === 'demo') return 'profile';
+  if (isCommonWebScreen(screen)) return screen;
+
+  switch (role) {
+    case 'bank':
+      if (screen === 'loan' || screen === 'loans' || screen === 'settlements') return 'loans';
+      if (screen === 'applications' || screen === 'passport') return 'applications';
+      return 'home';
+    case 'vet':
+      if (screen === 'appointment' || screen === 'appointments' || screen === 'emergency')
+        return 'appointments';
+      if (screen === 'animal' || screen === 'animals' || screen === 'passport') return 'animals';
+      if (screen === 'reviews' || screen === 'claims' || screen === 'claim' || screen === 'review-overdue')
+        return 'reviews';
+      if (screen === 'schedule') return 'profile';
+      return 'home';
+    case 'insurer':
+      if (screen === 'applications' || screen === 'passport') return 'applications';
+      if (screen === 'policies' || screen === 'policy') return 'policies';
+      if (screen === 'claims' || screen === 'claim' || screen === 'review-overdue') return 'claims';
+      return 'home';
+    case 'admin':
+      if (screen === 'users' || screen === 'user') return 'users';
+      if (screen === 'content' || screen === 'article') return 'content';
+      if (screen === 'reports' || screen === 'audit') return 'reports';
+      return 'home';
+    case 'farmer':
+      if (['animals', 'animal', 'animal-add', 'animal-edit', 'record-add', 'farm'].includes(screen))
+        return 'animals';
+      if (['devices', 'device', 'vitals', 'alerts', 'alert'].includes(screen))
+        return 'devices';
+      if (
+        [
+          'care',
+          'vets',
+          'vet',
+          'book',
+          'appointments',
+          'appointment',
+          'emergency',
+          'prescriptions',
+          'prescription',
+          'reminders',
+        ].includes(screen)
+      )
+        return 'care';
+      if (screen === 'ai') return 'ai';
+      if (
+        [
+          'wallet',
+          'loans',
+          'loan',
+          'loan-apply',
+          'insurance',
+          'insurance-apply',
+          'policy',
+          'policies',
+          'claims',
+          'claim',
+          'claim-apply',
+        ].includes(screen)
+      )
+        return 'wallet';
+      if (['market', 'shop', 'orders', 'order'].includes(screen)) return 'market';
+      if (['education', 'article'].includes(screen)) return 'education';
+      return 'home';
+  }
+}
+

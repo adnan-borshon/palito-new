@@ -48,7 +48,12 @@ export default function RoleWorkspacePage({
 
   return (
     <AppShell role={validRole} activeScreen={screen} activeId={id}>
-      <WebFeatureRegistry role={validRole} screen={screen} id={id} />
+      <WebFeatureRegistry
+        key={`${validRole}:${screen}:${id ?? ''}`}
+        role={validRole}
+        screen={screen}
+        id={id}
+      />
     </AppShell>
   );
 }

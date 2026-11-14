@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { DEMO_ACCOUNTS, type Role } from '@palito/shared';
 import { useWebApp } from '@/providers/web-provider.tsx';
@@ -9,16 +10,205 @@ import { Badge, Button, Card, Field, WebIcon } from '@/components/ui.tsx';
 
 const PRIORITY_ROLE_ORDER: Role[] = ['bank', 'vet', 'admin', 'insurer', 'farmer'];
 
+export function WelcomeView() {
+  const router = useRouter();
+  const { locale, t, run, busy } = useWebApp();
+  const [step, setStep] = useState(0);
+
+  const pages = [
+    {
+      title: t('সুস্থ পশু, সমৃদ্ধ খামার', 'Healthy animals. A thriving farm.'),
+      body: t(
+        'আপনার খামারের যত্ন, এখন আপনার হাতেই। স্বাস্থ্য, চিকিৎসা ও আর্থিক সেবা—সব একসাথে।',
+        'Care for your farm, right in your hands. Animal health, veterinary care, and financial services together.',
+      ),
+    },
+    {
+      title: t('যত্নে থাকুক প্রতিটি প্রাণ', 'Every animal. Carefully cared for.'),
+      body: t(
+        'পশুর স্বাস্থ্য দেখুন, সতর্কতা পান এবং প্রয়োজনে পশুচিকিৎসকের সহায়তা নিন।',
+        'Follow animal health, notice alerts, and reach a veterinarian when your animals need care.',
+      ),
+    },
+    {
+      title: t('আগামীর জন্য নিরাপদ খামার', 'A secure farm. A brighter tomorrow.'),
+      body: t(
+        'যাচাইকৃত স্বাস্থ্য পাসপোর্টের মাধ্যমে পশুবীমা ও সহজ শর্তে খামার ঋণ সুবিধা পান।',
+        'Access livestock insurance and health-linked farm credit backed by verified digital health passports.',
+      ),
+    },
+  ];
+
+  async function finish() {
+    const res = await run({ type: 'session.onboard' });
+    if (res.ok) {
+      router.replace('/login');
+    }
+  }
+
+  return (
+    <div
+      data-testid="welcome-screen"
+      className="min-h-dvh flex items-center justify-center bg-[#F8FAFC] p-6"
+    >
+      <Card className="w-full max-w-2xl flex flex-col gap-6 p-6 sm:p-8">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <img
+              src="/images/palito-mark.png"
+              alt="Palito"
+              className="w-10 h-10 rounded-[10px] bg-[#EBF4EE] p-1.5 object-contain"
+            />
+            <span className="text-lg font-bold text-[#0A401E]">পালিতো · Palito</span>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() =>
+              void run({ type: 'session.locale', locale: locale === 'bn' ? 'en' : 'bn' })
+            }
+          >
+            {locale === 'bn' ? 'English' : 'বাংলা'}
+          </Button>
+        </div>
+
+        <div className="rounded-[16px] bg-[#EBF4EE] p-6 flex items-center justify-center">
+          <img
+            src="/images/onboarding.png"
+            alt={t('পালিতের পশুস্বাস্থ্য সেবা', 'Palito livestock care services')}
+            className="max-h-56 w-auto object-contain"
+          />
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <div>
+            <Badge tone="success">
+              {t('আপনার খামারের বিশ্বস্ত সঙ্গী', 'Your trusted farming companion')}
+            </Badge>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-[#0A401E]">
+            {pages[step].title}
+          </h1>
+          <p className="text-sm sm:text-base text-[#475569]">{pages[step].body}</p>
+        </div>
+
+        <div
+          className="flex items-center justify-center gap-2"
+          aria-label={t(
+            `৩টির মধ্যে ${step + 1} নম্বর পরিচিতি`,
+            `Introduction ${step + 1} of 3`,
+          )}
+        >
+          {pages.map((_, idx) => (
+            <span
+              key={idx}
+              className={`h-2 rounded-full transition-all ${
+                idx === step ? 'w-6 bg-[#15803D]' : 'w-2 bg-[#CBD5E1]'
+              }`}
+            />
+          ))}
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-[#E2E8F0]">
+          {step < 2 ? (
+            <Button
+              variant="ghost"
+              disabled={busy}
+              data-testid="welcome-skip"
+              onClick={() => void finish()}
+            >
+              {t('পরিচিতি এড়িয়ে যান', 'Skip introduction')}
+            </Button>
+          ) : (
+            <span />
+          )}
+          <Button
+            variant="primary"
+            icon="chevron-right"
+            disabled={busy}
+            data-testid="welcome-continue"
+            onClick={() => (step === 2 ? void finish() : setStep(step + 1))}
+          >
+            {step === 2 ? t('শুরু করুন', 'Get started') : t('পরবর্তী', 'Continue')}
+          </Button>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 export function LoginView() {
   const router = useRouter();
-  const { state, locale, t, run, busy, error, feedback } = useWebApp();
-  const [phone, setPhone] = useState(DEMO_ACCOUNTS[2]?.phone ?? '+8801711000003');
+  const { state, repo, locale, t, run, busy, error, feedback, clearError, clearFeedback } =
+    useWebApp();
+  const [phone, setPhone] = useState(DEMO_ACCOUNTS[3]?.phone ?? '+8801612345678');
   const [code, setCode] = useState('123456');
   const [otpRequested, setOtpRequested] = useState(false);
+  const [resendSeconds, setResendSeconds] = useState(0);
+  const [requestTick, setRequestTick] = useState(0);
+  const otpFormRef = useRef<HTMLFormElement | null>(null);
+  const otpAbortRef = useRef<AbortController | null>(null);
 
   const primaryAccounts = PRIORITY_ROLE_ORDER.map(
-    (role) => DEMO_ACCOUNTS.find((account) => account.role === role)!,
+    (role) =>
+      state.users.find((account) => account.role === role && account.status === 'active') ??
+      DEMO_ACCOUNTS.find((account) => account.role === role)!,
   ).filter(Boolean);
+
+  function stopSmsOtpListener() {
+    if (otpAbortRef.current) {
+      otpAbortRef.current.abort();
+      otpAbortRef.current = null;
+    }
+  }
+
+  useEffect(() => {
+    if (!otpRequested || !state.session.otpExpiresAt) return;
+    const domainRemaining = Math.max(
+      0,
+      Math.ceil((Date.parse(state.session.otpExpiresAt) - Date.parse(state.now) - 270000) / 1000),
+    );
+    const timer = setInterval(() => {
+      setResendSeconds(
+        Math.max(0, domainRemaining - Math.floor((Date.now() - requestTick) / 1000)),
+      );
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [otpRequested, requestTick, state.now, state.session.otpExpiresAt]);
+
+  // Progressive enhancement: WebOTP API listener (modern-web-guidance: sms-otp-form)
+  useEffect(() => {
+    if (!otpRequested || typeof window === 'undefined' || !('OTPCredential' in window)) {
+      return;
+    }
+    stopSmsOtpListener();
+    const ac = new AbortController();
+    otpAbortRef.current = ac;
+
+    void (
+      navigator.credentials as CredentialsContainer & {
+        get(options?: CredentialRequestOptions & { otp?: { transport: string[] } }): Promise<
+          (Credential & { code?: string }) | null
+        >;
+      }
+    )
+      .get({
+        otp: { transport: ['sms'] },
+        signal: ac.signal,
+      })
+      .then((otp: (Credential & { code?: string }) | null) => {
+        if (!otp?.code) return;
+        setCode(otp.code);
+        otpFormRef.current?.requestSubmit();
+      })
+      .catch((err: unknown) => {
+        if (err && typeof err === 'object' && 'name' in err && err.name === 'AbortError') {
+          return;
+        }
+      });
+
+    return () => stopSmsOtpListener();
+  }, [otpRequested, requestTick]);
 
   async function handleSelectQuickAccount(accountPhone: string, accountId: string, role: Role) {
     setPhone(accountPhone);
@@ -29,16 +219,28 @@ export function LoginView() {
   }
 
   async function handleRequestOtp() {
-    const res = await run({ type: 'auth.requestOtp', phone });
+    stopSmsOtpListener();
+    const targetPhone =
+      state.session.pendingPhone && otpRequested ? state.session.pendingPhone : phone;
+    const res = await run({ type: 'auth.requestOtp', phone: targetPhone });
     if (res.ok) {
       setOtpRequested(true);
+      setRequestTick(Date.now());
+      setResendSeconds(30);
     }
   }
 
-  async function handleVerifyOtp() {
+  async function handleVerifyOtp(e?: FormEvent<HTMLFormElement>) {
+    e?.preventDefault();
+    stopSmsOtpListener();
     const res = await run({ type: 'auth.verifyOtp', code });
     if (res.ok) {
-      const matched = state.users.find((u) => u.phone.replace(/\D/g, '').endsWith(phone.replace(/\D/g, '').slice(-10)));
+      const snapshot = repo.getSnapshot();
+      const matched =
+        snapshot.users.find((u) => u.id === snapshot.session.userId) ??
+        state.users.find((u) =>
+          u.phone.replace(/\D/g, '').endsWith(phone.replace(/\D/g, '').slice(-10)),
+        );
       router.push(webHref(matched?.role ?? 'bank', 'home'));
     }
   }
@@ -209,53 +411,99 @@ export function LoginView() {
             </div>
           </Card>
 
-          {/* Standard Phone + OTP Verification Workflow */}
+          {/* Standard Phone + OTP Verification Workflow (modern-web-guidance: sms-otp-form) */}
           <Card className="flex flex-col gap-4">
-            <div className="text-sm font-bold text-[#1F2937]">
-              {t('মোবাইল নম্বর ও ওটিপি যাচাইকরণ', 'Phone Number & OTP Verification')}
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-bold text-[#1F2937]">
+                {t('মোবাইল নম্বর ও ওটিপি যাচাইকরণ', 'Phone Number & OTP Verification')}
+              </div>
+              <Link
+                href="/welcome"
+                className="text-xs font-semibold text-[#15803D] hover:underline"
+              >
+                {t('পরিচিতি দেখুন', 'Onboarding Guide')}
+              </Link>
             </div>
 
             <Field
               label={t('নিবন্ধিত মোবাইল নম্বর', 'Registered Mobile Number')}
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="+8801711000003"
+              placeholder="+8801612345678"
               autoComplete="tel"
               hint={t(
-                'ব্যাংক: +8801711000003 · ভ7ট: +8801711000002 · অ্যাডমিন: +8801711000005 · খামারি: +8801711000001',
-                'Bank: +8801711000003 · Vet: +8801711000002 · Admin: +8801711000005 · Farmer: +8801711000001',
+                'ব্যাংক: +8801612345678 · ভেট: +8801912345678 · অ্যাডমিন: +8801312345678 · বীমা: +8801512345678 · খামারি: +8801712345678',
+                'Bank: +8801612345678 · Vet: +8801912345678 · Admin: +8801312345678 · Insurer: +8801512345678 · Farmer: +8801712345678',
               )}
+              data-testid="phone-input"
             />
 
             <div className="flex flex-wrap gap-2">
               <Button
                 variant={otpRequested ? 'secondary' : 'primary'}
                 icon="phone"
-                disabled={busy}
+                disabled={busy || (otpRequested && resendSeconds > 0)}
+                data-testid={otpRequested ? 'resend-otp' : 'request-otp'}
                 onClick={() => void handleRequestOtp()}
               >
-                {t('ওটিপি পাঠান', 'Send OTP Code')}
+                {otpRequested
+                  ? resendSeconds > 0
+                    ? t(`${resendSeconds} সেকেন্ড পরে আবার কোড নিন`, `Resend code in ${resendSeconds}s`)
+                    : t('আবার কোড নিন', 'Resend OTP Code')
+                  : t('ওটিপি পাঠান', 'Send OTP Code')}
               </Button>
+              {otpRequested ? (
+                <Button
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => {
+                    stopSmsOtpListener();
+                    setOtpRequested(false);
+                    setCode('123456');
+                    clearError();
+                    clearFeedback();
+                  }}
+                >
+                  {t('নম্বর পরিবর্তন করুন', 'Change Phone Number')}
+                </Button>
+              ) : null}
             </div>
 
-            <div className="border-t border-[#E2E8F0] pt-4 flex flex-col gap-3">
+            <form
+              ref={otpFormRef}
+              method="POST"
+              onSubmit={(e) => void handleVerifyOtp(e)}
+              className="border-t border-[#E2E8F0] pt-4 flex flex-col gap-3"
+            >
               <Field
+                type="text"
+                name="otp"
+                inputMode="numeric"
+                pattern="\d{6}"
+                maxLength={6}
+                required
+                hintAbove
                 label={t('৬-সংখ্যার ওটিপি কোড', '6-Digit Verification Code')}
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 placeholder="123456"
                 autoComplete="one-time-code"
-                hint={t('যাচাইকরণ কোড: 123456', 'Verification code: 123456')}
+                hint={t(
+                  'আপনার ফোনে পাঠানো ৬-সংখ্যার কোডটি লিখুন (কোড: 123456 · মেয়াদ ৫ মিনিট)',
+                  'Enter the 6-digit code sent to your phone (Code: 123456 · valid for 5 minutes)',
+                )}
+                data-testid="otp-input"
               />
               <Button
+                type="submit"
                 variant="primary"
                 icon="check"
                 disabled={busy}
-                onClick={() => void handleVerifyOtp()}
+                data-testid="verify-otp"
               >
                 {t('যাচাই করে প্রবেশ করুন', 'Verify & Enter Workspace')}
               </Button>
-            </div>
+            </form>
           </Card>
         </div>
       </section>
