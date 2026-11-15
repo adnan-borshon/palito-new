@@ -80,6 +80,13 @@ enum ValuationStatus {
 }
 
 model User {
+  careCommands CareCommand[]
+  careEvents CareEvent[]
+  uploadedFiles PrivateFile[] @relation("Uploader")
+  patientFiles PrivateFile[] @relation("FileOwner")
+  careReminders CareReminder[]
+  consents CareGrant[]
+
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tokensRevokedAfter DateTime? @map("tokens_revoked_after") @db.Timestamptz(3)
   firebaseUid String @unique @map("firebase_uid") @db.VarChar(128)
@@ -144,6 +151,10 @@ model Membership {
 }
 
 model VetCredential {
+  slots VetSlot[]
+  schedule VetSchedule?
+  profile VetProfile?
+
   userId String @id @map("user_id") @db.Uuid
   registrationNumber String @unique @map("registration_number") @db.VarChar(80)
   status CredentialStatus @default(PENDING)
@@ -158,6 +169,8 @@ model VetCredential {
 }
 
 model Farm {
+  version Int @default(1)
+
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   ownerId String @map("owner_id") @db.Uuid
   name String @db.VarChar(120)
@@ -189,6 +202,12 @@ model FarmMembership {
 }
 
 model Animal {
+  photoFileId String? @map("photo_file_id") @db.Uuid
+  photo PrivateFile? @relation("AnimalPhoto",fields:[photoFileId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  files PrivateFile[] @relation("PatientFiles")
+  careEvents CareEvent[]
+  reminders CareReminder[]
+
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   farmId String @map("farm_id") @db.Uuid
   ownerId String @map("owner_id") @db.Uuid
@@ -254,6 +273,11 @@ model Valuation {
 }
 
 model Appointment {
+  slotId String? @map("slot_id") @db.Uuid
+  slot VetSlot? @relation(fields:[slotId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  decisionNote String @default("") @map("decision_note") @db.VarChar(1000)
+  grant CareGrant?
+
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   animalId String @map("animal_id") @db.Uuid
   farmId String @map("farm_id") @db.Uuid
@@ -279,6 +303,8 @@ model Appointment {
 }
 
 model HealthRecord {
+  reminder CareReminder?
+
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   animalId String @map("animal_id") @db.Uuid
   authorId String @map("author_id") @db.Uuid
@@ -392,4 +418,111 @@ model RecoveryRequest {
   @@index([userId, status])
   @@map("recovery_requests")
   @@schema("palito")
+}
+
+model VetSchedule {
+  vetId String @id @map("vet_id") @db.Uuid
+  version Int @default(0)
+  vet VetCredential @relation(fields:[vetId],references:[userId],onDelete:Restrict,onUpdate:NoAction)
+  @@map("vet_schedules")
+  @@schema("palito")
+}
+model VetSlot {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  vetId String @map("vet_id") @db.Uuid
+  startsAt DateTime @map("starts_at") @db.Timestamptz(3)
+  endsAt DateTime @map("ends_at") @db.Timestamptz(3)
+  status String @default("OPEN") @db.VarChar(12)
+  vet VetCredential @relation(fields:[vetId],references:[userId],onDelete:Restrict,onUpdate:NoAction)
+  appointments Appointment[]
+  @@unique([vetId,startsAt,endsAt])
+  @@index([vetId,status,startsAt])
+  @@map("vet_slots")
+  @@schema("palito")
+}
+model CareGrant {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  appointmentId String @unique @map("appointment_id") @db.Uuid
+  farmerId String @map("farmer_id") @db.Uuid
+  consentVersion String @map("consent_version") @db.VarChar(20)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(3)
+  grantedAt DateTime @default(now()) @map("granted_at") @db.Timestamptz(3)
+  appointment Appointment @relation(fields:[appointmentId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  farmer User @relation(fields:[farmerId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  @@map("care_grants")
+  @@schema("palito")
+}
+model PrivateFile {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  animalId String @map("animal_id") @db.Uuid
+  uploaderId String @map("uploader_id") @db.Uuid
+  ownerAtUploadId String @map("owner_at_upload_id") @db.Uuid
+  purpose String @db.VarChar(20)
+  contentType String @map("content_type") @db.VarChar(20)
+  declaredBytes Int @map("declared_bytes")
+  status String @default("PENDING") @db.VarChar(16)
+  sha256 String? @db.Char(64)
+  bytes Bytes? @db.ByteA
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  animal Animal @relation("PatientFiles",fields:[animalId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  uploader User @relation("Uploader",fields:[uploaderId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  owner User @relation("FileOwner",fields:[ownerAtUploadId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  photos Animal[] @relation("AnimalPhoto")
+  @@index([animalId,status,createdAt])
+  @@map("private_files")
+  @@schema("palito")
+}
+model CareReminder {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  animalId String @map("animal_id") @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  recordId String @unique @map("record_id") @db.Uuid
+  dueAt DateTime @map("due_at") @db.Timestamptz(3)
+  enabled Boolean @default(true)
+  version Int @default(1)
+  animal Animal @relation(fields:[animalId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  owner User @relation(fields:[ownerId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  record HealthRecord @relation(fields:[recordId,animalId],references:[id,animalId],onDelete:Restrict,onUpdate:NoAction)
+  @@index([ownerId,dueAt,id])
+  @@map("care_reminders")
+  @@schema("palito")
+  @@unique([recordId, animalId])
+}
+model CareEvent {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId String @map("actor_id") @db.Uuid
+  animalId String @map("animal_id") @db.Uuid
+  kind String @db.VarChar(40)
+  payload Json @db.JsonB
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  actor User @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  animal Animal @relation(fields:[animalId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  @@index([createdAt,id])
+  @@map("care_events")
+  @@schema("palito")
+}
+model CareCommand {
+  actorId String @map("actor_id") @db.Uuid
+  key String @db.VarChar(100)
+  operation String @db.VarChar(160)
+  payloadHash String @map("payload_hash") @db.Char(64)
+  result Json @db.JsonB
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  actor User @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  @@id([actorId,key])
+  @@map("care_commands")
+  @@schema("palito")
+}
+
+model VetProfile {
+ vetId String @id @map("vet_id") @db.Uuid
+ district String @db.VarChar(120)
+ species String[] @db.VarChar(40)
+ bio String @db.VarChar(1000)
+ version Int @default(1)
+ vet VetCredential @relation(fields:[vetId],references:[userId],onDelete:Restrict,onUpdate:Cascade)
+ @@map("vet_profiles")
+ @@schema("palito")
 }

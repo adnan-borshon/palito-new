@@ -66,3 +66,7 @@ Domain contracts remain M0 design. M1 implements only GET `/api/v1/health/live`,
 | Providers | POST /provider-webhooks/:provider | M6 onward; signature and amount/currency/recipient validation, event deduplication; no user session substitutes for provider trust |
 
 Any method not listed remains denied until its feature contract is reviewed. No generic `/commands` endpoint and no global role overwrite route.
+
+## Actual M4 contract
+
+See [healthcare](healthcare.md) for implemented DTOs, per-record consent, state/time rules, private-image protocol, client lifecycle and exact pilot limitations; [progress](progress.md) records actual checks. Existing proposals above remain future contracts where not implemented there. Enable `HEALTHCARE_NO_CHARGE_PILOT=true` only for an explicit no-charge development/staging pilot; default booking is off. Apply the fifth additive migration only to an authorized development/test database with the migration role. Native uses a configured development build, not Expo Go; web uses same-origin API rewrites/cookies. No provider deployment or real SMS is implied. Stop for review before M5.

@@ -1,6 +1,6 @@
 # Backend implementation backlog
 
-Derived from the uploaded [source plan](source-plan.md), reconciled to source `b31b165bc92f2734776b608aeba241a6b9dd291e` on 2026-11-15. Engineering owns implementation/test evidence; product, clinical and partner policy owners are assigned in decisions. Read traceability for individual PAL IDs and planned acceptance tests. M0–M2 were reviewed; M3 is authorized and in progress. See identity.md for implemented paths and remaining exit gates. M4+ remain unimplemented.
+Derived from the uploaded [source plan](source-plan.md), reconciled to source `b31b165bc92f2734776b608aeba241a6b9dd291e` on 2026-11-15. Engineering owns implementation/test evidence; product, clinical and partner policy owners are assigned in decisions. Read traceability for individual PAL IDs and planned acceptance tests. M0–M3 were delivered and reviewed; M4 healthcare is authorized and implemented for review. See progress.md and healthcare.md for actual evidence/limits. M5+ remain unimplemented.
 
 Release A: identity + healthcare + reliable jobs; finance disabled or explicit sandbox. Release B: finance sandbox after approved terms/ledger/contracts. Release C: independently gated telemetry/AI/calls/commerce/reporting/provider pilot. These groups sequence all requirements; they do not remove any SRS/PAL scope. Initial API and conceptual tables are in architecture/API contracts; schema migrations are M2, not M0.
 
@@ -36,6 +36,7 @@ Release A: identity + healthcare + reliable jobs; finance disabled or explicit s
 **Skills:** Firebase tooling; Palito backend; device/browser tools.
 
 ### M4 — Healthcare workflow end to end
+**Current status:** implemented for review; actual contract in [healthcare](healthcare.md), checks in [progress](progress.md).
 **Depends on:** M3.
 **Submilestones:** M4a farms/animals/passports and private files; M4b discovery/slots/appointments; M4c consultation/prescription/history; M4d mobile/web integration and parity.
 **Work:** availability/time-zone rules, cancellation/rescheduling, clinical amendments, vet verification, scoped patient access, consent and expiry. Define booking-payment dependency: use an explicit no-charge pilot or disable paid booking until M6; never fake a completed payment.
@@ -91,4 +92,6 @@ Release A: identity + healthcare + reliable jobs; finance disabled or explicit s
 
 ## Immediate next step after M2 review
 
-On explicit authorization, M3 integrates Firebase verification and server-owned account/membership permissions, then real client session lifecycle and approved staff MFA. Review current provider prerequisites, emulator/project configuration, native SDK/device compatibility and the original B03–B06 gates. Do not treat synthetic UIDs, pending vet fixtures or database access as real identity verification. M3 must not silently implement all M4 care or M6 finance workflows.
+Historical M3 boundary: M3 integrates Firebase verification and server-owned account/membership permissions, then real client session lifecycle and approved staff MFA. Review current provider prerequisites, emulator/project configuration, native SDK/device compatibility and the original B03–B06 gates. Do not treat synthetic UIDs, pending vet fixtures or database access as real identity verification. M3 must not silently implement all M4 care or M6 finance workflows.
+
+Current stop: user review after M4. Do not implement M5 delivery/jobs until separately authorized.

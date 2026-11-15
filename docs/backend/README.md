@@ -1,27 +1,19 @@
-M3 software implementation is delivered for review. Start with [progress](progress.md), [identity implementation](identity.md) and [operator runbook](m3-operator-runbook.md). Staff/MFA/invitation/recovery and native configuration code are implemented. Live project and physical-device acceptance still require owner configuration and hardware. M4 has not started.
+# Palito backend review
 
-# Backend foundation review
+M4 healthcare is implemented for review after verified M3. **Stop before M5.** Read [current progress](progress.md), [healthcare](healthcare.md), [identity](identity.md) and [runnable setup](../../backend/README.md). No production deployment/migration, merge, paid activation or real OTP campaign is included.
 
-Updated 2026-11-15. The user reviewed M0/M1 and authorized M2. Review [current progress](progress.md), [database foundation](database.md) and [runnable setup](../../backend/README.md). Core Prisma schema/migrations/roles are implemented; Firebase and domain API workflows are later milestones. Historical M2 boundary: stop for review before M3; no deployment is included.
+The real `/care` workspace is separate from preserved local demo routes. Booking defaults off; an explicit `HEALTHCARE_NO_CHARGE_PILOT=true` development/staging choice enables only BDT 0 care. Reminder delivery remains M5; paid care M6; actual video provider M8c.
 
-Start with [progress](progress.md) for executed checks and remaining limitations. M0 architectural direction remains the baseline; dependent provider/policy gates remain:
-
-1. Keep NestJS + PostgreSQL + Prisma + Firebase Auth, one API and one PostgreSQL-backed worker.
-2. Farmer phone OTP; invited privileged staff use verified email/password plus SMS MFA through Identity Platform. Native Firebase development-build compatibility must pass M3 before rollout; no phone-primary MFA bypass.
-3. Healthcare pilot first; propose no-charge appointments until payment integration. Finance and automatic clinical/financial decisions remain disabled pending reviewed policies.
-4. Keep every existing PAL requirement. Additional SRS gaps are recorded without promising blockchain, accuracy or payout timings.
-
-| Document | Review purpose |
+| Document | Purpose |
 |---|---|
-| [Architecture](architecture.md) | Components, domain ownership, data model and migration boundaries |
-| [API contracts](api-contracts.md) | Proposed methods, DTOs, read projections and error/idempotency rules |
-| [Traceability](requirements-traceability.md) | One row for each of the 65 PAL IDs, plus SRS gaps and use cases |
-| [Command inventory](command-inventory.md) | All 53 current commands classified and mapped |
-| [Decisions](decisions.md) | Proposed auth choice, policy owners and blocking deadlines |
-| [Security](security.md) | Permission matrix, trust boundaries and adversarial test plan |
-| [Tooling](tooling.md) | Reviewed/adopted versus installed/proposed tooling |
-| [Milestones](implementation-plan.md) | M0 checkpoint and M1–M10 acceptance gates |
-| [Runbook](runbook.md) | Current checks and future operational verification |
-| [Source plan](source-plan.md) | Uploaded planning baseline (trailing blank lines normalized); historical statements remain historical |
+| [Progress](progress.md) | Current implementation, checks and limits |
+| [Healthcare](healthcare.md) | Actual M4 routes, consent, state/time rules and private file protocol |
+| [Identity](identity.md) / [M3 operator runbook](m3-operator-runbook.md) | Firebase, current memberships, staff MFA, sessions and live setup gates |
+| [Database](database.md) | Relational foundation and restricted roles; M4 adds the fifth migration |
+| [Architecture](architecture.md) / [API contracts](api-contracts.md) | Baseline direction; healthcare.md overrides planned M4 routes |
+| [Traceability](requirements-traceability.md) / [Command inventory](command-inventory.md) | Preserved 65 PAL requirements and 53 demo command mappings |
+| [Decisions](decisions.md) / [Security](security.md) | Policy ownership and trust boundaries |
+| [Milestones](implementation-plan.md) / [Runbook](runbook.md) | Delivery gates and verification |
+| [Source plan](source-plan.md) | Historical uploaded baseline |
 
-Domain documents remain design contracts. Only the M1 foundation and M2 database layer listed in the checkpoint are implemented; this is not production readiness. Test IDs in traceability are planned acceptance tests unless progress explicitly records execution. Engineering owner means the next implementer; product/partner decisions require the named decision owner. M2 is authorized and delivered for review; M3 waits for the user's next instruction.
+M0–M3 checkpoints remain historical evidence, not current feature status. Live Firebase/ADC/native identities, real SMS and physical-device checks remain explicit release gates. M4 uses bounded private PostgreSQL image objects as a small-pilot adapter pending managed storage, quotas and retention review. Emulator, native SDK mocks, hosted Chrome and actual Android compilation are distinct kinds of evidence; none substitutes for live device/project acceptance.

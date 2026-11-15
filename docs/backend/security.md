@@ -42,3 +42,7 @@ Care/claim grant expiry, staff departure, account suspension, consent withdrawal
 | Lost jobs/provider ambiguity | Transactional outbox, unique logical deliveries, bounded retry and reconciliation | SEC-RECOVERY: worker crash before/after send, failed job triage, restore rehearsal |
 
 Apply OWASP ASVS/API Security guidance to enabled API scope; guidance is not an installed scanner. Scan only authorized local/staging systems. Retention/deletion/consent policies need approval; amendments/reversals preserve necessary clinical/financial history. Do not declare legal compliance from this design.
+
+## M4 enforced boundaries
+
+See [healthcare](healthcare.md) for implemented DTOs, per-record consent, state/time rules, private-image protocol, client lifecycle and exact pilot limitations; [progress](progress.md) records actual checks. Existing proposals above remain future contracts where not implemented there. Enable `HEALTHCARE_NO_CHARGE_PILOT=true` only for an explicit no-charge development/staging pilot; default booking is off. Apply the fifth additive migration only to an authorized development/test database with the migration role. Native uses a configured development build, not Expo Go; web uses same-origin API rewrites/cookies. No provider deployment or real SMS is implied. Stop for review before M5.

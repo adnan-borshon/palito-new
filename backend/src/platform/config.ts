@@ -22,6 +22,7 @@ const schema = z.object({
   AUTH_MODE: z.enum(['disabled', 'firebase', 'emulator']).default('disabled'),
   FIREBASE_PROJECT_ID: z.string().regex(/^[a-z][a-z0-9-]{4,62}$/).default('demo-palito'),
   WEB_ORIGIN: origin.default('http://localhost:3000'),
+  HEALTHCARE_NO_CHARGE_PILOT: z.enum(['true','false']).default('false').transform(value=>value==='true'),
   DEMO_MODE: z.literal('false').default('false'),
 });
 

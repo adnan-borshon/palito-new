@@ -63,3 +63,5 @@ The old engine's `localCommand`/`publicCommand` flags describe demo offline beha
 Classification totals: Deferred integration: 7, Demo-only: 6, Local preference: 2, Production API: 38.
 
 Read workflows have no demo commands: map dashboard, passports, history/gallery, vet discovery, schedules, queues, wallet/receipts, inbox, content, system health and reports through the read projections in [traceability](requirements-traceability.md) and [API contracts](api-contracts.md). Booking cost/call controls are local UI simulations today; real payment is M6 and participant-limited provider calls M8c. No current command or read screen is silently considered an implemented backend feature.
+
+M4 addition: the real `/care` workspace uses explicit API command DTOs documented in healthcare.md. The original 53 local demo commands and their mappings above remain preserved; no whole DemoState server endpoint or demo-to-live migration was introduced.

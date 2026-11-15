@@ -3,7 +3,7 @@ import {spawn} from 'node:child_process';
 import {once} from 'node:events';
 import {fileURLToPath} from 'node:url';
 import {chromium} from 'playwright';
-export async function browserJourney(){
+export async function browserJourney(vet?:import('./care-browser.scenario.js').BrowserVet){
  const root=fileURLToPath(new URL('../../../../',import.meta.url));
  const child=spawn(process.execPath,[`${root}node_modules/next/dist/bin/next`,'dev','--hostname','127.0.0.1','--port','3000'],{cwd:`${root}frontend/web`,env:{...process.env,NODE_ENV:'development',NEXT_TELEMETRY_DISABLED:'1',PALITO_API_ORIGIN:'http://127.0.0.1:4000',NEXT_PUBLIC_FIREBASE_PROJECT_ID:'demo-palito',NEXT_PUBLIC_FIREBASE_API_KEY:'synthetic-emulator-key',NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:'demo-palito.firebaseapp.com',NEXT_PUBLIC_AUTH_EMULATOR:'true'},stdio:'ignore'});
  let browser;
@@ -30,6 +30,7 @@ export async function browserJourney(){
   const denied=await page.evaluate(async()=>{const response=await fetch('/api/v1/sessions/current',{method:'DELETE'});return response.status;});assert.equal(denied,403);
   // A separate browser identity cannot inherit another browser's cookies or profile.
   const isolated=await browser.newContext();const other=await isolated.newPage();await other.goto('http://localhost:3000/identity');assert.equal(await other.getByText('স্বাগতম · Welcome, Browser farmer',{exact:true}).count(),0);await isolated.close();
+  if(vet){const {careBrowserJourney}=await import('./care-browser.scenario.js');await careBrowserJourney(page,browser,vet);await page.goto('http://localhost:3000/identity');await page.getByText('স্বাগতম · Welcome, Browser farmer',{exact:true}).waitFor();}
   await page.getByRole('button',{name:'সাইন আউট · Sign out',exact:true}).click();await page.getByLabel('নাম · Name',{exact:true}).waitFor();
   await page.reload();await page.getByLabel('নাম · Name',{exact:true}).waitFor();
   assert.ok(!(await context.cookies()).some(c=>c.name==='__Host-palito-session'));

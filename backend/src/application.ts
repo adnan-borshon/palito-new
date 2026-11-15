@@ -51,6 +51,7 @@ export function configureApplication(app: INestApplication, config: AppConfig, l
     skip:(request:Request)=>!['/api/v1/recovery-requests','/api/v1/onboarding','/api/v1/sessions','/api/v1/staff/invitations/accept'].includes(request.path),
     handler:(request:Request,response:Response)=>sendError(response,429,(request as CorrelatedRequest).requestId),
   }));
+  app.use('/api/v1/files/:id/content',express.raw({type:['image/png','image/jpeg'],limit:1048576}));
   app.use(express.json({ limit: config.BODY_LIMIT_BYTES, strict: true }));
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true, forbidNonWhitelisted: true, forbidUnknownValues: true,
@@ -62,7 +63,7 @@ export function configureApplication(app: INestApplication, config: AppConfig, l
 
 export function createOpenApi(app: INestApplication) {
   const options = new DocumentBuilder().setTitle('Palito API').setVersion('0.1.0')
-    .setDescription('Identity and session API plus operational health. Healthcare and financial workflows remain gated.')
+    .setDescription('Identity, owner-scoped healthcare, consented veterinary care and operational health. Booking requires explicit no-charge pilot configuration; finance and notification delivery remain gated.')
     .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'Firebase ID token' }, 'firebase').build();
   return SwaggerModule.createDocument(app, options);
 }

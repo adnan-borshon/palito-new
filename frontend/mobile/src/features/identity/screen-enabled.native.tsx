@@ -52,7 +52,7 @@ export default function IdentityScreen() {
   if (!enabled) return <ScrollView contentContainerStyle={{ padding: 24 }}><Text>Sign-in is not configured for this build.</Text></ScrollView>;
   return <ScrollView contentContainerStyle={{ padding: 24, gap: 16 }} keyboardShouldPersistTaps="handled">
     <Link href="/account-security">Account security</Link><Link href="/staff-identity">Staff invitation / MFA</Link><Text accessibilityRole="header">পালিতো · Palito sign-in</Text>
-    {profile ? <><Text>স্বাগতম · {profile.displayName}</Text><Text>Farm and care services follow in the next milestone.</Text><Button title="সাইন আউট · Sign out" disabled={busy} onPress={() => void act(async () => { await signOut(getAuth()); setProfile(null); setPhone(''); setName(''); setCode(''); setConfirmation(null); })} /></> : <>
+    {profile ? <><Text>স্বাগতম · {profile.displayName}</Text><Link href="/care">খামার ও চিকিৎসা · Farm & care</Link><Button title="সাইন আউট · Sign out" disabled={busy} onPress={() => void act(async () => { await signOut(getAuth()); setProfile(null); setPhone(''); setName(''); setCode(''); setConfirmation(null); })} /></> : <>
       <TextInput accessibilityLabel="Name" placeholder="নাম · Name" maxLength={120} value={name} onChangeText={setName} />
       <TextInput accessibilityLabel="Phone" placeholder="+880" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
       <Text>I agree to receive a verification SMS. Message rates may apply.</Text><Switch accessibilityLabel="SMS consent" value={consent} onValueChange={setConsent} />

@@ -72,3 +72,7 @@ Do not import `palito.demo.v1` snapshots or seeded identities into PostgreSQL. S
 Money: JSON `{ currency: "BDT", amountMinor: "12345" }` means BDT 123.45. Whole-BDT demo amounts convert explicitly by multiplying by 100 with exact integer validation. Use decimal strings for BIGINT; reject floats/exponents/negative money where forbidden. Product policy specifies rounding, interest and allocation before M6.
 
 Time: date-only `YYYY-MM-DD` for births; UTC RFC3339 instants for events; display `Asia/Dhaka`. Server clock controls eligibility and expiry. Telemetry retains observed and received timestamps. Historical signed records and accepted financial terms are versioned and retained under a policy still to be approved.
+
+## M4 implementation
+
+See [healthcare](healthcare.md) for implemented DTOs, per-record consent, state/time rules, private-image protocol, client lifecycle and exact pilot limitations; [progress](progress.md) records actual checks. Existing proposals above remain future contracts where not implemented there. Enable `HEALTHCARE_NO_CHARGE_PILOT=true` only for an explicit no-charge development/staging pilot; default booking is off. Apply the fifth additive migration only to an authorized development/test database with the migration role. Native uses a configured development build, not Expo Go; web uses same-origin API rewrites/cookies. No provider deployment or real SMS is implied. Stop for review before M5.

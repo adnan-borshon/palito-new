@@ -69,3 +69,11 @@ The user explicitly requested completion of M3. B03/B05 are implemented as conse
 B31: PostgreSQL stores an immediate auth-time revocation cutoff alongside nonce-bound web session hashes. All-device logout, verified phone changes and status changes invalidate older ID tokens, even if Firebase valid-since falls in the same second or provider revocation later fails. New sign-in must occur after the cutoff. No durable credential is copied into demo/browser persistence.
 
 B32: Genuine Android compilation exposed the v27 native SDK toolchain mismatch. Pin app/auth together to 26.4.2, with its supported Android BoM 34.18.0 and Apple SDK 12.19.3 defaults. Preserve Expo 58/RN 0.88 and static Apple frameworks; no unsupported BoM downgrade or metadata suppression flags. Web JS/Admin SDK choices are independent and retained. Native compile/physical-device results remain distinct.
+
+## M4 pilot decisions
+
+B36: User authorized M4 after verified M3. Use explicit default-off no-charge pilot (BDT 0), not fabricated paid success. Appointment-based consultations and current-consent patient scope are implemented on both real clients. Paid care/video providers remain their assigned later milestones.
+
+B37: Publish nonoverlapping 30-minute UTC slots within 90 days; display Asia/Dhaka. Fresh verified-vet MFA context and current membership apply to care. Consent care-v1 covers this animal's current passport/history/location/current-owner images until end+72h; withdrawal/cancellation/rejection/transfer revoke subsequent access. Practice species/district/bio are self-reported, distinct from verified credentials.
+
+B38: Private bounded PNG/JPEG byte objects in PostgreSQL are a small-pilot adapter pending managed storage selection. Decode/re-encode, metadata removal, quarantine/hash/finalization and revocable authenticated fetch are implemented; no S3, generic malware scanner or automatic cleanup is claimed. Larger live rollout requires quotas/retention/provider review. Clinical signs/amendments remain relational and append-only, not blockchain. Follow-ups are vet-authored; M5 handles delivery/cleanup.

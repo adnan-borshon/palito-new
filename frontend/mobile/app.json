@@ -46,6 +46,14 @@
             "./assets/palito/fonts/PlusJakartaSans-Bold.ttf"
           ]
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Select a private animal photo or care evidence.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
       ]
     ],
     "experiments": {

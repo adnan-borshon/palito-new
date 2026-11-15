@@ -71,7 +71,7 @@ after(async () => {
 
 test('clean official migrations and idempotent synthetic seed expose typed Prisma data with exact money/date values', async () => {
   const rows=await migrator.query('SELECT migration_name FROM palito._prisma_migrations ORDER BY migration_name');
-  assert.equal(rows.rowCount,4); assert.equal(await prisma.user.count(),4);
+  assert.equal(rows.rowCount,5); assert.equal(await prisma.user.count(),4);
   const animal=await prisma.animal.findUniqueOrThrow({where:{id:ids.animalA}});
   assert.equal(animal.estimateMinor,14000000n); assert.equal(animal.birthDate.toISOString(),'2020-01-01T00:00:00.000Z');
   assert.equal(animal.weightKg.toFixed(3),'450.000');
@@ -364,7 +364,15 @@ if(process.env.FIREBASE_AUTH_EMULATOR_HOST) test('staff invitation, official emu
 
 if(process.env.BROWSER_E2E==='true') test('Chromium phone sign-in, cookie restore, CSRF, isolated browser and logout via Next proxy',async()=>{
  const {createApplication}=await import('../../src/application.js');const {loadConfig}=await import('../../src/platform/config.js');const {createLogger}=await import('../../src/platform/logger.js');
- const config=loadConfig({...urls(databaseName),AUTH_MODE:'emulator',FIREBASE_PROJECT_ID:'demo-palito',FIREBASE_AUTH_EMULATOR_HOST:process.env.FIREBASE_AUTH_EMULATOR_HOST,LOG_LEVEL:'silent',CORS_ORIGINS:'http://localhost:3000',RATE_LIMIT_MAX:'1000'});
+ const config=loadConfig({...urls(databaseName),AUTH_MODE:'emulator',FIREBASE_PROJECT_ID:'demo-palito',FIREBASE_AUTH_EMULATOR_HOST:process.env.FIREBASE_AUTH_EMULATOR_HOST,HEALTHCARE_NO_CHARGE_PILOT:'true',LOG_LEVEL:'silent',CORS_ORIGINS:'http://localhost:3000',RATE_LIMIT_MAX:'1000'});
  const app=await createApplication(config,createLogger(config));await app.listen(4000,'127.0.0.1');
- try{const {browserJourney}=await import('./browser.scenario.js');await browserJourney();}finally{await app.close();}
+ try{const {careVet}=await import('./care-api.scenario.js');const vet=await careVet(prisma);const {browserJourney}=await import('./browser.scenario.js');await browserJourney(vet);}finally{await app.close();}
+});
+
+test('M4 healthcare: scoped farms, records, two-instance booking race, state machine, immutable prescriptions, private images, consent and transfer',async()=>{
+ const {careScenario}=await import('./care.scenario.js');await careScenario(prisma,urls(databaseName));
+});
+
+if(process.env.FIREBASE_AUTH_EMULATOR_HOST)test('M4 official Firebase phone/MFA HTTP workflow and raw private upload boundaries',async()=>{
+ const {careApiScenario}=await import('./care-api.scenario.js');await careApiScenario(prisma,urls(databaseName));
 });
