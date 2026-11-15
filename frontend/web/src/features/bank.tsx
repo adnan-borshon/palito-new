@@ -1,7 +1,9 @@
 'use client';
 
+import Image from 'next/image';
+
 import { useMemo, useState } from 'react';
-import { demoLoanQuote, hasIoTEvidence, maximumLoanAmount } from '@palito/shared';
+import { hasIoTEvidence, maximumLoanAmount } from '@palito/shared';
 import { useWebApp } from '@/providers/web-provider.tsx';
 import {
   Badge,
@@ -30,7 +32,7 @@ export function BankWebFeature({
 
   const myLoans = useMemo(
     () => state.loans.filter((l) => !user?.id || user.role !== 'bank' || l.bankId === user.id),
-    [state.loans, user?.id, user?.role],
+    [state.loans, user],
   );
 
   const [tab, setTab] = useState<'underwriting' | 'portfolio' | 'settlements' | 'passport'>(
@@ -122,7 +124,6 @@ export function BankWebFeature({
     : activeLoan
       ? maximumLoanAmount(activeLoan.collateralValue)
       : 0;
-  const quote = collateralAnimal ? demoLoanQuote(collateralAnimal) : null;
   const ltvRatio =
     activeLoan && activeLoan.collateralValue > 0
       ? Math.round((activeLoan.amount / activeLoan.collateralValue) * 100)
@@ -494,7 +495,10 @@ export function BankWebFeature({
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
                       <div className="flex items-center gap-3">
-                        <img
+                        <Image
+                unoptimized
+                width={64}
+                height={64}
                           src="/images/cow.jpg"
                           alt={collateralAnimal.name}
                           className="w-16 h-16 rounded-[12px] object-cover border border-[#E2E8F0]"

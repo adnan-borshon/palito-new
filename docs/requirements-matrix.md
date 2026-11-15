@@ -2,7 +2,7 @@
 
 Updated 2026-11-14. Source: `docs/srs.pdf`, **physical PDF page numbers** (49 pages), and the approved user plan. SRS defines three detailed use cases: UC-001 intervention, UC-002 insurance claim, UC-003 livestock loan. A contents reference to UC-004 has no corresponding defined use case and is not invented here.
 
-Web coverage remains blocked by **PAL-GATE-01** until explicit user approval of the mobile phase. Native hardware-specific behavior is marked **Automated Pass / Device Unverified** where no physical Android/iOS device is attached.
+Historical mobile/demo matrix. Mobile approval is recorded on 2026-11-15 and the web app exists. Every PAL ID is retained in the [backend traceability matrix](backend/requirements-traceability.md), with separate planned API acceptance. Existing pass labels below are historical demo evidence, not production backend verification. Native hardware-specific behavior is marked **Automated Pass / Device Unverified** where no physical Android/iOS device is attached.
 
 | ID | SRS PDF page / source | Role | Canonical screen | Figma node suffix | Behavior / acceptance check | Mock dependency | Implementation | Verification |
 |---|---|---|---|---|---|---|---|---|
@@ -70,4 +70,4 @@ Web coverage remains blocked by **PAL-GATE-01** until explicit user approval of 
 | PAL-QA-03 | plan | All | Navigation / forms | All eligible | Safe areas, keyboard, scrolling, back navigation, repeated presses and deep-link recovery. | Native navigation | `src/app/[role]/_layout.tsx`, `src/components/ui/index.tsx` | Automated Pass / Device Unverified |
 | PAL-QA-04 | plan | All | Persistence / reset | New | Restore same versioned records across sessions/accounts; reset deterministic seed; handle malformed storage. | Storage adapter | `shared/src/persistence.ts`, `shared/src/repository.ts` | Automated Pass (`invariants.test.ts`) |
 | PAL-QA-05 | plan | All | Review handoff | Not applicable | Run TS/lint/Doctor/dependency/bundle/shared/component/journey checks; native gaps explicitly unverified. | Test harness | `docs/testing/mobile-verification.md` | Automated Pass (20/20 Doctor, 29 tests pass) |
-| PAL-GATE-01 | approved plan | All | Mobile review | Not applicable | Provide runnable preview/results/coverage, wait for explicit approval before any web implementation. | Human review gate | `docs/progress.md`, `README.md` | **Awaiting User Review & Approval** |
+| PAL-GATE-01 | approved plan | All | Mobile review | Not applicable | Provide runnable preview/results/coverage, wait for explicit approval before any web implementation. | Human review gate | `docs/progress.md`, `README.md` | **Mobile approval recorded 2026-11-15; backend M0 review pending** |

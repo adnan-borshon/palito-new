@@ -1,6 +1,12 @@
+> Current M3 update (2026-11-15): Firebase identity/session paths and opt-in `/identity` client screens are implemented. M3 software now includes staff invitation/approval, MFA/recovery, verified contact changes, revocation and native configuration; live-provider/device acceptance remains separate. Read [identity checkpoint](backend/identity.md) for exact endpoints, setup, actual tests and provider/device release gates and completed staff/recovery implementation. Earlier milestone descriptions below remain historical or proposed unless superseded there.
+
 # Palito mobile & web progress
 
 Updated 2026-11-15. **Both `@palito/mobile` (Expo SDK 58) and `@palito/web` (Next.js 16 App Router) are implemented and connected to `@palito/shared`.**
+
+## Backend M2 review checkpoint — 2026-11-15
+
+M0/M1 were reviewed and M2 authorized. The NestJS foundation and core Prisma/PostgreSQL schema/migrations/roles are implemented; [backend progress](backend/progress.md) records actual current checks and limits. All 65 PAL requirements and 53 commands remain mapped. Firebase and domain API workflows are not implemented; stop for user review before M3.
 
 ## Current phase
 

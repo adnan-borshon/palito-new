@@ -52,3 +52,20 @@ frontend/mobile/android/
 **/test-results/
 **/playwright-report/
 docs/.references/
+
+# Local credentials and generated outputs
+**/.env
+**/.env.*
+!**/.env.example
+**/.next/
+**/dist-test/
+**/openapi.json
+backend/src/generated/
+backend/.migration-test-*/
+
+# Local Firebase emulator output and native provider files
+**/firebase-debug.log
+**/ui-debug.log
+**/auth-debug.log
+**/google-services.json
+**/GoogleService-Info.plist

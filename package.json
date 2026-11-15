@@ -8,7 +8,8 @@
   "workspaces": [
     "frontend/mobile",
     "frontend/web",
-    "frontend/shared"
+    "frontend/shared",
+    "backend"
   ],
   "scripts": {
     "start": "npm run start --workspace @palito/mobile",
@@ -25,6 +26,19 @@
     "test": "npm run test --workspaces --if-present",
     "test:shared": "npm run test --workspace @palito/shared",
     "test:mobile": "npm run test --workspace @palito/mobile",
-    "export:web": "npm run export:web --workspace @palito/mobile"
+    "export:web": "npm run export:web --workspace @palito/mobile",
+    "dev:backend": "npm run dev --workspace @palito/backend",
+    "build:backend": "npm run build --workspace @palito/backend",
+    "lint:backend": "npm run lint --workspace @palito/backend",
+    "lint:all": "npm run lint --workspaces --if-present",
+    "test:backend": "npm run test --workspace @palito/backend",
+    "test:backend:integration": "npm run test:integration --workspace @palito/backend",
+    "setup:backend": "npm run setup:dev --workspace @palito/backend",
+    "db:bootstrap": "npm run db:bootstrap --workspace @palito/backend",
+    "db:migrate": "npm run migrate:deploy --workspace @palito/backend",
+    "db:seed": "npm run db:seed --workspace @palito/backend"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "1.14.7"
   }
 }

@@ -1,5 +1,7 @@
 'use client';
 
+import Image from 'next/image';
+
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -54,7 +56,10 @@ export function WelcomeView() {
       <Card className="w-full max-w-2xl flex flex-col gap-6 p-6 sm:p-8">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <img
+            <Image
+                unoptimized
+                width={40}
+                height={40}
               src="/images/palito-mark.png"
               alt="Palito"
               className="w-10 h-10 rounded-[10px] bg-[#EBF4EE] p-1.5 object-contain"
@@ -73,7 +78,10 @@ export function WelcomeView() {
         </div>
 
         <div className="rounded-[16px] bg-[#EBF4EE] p-6 flex items-center justify-center">
-          <img
+          <Image
+                unoptimized
+                width={320}
+                height={320}
             src="/images/onboarding.png"
             alt={t('পালিতের পশুস্বাস্থ্য সেবা', 'Palito livestock care services')}
             className="max-h-56 w-auto object-contain"
@@ -251,7 +259,10 @@ export function LoginView() {
       <section className="lg:col-span-6 bg-[#0A401E] text-white p-8 lg:p-14 flex flex-col justify-between gap-8">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <img
+            <Image
+                unoptimized
+                width={44}
+                height={44}
               src="/images/palito-mark.png"
               alt="Palito"
               className="w-11 h-11 rounded-[12px] bg-white p-1.5 object-contain"

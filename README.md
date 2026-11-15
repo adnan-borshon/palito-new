@@ -1,11 +1,17 @@
+> Current M3 update (2026-11-15): Firebase identity/session paths and opt-in `/identity` client screens are implemented. M3 software now includes staff invitation/approval, MFA/recovery, verified contact changes, revocation and native configuration; live-provider/device acceptance remains separate. Read [identity checkpoint](docs/backend/identity.md) for exact endpoints, setup, actual tests and provider/device release gates and completed staff/recovery implementation. Earlier milestone descriptions below remain historical or proposed unless superseded there.
+
 # Palito
 
 Bangla-first livestock care, veterinary, insurance, lending, and administration frontend for **Farmer**, **Veterinarian**, **Bank**, **Insurer**, and **Administrator** roles.
 
 - `frontend/mobile`: Complete Expo SDK 58 + React Native 0.88 + Expo Router + TypeScript mobile application across all five roles.
 - `frontend/shared`: Portable TypeScript domain engine, validation, Bangla/English localization, deterministic fixtures, and versioned local storage repository.
-- `frontend/web`: Reserved for the Next.js App Router web application (gated until mobile review approval).
-- `backend`: Intentionally empty placeholder. All authentication, AI, IoT, calls, payments, insurance, loans, and deliveries are clearly labeled local demonstrations.
+- `frontend/web`: Existing Next.js App Router web application across all five roles.
+- `backend`: NestJS foundation plus M2 Prisma/PostgreSQL core schema, reviewed migrations, restricted runtime role, OpenAPI and CI. [Run locally](backend/README.md) or [review progress](docs/backend/progress.md). Existing client authentication and domain workflows still use the local demo repository.
+
+## Current backend review
+
+M0/M1 were reviewed and M2 is delivered for review. See [backend progress](docs/backend/progress.md) for executed checks and limits. M3 requires the user's next instruction. The frontend walkthroughs below still operate on local records.
 
 ## Run locally
 
@@ -23,12 +29,12 @@ npm start
 | `npm run web` | Open the Expo mobile preview in the browser |
 | `npm run android` | Launch on a connected Android device or configured emulator |
 | `npm run ios` | Launch on an iOS simulator (requires macOS) |
-| `npm run typecheck` | Run TypeScript `--noEmit` across `@palito/mobile` and `@palito/shared` |
+| `npm run typecheck` | Run TypeScript `--noEmit` across all three frontend workspaces |
 | `npm run lint` | Run `expo lint` on the mobile workspace |
-| `npm run test` | Run all shared and mobile automated test suites |
+| `npm run test` | Run shared, mobile and web domain/component test suites |
 | `npm run test:shared` | Run the 18 shared domain & journey tests (`node --test`) |
 | `npm run test:mobile` | Run the 11 Jest + React Native Testing Library mobile tests |
-| `npm run doctor` | Run `npx expo-doctor` diagnostics (`20/20` checks) |
+| `npm run doctor` | Run `npx expo-doctor` diagnostics (record actual current results) |
 | `npm run export:web` | Build the static mobile preview bundle in `frontend/mobile/dist/` |
 
 ## Seeded demo accounts & OTP

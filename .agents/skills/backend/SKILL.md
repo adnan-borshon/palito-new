@@ -1,3 +1,8 @@
+---
+name: backend
+description: Implement and review Palito backend services, Firebase authentication, PostgreSQL migrations, scoped permissions, financial integrity, and milestone verification.
+---
+
 # Backend, authentication, database, security and testing workflow for Palito
 
 Use this skill when implementing or reviewing Palito backend services, Firebase Authentication, PostgreSQL schema/migrations, permissions, security controls, or tests.

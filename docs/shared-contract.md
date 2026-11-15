@@ -16,4 +16,4 @@ Routes: `/` onboarding/auth redirect, `/welcome`, `/login`, `/[role]/[screen]`, 
 
 Native UI exports from `@/components/ui`: `Screen`, `AppText`, `Button`, `Card`, `Field`, `Choice`, `Badge`, `Section`, `Row`, `EmptyState`, `LoadingState`, `ErrorState`, `Confirm`, `Stat`, `Icon`, `Divider`. Design tokens live in `@/theme`. Fonts loaded at root. Use `@/providers/demo` for state and `@/navigation` for role links.
 
-Review gate: complete mobile coverage, verify, user review, explicit approval, then web. Shared code is platform independent; no web screen or Next.js implementation is authorized yet.
+Historical review gate: mobile approval is recorded on 2026-11-15 in `docs/implementation-plan.md`; the web app now exists. This document remains the **demo** command/storage contract (whole BDT, local state), not a production API specification. Backend M0 designs are in `docs/backend`; only M0 is currently authorized. Future API minor units require explicit conversion, scoped queries and server authorization; never reinterpret saved demo amounts or import demo snapshots automatically.

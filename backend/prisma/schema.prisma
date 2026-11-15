@@ -1,0 +1,528 @@
+generator client {
+  provider = "prisma-client"
+  output = "../src/generated/prisma"
+  moduleFormat = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas = ["palito"]
+}
+
+enum AccountStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+  @@schema("palito")
+}
+
+enum OrganizationKind {
+  PLATFORM
+  BANK
+  INSURER
+  CLINIC
+  @@schema("palito")
+}
+
+enum StaffRole {
+  ADMIN
+  BANK_STAFF
+  INSURER_STAFF
+  VET
+  @@schema("palito")
+}
+
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  REVOKED
+  @@schema("palito")
+}
+
+enum CredentialStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  REVOKED
+  @@schema("palito")
+}
+
+enum AnimalStatus {
+  ACTIVE
+  ARCHIVED
+  DECEASED
+  @@schema("palito")
+}
+
+enum AppointmentStatus {
+  REQUESTED
+  ACCEPTED
+  REJECTED
+  CANCELLED
+  IN_PROGRESS
+  COMPLETED
+  @@schema("palito")
+}
+
+enum RecordSource {
+  FARMER
+  VET
+  @@schema("palito")
+}
+
+enum ValuationStatus {
+  DRAFT
+  APPROVED
+  @@schema("palito")
+}
+
+model User {
+  careCommands CareCommand[]
+  careEvents CareEvent[]
+  uploadedFiles PrivateFile[] @relation("Uploader")
+  patientFiles PrivateFile[] @relation("FileOwner")
+  careReminders CareReminder[]
+  consents CareGrant[]
+
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tokensRevokedAfter DateTime? @map("tokens_revoked_after") @db.Timestamptz(3)
+  firebaseUid String @unique @map("firebase_uid") @db.VarChar(128)
+  displayName String @map("display_name") @db.VarChar(120)
+  phoneE164 String? @unique @map("phone_e164") @db.VarChar(16)
+  emailNormalized String? @unique @map("email_normalized") @db.VarChar(254)
+  locale String @default("bn") @db.VarChar(2)
+  status AccountStatus @default(PENDING)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  sentInvitations StaffInvitation[] @relation("InvitationActor")
+  auditsActed IdentityAudit[] @relation("AuditActor")
+  auditsReceived IdentityAudit[] @relation("AuditSubject")
+  recoveryRequests RecoveryRequest[] @relation("RecoveryUser")
+  recoveryReviews RecoveryRequest[] @relation("RecoveryReviewer")
+  webSessions WebSession[]
+  memberships Membership[]
+  vetCredential VetCredential? @relation("VetUser")
+  credentialReviews VetCredential[] @relation("CredentialReviewer")
+  farms Farm[]
+  farmMemberships FarmMembership[]
+  appointments Appointment[]
+  observations HealthRecord[] @relation("RecordAuthor")
+  ownershipFrom OwnershipHistory[] @relation("OwnershipFrom")
+  ownershipTo OwnershipHistory[] @relation("OwnershipTo")
+  valuationOwner Valuation[] @relation("ValuationOwner")
+  valuationAssessor Valuation[] @relation("ValuationAssessor")
+  valuationApprover Valuation[] @relation("ValuationApprover")
+  @@map("users")
+  @@schema("palito")
+}
+
+model Organization {
+  invitations StaffInvitation[]
+  identityAudits IdentityAudit[]
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kind OrganizationKind
+  name String @db.VarChar(160)
+  status AccountStatus @default(PENDING)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  memberships Membership[]
+  @@unique([id, kind])
+  @@map("organizations")
+  @@schema("palito")
+}
+
+model Membership {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  organizationKind OrganizationKind @map("organization_kind")
+  userId String @map("user_id") @db.Uuid
+  role StaffRole
+  status MembershipStatus @default(INVITED)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization Organization @relation(fields: [organizationId, organizationKind], references: [id, kind], onDelete: Restrict, onUpdate: Restrict)
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  @@unique([organizationId, userId])
+  @@index([organizationId, status, id])
+  @@index([userId, status])
+  @@map("memberships")
+  @@schema("palito")
+}
+
+model VetCredential {
+  slots VetSlot[]
+  schedule VetSchedule?
+  profile VetProfile?
+
+  userId String @id @map("user_id") @db.Uuid
+  registrationNumber String @unique @map("registration_number") @db.VarChar(80)
+  status CredentialStatus @default(PENDING)
+  reviewedById String? @map("reviewed_by_id") @db.Uuid
+  reviewedAt DateTime? @map("reviewed_at") @db.Timestamptz(3)
+  user User @relation("VetUser", fields: [userId], references: [id], onDelete: Restrict)
+  reviewer User? @relation("CredentialReviewer", fields: [reviewedById], references: [id], onDelete: Restrict)
+  appointments Appointment[]
+  records HealthRecord[] @relation("ClinicalAuthor")
+  @@map("vet_credentials")
+  @@schema("palito")
+}
+
+model Farm {
+  version Int @default(1)
+
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  name String @db.VarChar(120)
+  district String @db.VarChar(120)
+  address String @db.VarChar(500)
+  areaAcres Decimal @map("area_acres") @db.Decimal(12, 3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  members FarmMembership[]
+  animals Animal[]
+  appointments Appointment[]
+  @@unique([id, ownerId])
+  @@index([ownerId, createdAt, id])
+  @@map("farms")
+  @@schema("palito")
+}
+
+model FarmMembership {
+  farmId String @map("farm_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  role String @db.VarChar(20)
+  status MembershipStatus @default(INVITED)
+  farm Farm @relation(fields: [farmId], references: [id], onDelete: Restrict)
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  @@id([farmId, userId])
+  @@index([userId, status])
+  @@map("farm_memberships")
+  @@schema("palito")
+}
+
+model Animal {
+  photoFileId String? @map("photo_file_id") @db.Uuid
+  photo PrivateFile? @relation("AnimalPhoto",fields:[photoFileId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  files PrivateFile[] @relation("PatientFiles")
+  careEvents CareEvent[]
+  reminders CareReminder[]
+
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  farmId String @map("farm_id") @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  tag String @unique @db.VarChar(80)
+  name String @db.VarChar(120)
+  species String @db.VarChar(40)
+  breed String @db.VarChar(120)
+  sex String @db.VarChar(10)
+  birthDate DateTime @map("birth_date") @db.Date
+  weightKg Decimal @map("weight_kg") @db.Decimal(8, 3)
+  estimateMinor BigInt @map("estimate_minor")
+  currency String @default("BDT") @db.Char(3)
+  status AnimalStatus @default(ACTIVE)
+  version Int @default(1)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  farm Farm @relation(fields: [farmId, ownerId], references: [id, ownerId], onDelete: Restrict, onUpdate: Restrict)
+  history OwnershipHistory[]
+  valuations Valuation[]
+  appointments Appointment[]
+  records HealthRecord[]
+  @@index([ownerId, createdAt, id])
+  @@index([farmId, status])
+  @@map("animals")
+  @@schema("palito")
+}
+
+model OwnershipHistory {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  animalId String @map("animal_id") @db.Uuid
+  fromOwnerId String? @map("from_owner_id") @db.Uuid
+  toOwnerId String @map("to_owner_id") @db.Uuid
+  reason String @db.VarChar(1000)
+  occurredAt DateTime @default(now()) @map("occurred_at") @db.Timestamptz(3)
+  animal Animal @relation(fields: [animalId], references: [id], onDelete: Restrict)
+  fromOwner User? @relation("OwnershipFrom", fields: [fromOwnerId], references: [id], onDelete: Restrict)
+  toOwner User @relation("OwnershipTo", fields: [toOwnerId], references: [id], onDelete: Restrict)
+  @@index([animalId, occurredAt, id])
+  @@map("ownership_history")
+  @@schema("palito")
+}
+
+model Valuation {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  animalId String @map("animal_id") @db.Uuid
+  ownerAtAssessmentId String @map("owner_at_assessment_id") @db.Uuid
+  assessorId String @map("assessor_id") @db.Uuid
+  approvedById String? @map("approved_by_id") @db.Uuid
+  version Int
+  status ValuationStatus @default(DRAFT)
+  amountMinor BigInt @map("amount_minor")
+  currency String @default("BDT") @db.Char(3)
+  assessedAt DateTime @map("assessed_at") @db.Timestamptz(3)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  approvedAt DateTime? @map("approved_at") @db.Timestamptz(3)
+  animal Animal @relation(fields: [animalId], references: [id], onDelete: Restrict)
+  owner User @relation("ValuationOwner", fields: [ownerAtAssessmentId], references: [id], onDelete: Restrict)
+  assessor User @relation("ValuationAssessor", fields: [assessorId], references: [id], onDelete: Restrict)
+  approver User? @relation("ValuationApprover", fields: [approvedById], references: [id], onDelete: Restrict)
+  @@unique([animalId, version])
+  @@index([animalId, status, expiresAt])
+  @@map("valuations")
+  @@schema("palito")
+}
+
+model Appointment {
+  slotId String? @map("slot_id") @db.Uuid
+  slot VetSlot? @relation(fields:[slotId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  decisionNote String @default("") @map("decision_note") @db.VarChar(1000)
+  grant CareGrant?
+
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  animalId String @map("animal_id") @db.Uuid
+  farmId String @map("farm_id") @db.Uuid
+  farmerId String @map("farmer_id") @db.Uuid
+  vetId String @map("vet_id") @db.Uuid
+  startsAt DateTime @map("starts_at") @db.Timestamptz(3)
+  endsAt DateTime @map("ends_at") @db.Timestamptz(3)
+  mode String @db.VarChar(10)
+  reason String @db.VarChar(2000)
+  status AppointmentStatus @default(REQUESTED)
+  version Int @default(1)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  animal Animal @relation(fields: [animalId], references: [id], onDelete: Restrict)
+  farm Farm @relation(fields: [farmId], references: [id], onDelete: Restrict)
+  farmer User @relation(fields: [farmerId], references: [id], onDelete: Restrict)
+  vet VetCredential @relation(fields: [vetId], references: [userId], onDelete: Restrict)
+  records HealthRecord[]
+  @@unique([id, animalId, vetId])
+  @@index([farmerId, startsAt, id])
+  @@index([vetId, startsAt, id])
+  @@map("appointments")
+  @@schema("palito")
+}
+
+model HealthRecord {
+  reminder CareReminder?
+
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  animalId String @map("animal_id") @db.Uuid
+  authorId String @map("author_id") @db.Uuid
+  vetId String? @map("vet_id") @db.Uuid
+  appointmentId String? @map("appointment_id") @db.Uuid
+  source RecordSource
+  kind String @db.VarChar(20)
+  note String @db.VarChar(4000)
+  signedAt DateTime? @map("signed_at") @db.Timestamptz(3)
+  amendsId String? @map("amends_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  animal Animal @relation(fields: [animalId], references: [id], onDelete: Restrict)
+  author User @relation("RecordAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  vet VetCredential? @relation("ClinicalAuthor", fields: [vetId], references: [userId], onDelete: Restrict)
+  appointment Appointment? @relation(fields: [appointmentId, animalId, vetId], references: [id, animalId, vetId], onDelete: Restrict, onUpdate: Restrict)
+  amends HealthRecord? @relation("Amendment", fields: [amendsId, animalId], references: [id, animalId], onDelete: Restrict, onUpdate: Restrict)
+  amendments HealthRecord[] @relation("Amendment")
+  prescription Prescription?
+  @@unique([id, animalId])
+  @@unique([id, animalId, vetId])
+  @@index([animalId, createdAt, id])
+  @@index([authorId])
+  @@map("health_records")
+  @@schema("palito")
+}
+
+model Prescription {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  recordId String @unique @map("record_id") @db.Uuid
+  animalId String @map("animal_id") @db.Uuid
+  vetId String @map("vet_id") @db.Uuid
+  advice String @db.VarChar(4000)
+  signedAt DateTime? @map("signed_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  record HealthRecord @relation(fields: [recordId, animalId, vetId], references: [id, animalId, vetId], onDelete: Restrict, onUpdate: Restrict)
+  items PrescriptionItem[]
+  @@unique([recordId, animalId, vetId])
+  @@map("prescriptions")
+  @@schema("palito")
+}
+
+model PrescriptionItem {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  prescriptionId String @map("prescription_id") @db.Uuid
+  medicineName String @map("medicine_name") @db.VarChar(200)
+  dose String @db.VarChar(200)
+  frequency String @db.VarChar(200)
+  days Int
+  prescription Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Restrict)
+  @@index([prescriptionId])
+  @@map("prescription_items")
+  @@schema("palito")
+}
+
+// Hash only; raw Firebase cookies are never persisted. Current-session revocation is local.
+model WebSession {
+  tokenHash String @id @map("token_hash") @db.Char(64)
+  firebaseUid String @map("firebase_uid") @db.VarChar(128)
+  user User @relation(fields: [firebaseUid], references: [firebaseUid], onDelete: Restrict, onUpdate: NoAction)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@index([firebaseUid, expiresAt])
+  @@map("web_sessions")
+  @@schema("palito")
+}
+
+model StaffInvitation {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tokenHash String @unique @map("token_hash") @db.Char(64)
+  email String @db.VarChar(254)
+  organizationId String @map("organization_id") @db.Uuid
+  role StaffRole
+  organization Organization @relation(fields:[organizationId], references:[id], onDelete:Restrict, onUpdate:NoAction)
+  creator User @relation("InvitationActor", fields:[createdById], references:[id], onDelete:Restrict, onUpdate:NoAction)
+  createdById String @map("created_by_id") @db.Uuid
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  acceptedAt DateTime? @map("accepted_at") @db.Timestamptz(3)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@index([organizationId, createdAt])
+  @@map("staff_invitations")
+  @@schema("palito")
+}
+
+model IdentityAudit {
+  actor User? @relation("AuditActor", fields:[actorId], references:[id], onDelete:Restrict, onUpdate:NoAction)
+  subject User? @relation("AuditSubject", fields:[subjectId], references:[id], onDelete:Restrict, onUpdate:NoAction)
+  organization Organization? @relation(fields:[organizationId], references:[id], onDelete:Restrict, onUpdate:NoAction)
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId String? @map("actor_id") @db.Uuid
+  subjectId String? @map("subject_id") @db.Uuid
+  action String @db.VarChar(80)
+  organizationId String? @map("organization_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@index([subjectId, createdAt])
+  @@map("identity_audit")
+  @@schema("palito")
+}
+
+model RecoveryRequest {
+  user User @relation("RecoveryUser", fields:[userId], references:[id], onDelete:Restrict, onUpdate:NoAction)
+  reviewer User? @relation("RecoveryReviewer", fields:[reviewedById], references:[id], onDelete:Restrict, onUpdate:NoAction)
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  kind String @db.VarChar(20)
+  status String @default("PENDING") @db.VarChar(20)
+  reviewedById String? @map("reviewed_by_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  reviewedAt DateTime? @map("reviewed_at") @db.Timestamptz(3)
+  @@index([userId, status])
+  @@map("recovery_requests")
+  @@schema("palito")
+}
+
+model VetSchedule {
+  vetId String @id @map("vet_id") @db.Uuid
+  version Int @default(0)
+  vet VetCredential @relation(fields:[vetId],references:[userId],onDelete:Restrict,onUpdate:NoAction)
+  @@map("vet_schedules")
+  @@schema("palito")
+}
+model VetSlot {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  vetId String @map("vet_id") @db.Uuid
+  startsAt DateTime @map("starts_at") @db.Timestamptz(3)
+  endsAt DateTime @map("ends_at") @db.Timestamptz(3)
+  status String @default("OPEN") @db.VarChar(12)
+  vet VetCredential @relation(fields:[vetId],references:[userId],onDelete:Restrict,onUpdate:NoAction)
+  appointments Appointment[]
+  @@unique([vetId,startsAt,endsAt])
+  @@index([vetId,status,startsAt])
+  @@map("vet_slots")
+  @@schema("palito")
+}
+model CareGrant {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  appointmentId String @unique @map("appointment_id") @db.Uuid
+  farmerId String @map("farmer_id") @db.Uuid
+  consentVersion String @map("consent_version") @db.VarChar(20)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(3)
+  grantedAt DateTime @default(now()) @map("granted_at") @db.Timestamptz(3)
+  appointment Appointment @relation(fields:[appointmentId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  farmer User @relation(fields:[farmerId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  @@map("care_grants")
+  @@schema("palito")
+}
+model PrivateFile {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  animalId String @map("animal_id") @db.Uuid
+  uploaderId String @map("uploader_id") @db.Uuid
+  ownerAtUploadId String @map("owner_at_upload_id") @db.Uuid
+  purpose String @db.VarChar(20)
+  contentType String @map("content_type") @db.VarChar(20)
+  declaredBytes Int @map("declared_bytes")
+  status String @default("PENDING") @db.VarChar(16)
+  sha256 String? @db.Char(64)
+  bytes Bytes? @db.ByteA
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  animal Animal @relation("PatientFiles",fields:[animalId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  uploader User @relation("Uploader",fields:[uploaderId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  owner User @relation("FileOwner",fields:[ownerAtUploadId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  photos Animal[] @relation("AnimalPhoto")
+  @@index([animalId,status,createdAt])
+  @@map("private_files")
+  @@schema("palito")
+}
+model CareReminder {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  animalId String @map("animal_id") @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  recordId String @unique @map("record_id") @db.Uuid
+  dueAt DateTime @map("due_at") @db.Timestamptz(3)
+  enabled Boolean @default(true)
+  version Int @default(1)
+  animal Animal @relation(fields:[animalId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  owner User @relation(fields:[ownerId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  record HealthRecord @relation(fields:[recordId,animalId],references:[id,animalId],onDelete:Restrict,onUpdate:NoAction)
+  @@index([ownerId,dueAt,id])
+  @@map("care_reminders")
+  @@schema("palito")
+  @@unique([recordId, animalId])
+}
+model CareEvent {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId String @map("actor_id") @db.Uuid
+  animalId String @map("animal_id") @db.Uuid
+  kind String @db.VarChar(40)
+  payload Json @db.JsonB
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  actor User @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  animal Animal @relation(fields:[animalId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  @@index([createdAt,id])
+  @@map("care_events")
+  @@schema("palito")
+}
+model CareCommand {
+  actorId String @map("actor_id") @db.Uuid
+  key String @db.VarChar(100)
+  operation String @db.VarChar(160)
+  payloadHash String @map("payload_hash") @db.Char(64)
+  result Json @db.JsonB
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  actor User @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  @@id([actorId,key])
+  @@map("care_commands")
+  @@schema("palito")
+}
+
+model VetProfile {
+ vetId String @id @map("vet_id") @db.Uuid
+ district String @db.VarChar(120)
+ species String[] @db.VarChar(40)
+ bio String @db.VarChar(1000)
+ version Int @default(1)
+ vet VetCredential @relation(fields:[vetId],references:[userId],onDelete:Restrict,onUpdate:Cascade)
+ @@map("vet_profiles")
+ @@schema("palito")
+}

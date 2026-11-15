@@ -1,5 +1,7 @@
 'use client';
 
+import Image from 'next/image';
+
 import { useMemo, useState } from 'react';
 import {
   demoBalance,
@@ -25,7 +27,6 @@ import {
   TabsBar,
   TextareaField,
   toneForStatus,
-  WebIcon,
 } from '@/components/ui.tsx';
 
 type FarmerSection =
@@ -169,7 +170,7 @@ export function FarmerWebFeature({
   const [loanAmount, setLoanAmount] = useState('70000');
   const [loanTerm, setLoanTerm] = useState('12');
   const [loanPurpose, setLoanPurpose] = useState('Dairy feed & automated milking unit');
-  const [loanRepaySource, setLoanRepaySource] = useState('Daily milk collection revenue');
+  const [loanRepaySource] = useState('Daily milk collection revenue');
   const [repayInput, setRepayInput] = useState('5000');
 
   const insurers = state.users.filter((u) => u.role === 'insurer' && u.status === 'active');
@@ -242,12 +243,13 @@ export function FarmerWebFeature({
   });
 
   const activeLoanQuote = activeAnimal ? demoLoanQuote(activeAnimal) : null;
-  const estMonthlyInstallment = useMemo(() => {
+  const annualRate = activeLoanQuote?.annualRate ?? 9;
+  const estMonthlyInstallment = (() => {
     const amt = Math.max(1000, Number(loanAmount) || 50000);
     const months = Math.max(3, Number(loanTerm) || 12);
-    const rate = activeLoanQuote?.annualRate ?? 9;
+    const rate = annualRate;
     return Math.ceil((amt * (1 + (rate / 100) * (months / 12))) / months);
-  }, [loanAmount, loanTerm, activeLoanQuote]);
+  })();
 
   const myCart = user ? state.carts[user.id] ?? [] : [];
 
@@ -404,7 +406,10 @@ export function FarmerWebFeature({
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2.5">
-                          <img
+                          <Image
+                unoptimized
+                width={44}
+                height={44}
                             src="/images/cow.jpg"
                             alt={animal.name}
                             className="w-11 h-11 rounded-[10px] object-cover"
@@ -455,7 +460,10 @@ export function FarmerWebFeature({
                     className="flex items-center justify-between gap-3 rounded-[12px] border border-[#E2E8F0] p-3"
                   >
                     <div className="flex items-center gap-3">
-                      <img
+                      <Image
+                unoptimized
+                width={44}
+                height={44}
                         src={`/images/vet-avatar-${(idx % 5) + 1}.${idx === 0 ? 'png' : 'jpg'}`}
                         alt={v.name}
                         className="w-11 h-11 rounded-full object-cover border border-[#D8E9DE]"
@@ -652,7 +660,10 @@ export function FarmerWebFeature({
                 <Card className="flex flex-col gap-4">
                   <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#E2E8F0] pb-4">
                     <div className="flex items-center gap-4">
-                      <img
+                      <Image
+                unoptimized
+                width={64}
+                height={64}
                         src="/images/cow.jpg"
                         alt={activeAnimal.name}
                         className="w-16 h-16 rounded-[14px] object-cover border border-[#E2E8F0]"
@@ -936,7 +947,10 @@ export function FarmerWebFeature({
                           key={i}
                           className="rounded-[12px] border border-[#E2E8F0] overflow-hidden bg-[#F8FAFC]"
                         >
-                          <img
+                          <Image
+                unoptimized
+                width={320}
+                height={320}
                             src={img.src}
                             alt={img.caption}
                             className="w-full h-36 object-cover"

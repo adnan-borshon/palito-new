@@ -1,5 +1,7 @@
 'use client';
 
+import Image from 'next/image';
+
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -127,7 +129,10 @@ export function AppShell({
           {/* Brand Header */}
           <div className="flex items-center justify-between gap-3">
             <Link href={webHref(role, 'home')} className="flex items-center gap-3">
-              <img
+              <Image
+                unoptimized
+                width={36}
+                height={36}
                 src="/images/palito-mark.png"
                 alt="Palito"
                 className="w-9 h-9 rounded-[10px] object-contain bg-[#EBF4EE] p-1"

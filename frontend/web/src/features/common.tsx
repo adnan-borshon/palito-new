@@ -1,5 +1,7 @@
 'use client';
 
+import Image from 'next/image';
+
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -382,7 +384,10 @@ function SupportWorkspace() {
       <div className="lg:col-span-5 flex flex-col gap-4">
         <Card tinted className="flex flex-col gap-3">
           <div className="flex items-center gap-3">
-            <img
+            <Image
+                unoptimized
+                width={48}
+                height={48}
               src="/images/support.png"
               alt="Palito Support"
               className="w-12 h-12 rounded-[12px] object-cover bg-white p-1"
