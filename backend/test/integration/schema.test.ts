@@ -71,7 +71,7 @@ after(async () => {
 
 test('clean official migrations and idempotent synthetic seed expose typed Prisma data with exact money/date values', async () => {
   const rows=await migrator.query('SELECT migration_name FROM palito._prisma_migrations ORDER BY migration_name');
-  assert.equal(rows.rowCount,5); assert.equal(await prisma.user.count(),4);
+  assert.equal(rows.rowCount,7); assert.equal(await prisma.user.count(),4);
   const animal=await prisma.animal.findUniqueOrThrow({where:{id:ids.animalA}});
   assert.equal(animal.estimateMinor,14000000n); assert.equal(animal.birthDate.toISOString(),'2020-01-01T00:00:00.000Z');
   assert.equal(animal.weightKg.toFixed(3),'450.000');
@@ -371,6 +371,14 @@ if(process.env.BROWSER_E2E==='true') test('Chromium phone sign-in, cookie restor
 
 test('M4 healthcare: scoped farms, records, two-instance booking race, state machine, immutable prescriptions, private images, consent and transfer',async()=>{
  const {careScenario}=await import('./care.scenario.js');await careScenario(prisma,urls(databaseName));
+});
+
+test('M5 jobs & notifications: outbox dedupe, crash/lease recovery, dead-letter retry, reminder escalation & adherence, expired file cleanup and audit immutability',async()=>{
+ const {opsScenario}=await import('./ops.scenario.js');await opsScenario(prisma,urls(databaseName));
+});
+
+test('M6 lending & ledger sandbox: maker/checker valuations, redacted risk, 70% LTV cap, collateral lock race, disbursement/repayment HMAC webhooks & double-entry reconciliation',async()=>{
+ const {financeScenario}=await import('./finance.scenario.js');await financeScenario(prisma,urls(databaseName));
 });
 
 if(process.env.FIREBASE_AUTH_EMULATOR_HOST)test('M4 official Firebase phone/MFA HTTP workflow and raw private upload boundaries',async()=>{

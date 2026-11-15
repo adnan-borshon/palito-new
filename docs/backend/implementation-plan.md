@@ -1,6 +1,6 @@
 # Backend implementation backlog
 
-Derived from the uploaded [source plan](source-plan.md), reconciled to source `b31b165bc92f2734776b608aeba241a6b9dd291e` on 2026-11-15. Engineering owns implementation/test evidence; product, clinical and partner policy owners are assigned in decisions. Read traceability for individual PAL IDs and planned acceptance tests. M0–M3 were delivered and reviewed; M4 healthcare is authorized and implemented for review. See progress.md and healthcare.md for actual evidence/limits. M5+ remain unimplemented.
+Derived from the uploaded [source plan](source-plan.md), reconciled to source `b31b165bc92f2734776b608aeba241a6b9dd291e` on 2026-11-15. Engineering owns implementation/test evidence; product, clinical and partner policy owners are assigned in decisions. Read traceability for individual PAL IDs and planned acceptance tests. M0–M4 were delivered and reviewed; M5 (jobs, reminders & recovery) and M6 (financial foundation & lending sandbox) are implemented for review. See `progress.md`, `ops-m5.md`, and `lending-m6.md` for actual evidence/limits. M7+ remain unimplemented.
 
 Release A: identity + healthcare + reliable jobs; finance disabled or explicit sandbox. Release B: finance sandbox after approved terms/ledger/contracts. Release C: independently gated telemetry/AI/calls/commerce/reporting/provider pilot. These groups sequence all requirements; they do not remove any SRS/PAL scope. Initial API and conceptual tables are in architecture/API contracts; schema migrations are M2, not M0.
 
@@ -45,19 +45,19 @@ Release A: identity + healthcare + reliable jobs; finance disabled or explicit s
 **Skills:** Palito backend, PostgreSQL, Playwright and native tooling.
 
 ### M5 — Jobs, reminders and recovery
+**Current status:** implemented for review; actual contract in [ops M5](ops-m5.md), checks in [progress](progress.md).
 **Depends on:** M4 domain events; job interfaces introduced earlier.
-**Work:** outbox and worker, delivery deduplication, retries/backoff, failed-job triage, reminders, four-hour escalation where confirmed, notification preferences and minimal message contents. Add backups, monitoring and account-scoped cache cleanup.
-**Tests planned:** crash before/after delivery, duplicate processing, timezone/date changes, disabled preferences, inaccessible file links and restore.
-**Exit:** committed events are durable; repeat processing is safe; external delivery ambiguity is reconciled. Do not promise exactly-once SMS delivery where the provider cannot guarantee it.
-**Skills:** Palito backend, PostgreSQL operations and provider docs.
+**Work:** outbox and worker (`OutboxWorkerService`, `worker.ts`), delivery deduplication, retries/backoff, dead-letter triage/retry, due & four-hour overdue escalation sweeps with adherence suppression, Asia/Dhaka daily adherence, notification preferences (`notify-v1`) and minimal message contents, expired non-READY upload cleanup, ops health/audit endpoints, and backup/restore rehearsal (`rehearse-backup-restore.mjs`).
+**Tests:** unit/math/DTO/HTTP auth checks (`ops.test.ts`), shared M5 care tests, and PostgreSQL integration suite (`ops.scenario.ts`, requires CI/PostgreSQL).
+**Exit:** committed events are durable; repeat processing is safe; simulated adapter (`in-app-only`/`sandbox`) does not send real telecom SMS/push.
 
 ### M6 — Financial foundation and lending sandbox
-**Depends on:** M3–5; approved sandbox policy.
+**Current status:** implemented for review behind explicit `FINANCE_SANDBOX_ENABLED=true` gate; actual contract in [lending M6](lending-m6.md), checks in [progress](progress.md).
+**Depends on:** M3–5; explicit sandbox policy (`sandbox-v1`).
 **Submilestones:** M6a money/ledger/intents; M6b approved valuation/quotes/collateral; M6c application/decision/schedule; M6d disbursement/repayment/grace/reconciliation.
-**Work:** capture accepted term version, independent valuation, 70% cap from confirmed requirements, reservation expiry/release, supported repayment schedule, ledger entries and provider adapter. Scope bank staff to organization/case.
-**Tests planned:** two API instances reserve one animal; expiry between quote and acceptance; farmer estimate changes; rounding; repayment and payout races; response lost after provider success; duplicate/out-of-order callbacks; debt below claim amount and above claim amount.
-**Exit:** ledger, schedules and allocations reconcile; no double debit/disbursement; unsettled provider transactions are visible and recoverable; frontend shows verified pending/confirmed states.
-**Skills:** Palito backend, PostgreSQL, OWASP guidance, Playwright.
+**Work:** maker/checker valuations, redacted bank risk projection, 70% LTV cap, expiring `sandbox-v1` quotes, single live collateral lock (`one_live_collateral_per_animal`), application/decision/disbursement, calendar-month schedule with remainder on final installment, FIFO allocation, manual reviewed grace, wallet & simulated provider intents, HMAC-SHA256 webhook deduplication, immutable balanced double-entry ledger, admin reconciliation, and separate `/finance` web/mobile sandbox screens.
+**Tests:** unit/math/DTO/HTTP gate/signature checks (`finance.test.ts`), shared `FinanceWorkspace` & mobile component tests, and PostgreSQL integration suite (`finance.scenario.ts`, requires CI/PostgreSQL).
+**Exit:** ledger, schedules and allocations reconcile (`balanced: true`); production forbids `FINANCE_SANDBOX_ENABLED`, `PAYMENT_PROVIDER=sandbox`, and `SANDBOX_WEBHOOK_SECRET`; B08–B10 partner terms remain required before real-money launch.
 
 ### M7 — Insurance and claim settlement sandbox
 **Depends on:** M6 ledger/loan contracts.
@@ -94,4 +94,4 @@ Release A: identity + healthcare + reliable jobs; finance disabled or explicit s
 
 Historical M3 boundary: M3 integrates Firebase verification and server-owned account/membership permissions, then real client session lifecycle and approved staff MFA. Review current provider prerequisites, emulator/project configuration, native SDK/device compatibility and the original B03–B06 gates. Do not treat synthetic UIDs, pending vet fixtures or database access as real identity verification. M3 must not silently implement all M4 care or M6 finance workflows.
 
-Current stop: user review after M4. Do not implement M5 delivery/jobs until separately authorized.
+Current stop: user review after M5 and M6. Do not implement M7 insurance/claims until authorized.

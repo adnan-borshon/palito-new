@@ -204,6 +204,11 @@ export class FinanceService {
 
     return this.db.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${p.userId}), hashtext(${key}))`;
+      const actor = await tx.user.findUnique({
+        where: { id: p.userId },
+        select: { status: true },
+      });
+      if (actor?.status !== "ACTIVE") throw new ForbiddenException();
       const saved = await tx.financeCommand.findUnique({
         where: { actorId_key: { actorId: p.userId, key } },
       });

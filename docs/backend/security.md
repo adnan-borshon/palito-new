@@ -43,6 +43,12 @@ Care/claim grant expiry, staff departure, account suspension, consent withdrawal
 
 Apply OWASP ASVS/API Security guidance to enabled API scope; guidance is not an installed scanner. Scan only authorized local/staging systems. Retention/deletion/consent policies need approval; amendments/reversals preserve necessary clinical/financial history. Do not declare legal compliance from this design.
 
-## M4 enforced boundaries
+## M4–M6 enforced boundaries
 
-See [healthcare](healthcare.md) for implemented DTOs, per-record consent, state/time rules, private-image protocol, client lifecycle and exact pilot limitations; [progress](progress.md) records actual checks. Existing proposals above remain future contracts where not implemented there. Enable `HEALTHCARE_NO_CHARGE_PILOT=true` only for an explicit no-charge development/staging pilot; default booking is off. Apply the fifth additive migration only to an authorized development/test database with the migration role. Native uses a configured development build, not Expo Go; web uses same-origin API rewrites/cookies. No provider deployment or real SMS is implied. Stop for review before M5.
+See [healthcare](healthcare.md), [ops M5](ops-m5.md), and [lending M6](lending-m6.md) for implemented DTOs, consent rules, outbox/ledger invariants, client boundaries, and exact pilot/sandbox limits; [progress](progress.md) records executed checks.
+- Care booking defaults off (`HEALTHCARE_NO_CHARGE_PILOT=true` enables BDT 0 pilot only).
+- Lending, wallet balances, and payment intents fail closed (`503`) unless `FINANCE_SANDBOX_ENABLED=true`, and production refuses `FINANCE_SANDBOX_ENABLED=true`, `PAYMENT_PROVIDER=sandbox`, `NOTIFICATION_CHANNEL_MODE=sandbox`, and `SANDBOX_WEBHOOK_SECRET`.
+- Bank risk projections (`/animals/:id/collateral-risk`) return redacted counts and exclude clinical notes/prescriptions (`clinicalDetailsRedacted: true`). Maker/checker enforces `assessorId !== approvedById` within the same active `BANK` org.
+- Webhooks authenticate solely via HMAC-SHA256 canonical JSON signature (`X-Palito-Signature`) and deduplicate `(provider, externalEventId)` in `provider_events`.
+- M5 admin monitoring (`/admin/system-health`, `/admin/outbox/dead-letter`, `/admin/outbox/:id/retry`, `/admin/audit-events`) and M6 `/admin/ledger/reconciliation` enforce active `ADMIN` membership (with M3 MFA/recent auth). Notifications never leak clinical diagnoses or prescriptions.
+- Stop for review before M7 insurance/claims implementation.

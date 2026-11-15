@@ -66,20 +66,23 @@ export class OutboxWorkerService implements OnApplicationShutdown {
     tx: Tx,
     input: OutboxEnqueueInput,
   ): Promise<{ id: string }> {
-    const row = await tx.outboxEvent.upsert({
+    await tx.outboxEvent.createMany({
+      data: [
+        {
+          topic: input.topic,
+          dedupeKey: input.dedupeKey,
+          aggregateKind: input.aggregateKind,
+          aggregateId: input.aggregateId,
+          payload: input.payload,
+          nextAttemptAt: input.nextAttemptAt ?? new Date(),
+        },
+      ],
+      skipDuplicates: true,
+    });
+    return tx.outboxEvent.findUniqueOrThrow({
       where: { dedupeKey: input.dedupeKey },
-      create: {
-        topic: input.topic,
-        dedupeKey: input.dedupeKey,
-        aggregateKind: input.aggregateKind,
-        aggregateId: input.aggregateId,
-        payload: input.payload,
-        nextAttemptAt: input.nextAttemptAt ?? new Date(),
-      },
-      update: {},
       select: { id: true },
     });
-    return row;
   }
 
   async enqueue(tx: Tx, input: OutboxEnqueueInput): Promise<{ id: string }> {
@@ -498,24 +501,20 @@ export class OutboxWorkerService implements OnApplicationShutdown {
         ? item.payload.linkId
         : undefined;
 
-    await this.db.prisma.notification.upsert({
-      where: {
-        recipientId_dedupeKey: {
+    await this.db.prisma.notification.createMany({
+      data: [
+        {
           recipientId,
+          category: copy.category,
+          title: copy.title,
+          body: copy.body,
+          linkKind: linkKind ?? null,
+          linkId: linkId ?? null,
           dedupeKey: item.dedupeKey,
+          createdAt: now,
         },
-      },
-      create: {
-        recipientId,
-        category: copy.category,
-        title: copy.title,
-        body: copy.body,
-        linkKind: linkKind ?? null,
-        linkId: linkId ?? null,
-        dedupeKey: item.dedupeKey,
-        createdAt: now,
-      },
-      update: {},
+      ],
+      skipDuplicates: true,
     });
 
     return `${this.config.NOTIFICATION_CHANNEL_MODE}:${item.dedupeKey}`;

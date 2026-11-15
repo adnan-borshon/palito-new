@@ -218,6 +218,7 @@ export default function CareScreen() {
     >
       <Link href="/identity">Sign-in & account</Link>
       <Link href="/staff-identity">Vet MFA sign-in</Link>
+      <Link href="/finance">স্যান্ডবক্স ঋণ ও লেজার · Finance sandbox</Link>
       <Text accessibilityRole="header" style={styles.title}>
         {view.title}
       </Text>

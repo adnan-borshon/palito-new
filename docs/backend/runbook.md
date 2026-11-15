@@ -63,6 +63,11 @@ Keep admin, migration and runtime URLs separate. Existing M1 environments must r
 
 Before applying a future migration, review its SQL and locking/data effect, run clean and prior-version upgrade tests on disposable PostgreSQL, verify runtime denial and model drift, and retain the immutable published history. If a migration fails, inspect status and affected state with the migration/administrator owner; do not automatically reset or delete real data. Production migration rollout/restore rehearsal remains M10.
 
-## M4 review and pilot setup
+## M4–M6 review, worker and sandbox setup
 
-See [healthcare](healthcare.md) for implemented DTOs, per-record consent, state/time rules, private-image protocol, client lifecycle and exact pilot limitations; [progress](progress.md) records actual checks. Existing proposals above remain future contracts where not implemented there. Enable `HEALTHCARE_NO_CHARGE_PILOT=true` only for an explicit no-charge development/staging pilot; default booking is off. Apply the fifth additive migration only to an authorized development/test database with the migration role. Native uses a configured development build, not Expo Go; web uses same-origin API rewrites/cookies. No provider deployment or real SMS is implied. Stop for review before M5.
+See [healthcare](healthcare.md), [ops M5](ops-m5.md), and [lending M6](lending-m6.md) for implemented DTOs, worker operations, ledger invariants, and client lifecycles; [progress](progress.md) records actual checks.
+- Enable `HEALTHCARE_NO_CHARGE_PILOT=true` only for an explicit no-charge development/staging pilot.
+- Configure `NOTIFICATION_CHANNEL_MODE=in-app-only` (default) or `sandbox`; run the M5 worker with `npm run worker --workspace @palito/backend` or `WORKER_ENABLED=true`.
+- Enable `FINANCE_SANDBOX_ENABLED=true`, `PAYMENT_PROVIDER=sandbox`, and a >=16-char `SANDBOX_WEBHOOK_SECRET` **only** in development/staging to exercise `/finance` sandbox workflows; production fails closed if any sandbox or emulator option is set.
+- Local backup/restore rehearsal (`npm run rehearse:backup-restore --workspace @palito/backend`) requires loopback PostgreSQL with `pg_dump`/`pg_restore`, `DATABASE_ADMIN_URL`, and `DATABASE_URL` in development/test.
+- Stop for review before M7 insurance/claims implementation.

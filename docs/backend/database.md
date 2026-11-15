@@ -56,4 +56,8 @@ Development/production API configuration requires the `palito_runtime` username;
 
 ## Explicitly later scope
 
-M3 adds identity verification, invitations/recovery/session details and request-level memberships; M4 adds care grants, consultation workflow, uploads and authorized commands; M5 adds reminders/outbox/jobs. M6/M7 add quotes, collateral/loan schedules, append-only balanced ledger, provider intents/events, coverage/claims and allocation tables under approved policy. M8 adds devices/telemetry/AI/calls/commerce/content as needed. Do not scaffold those unused modules or treat an existing valuation table as lending readiness.
+**M5 and M6 migrations added:**
+6. `20261115000600_jobs_notifications_ops`: `outbox_events`, `job_attempts`, `notifications`, `notification_preferences`, `reminder_adherence_events`, and `audit_events` with `FOR UPDATE SKIP LOCKED` polling indexes, immutable `audit_events` / `notifications` triggers (allowing only `read_at` updates on notifications), and `palito_runtime` grants.
+7. `20261115000700_lending_ledger_sandbox`: `finance_commands`, `ledger_accounts`, `ledger_transactions`, `ledger_entries`, `loan_quotes`, `loans`, `collateral_reservations` (`one_live_collateral_per_animal` partial unique index), `loan_installments`, `payment_intents`, `repayment_allocations`, and `provider_events` with `DEFERRABLE INITIALLY DEFERRED` double-entry balance trigger (`SUM(DEBIT) = SUM(CREDIT)`) and immutable ledger triggers.
+
+M7 (insurance claims/policies/settlements) and M8 (devices/telemetry/AI/calls/commerce/content) remain future schema additions and are unimplemented.

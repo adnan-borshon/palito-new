@@ -276,7 +276,7 @@ export async function careScenario(
     assert.equal(amendment.amendsId, signed.recordId);
     const reminders = await care.reminders(winning);
     assert.equal(reminders.items.length, 1);
-    assert.equal(reminders.delivery, "NOT_ENABLED_M5");
+    assert.equal(reminders.delivery, "OUTBOX_WORKER_M5");
     await care.reminder(winning, reminders.items[0]!.id, key(), 1, false);
     const png = await sharp({
       create: { width: 2, height: 2, channels: 3, background: "#286644" },

@@ -67,6 +67,6 @@ Domain contracts remain M0 design. M1 implements only GET `/api/v1/health/live`,
 
 Any method not listed remains denied until its feature contract is reviewed. No generic `/commands` endpoint and no global role overwrite route.
 
-## Actual M4 contract
+## Actual M4–M6 contracts
 
-See [healthcare](healthcare.md) for implemented DTOs, per-record consent, state/time rules, private-image protocol, client lifecycle and exact pilot limitations; [progress](progress.md) records actual checks. Existing proposals above remain future contracts where not implemented there. Enable `HEALTHCARE_NO_CHARGE_PILOT=true` only for an explicit no-charge development/staging pilot; default booking is off. Apply the fifth additive migration only to an authorized development/test database with the migration role. Native uses a configured development build, not Expo Go; web uses same-origin API rewrites/cookies. No provider deployment or real SMS is implied. Stop for review before M5.
+See [healthcare](healthcare.md), [ops M5](ops-m5.md), and [lending M6](lending-m6.md) for implemented M4–M6 DTOs, headers (`Idempotency-Key`, `If-Match`, `X-Palito-Signature`), consent/permission rules, outbox recovery, and ledger sandbox contracts; [progress](progress.md) records actual checks. Existing M7+ proposals above remain future unimplemented contracts. Both `HEALTHCARE_NO_CHARGE_PILOT=true` and `FINANCE_SANDBOX_ENABLED=true` are explicit opt-in development/staging choices forbidden in production. Apply migrations 1–7 only to authorized development/test databases using the migration role. Stop for review before M7.

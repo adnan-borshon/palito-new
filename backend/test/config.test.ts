@@ -16,7 +16,26 @@ test('CORS uses exact origins and production forbids insecure development config
   for (const CORS_ORIGINS of ['*', 'https://example.com/path', 'https://user:secret@example.com', 'https://example.com/']) assert.throws(() => testConfig({ CORS_ORIGINS }));
   const production = { NODE_ENV: 'production', WEB_ORIGIN: 'https://palito.example', DATABASE_URL: 'postgresql://palito_runtime:secret@db/palito?sslmode=verify-full', CORS_ORIGINS: 'https://palito.example' };
   assert.equal(testConfig(production).SWAGGER_ENABLED, false);
-  for (const env of [{ SWAGGER_ENABLED: 'true' }, { FIREBASE_AUTH_EMULATOR_HOST: 'localhost:9099' }, { PAYMENT_PROVIDER: 'sandbox' }, { CORS_ORIGINS: 'http://localhost:3000' }, { DATABASE_URL: 'postgresql://user:secret@db/palito' }]) assert.throws(() => testConfig({ ...production, ...env }));
+  assert.equal(testConfig(production).FINANCE_SANDBOX_ENABLED, false);
+  assert.equal(testConfig(production).NOTIFICATION_CHANNEL_MODE, 'in-app-only');
+  for (const env of [
+    { SWAGGER_ENABLED: 'true' },
+    { FIREBASE_AUTH_EMULATOR_HOST: 'localhost:9099' },
+    { PAYMENT_PROVIDER: 'sandbox' },
+    { FINANCE_SANDBOX_ENABLED: 'true' },
+    { NOTIFICATION_CHANNEL_MODE: 'sandbox' },
+    { SANDBOX_WEBHOOK_SECRET: 'sandbox-webhook-secret-16+' },
+    { CORS_ORIGINS: 'http://localhost:3000' },
+    { DATABASE_URL: 'postgresql://user:secret@db/palito' },
+  ]) assert.throws(() => testConfig({ ...production, ...env }));
+  assert.throws(() => testConfig({ SANDBOX_WEBHOOK_SECRET: 'too-short' }), /SANDBOX_WEBHOOK_SECRET/);
+  assert.throws(() => testConfig({ NOTIFICATION_CHANNEL_MODE: 'sms-live' }), /NOTIFICATION_CHANNEL_MODE/);
+  const defaults = testConfig();
+  assert.equal(defaults.FINANCE_SANDBOX_ENABLED, false);
+  assert.equal(defaults.NOTIFICATION_CHANNEL_MODE, 'in-app-only');
+  assert.equal(defaults.WORKER_ENABLED, false);
+  assert.equal(defaults.WORKER_POLL_MS, 5000);
+  assert.equal(defaults.WORKER_BATCH_SIZE, 25);
   const config = testConfig({ CORS_ORIGINS: 'http://localhost:3000' });
   assert.ok(Object.isFrozen(config)); assert.ok(Object.isFrozen(config.CORS_ORIGINS));
   assert.throws(()=>testConfig({NODE_ENV:'development'}),/dedicated palito_runtime role/);
