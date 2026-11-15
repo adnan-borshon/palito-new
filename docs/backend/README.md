@@ -1,8 +1,8 @@
-# Backend milestone 0 review
+# Backend foundation review
 
-Prepared 2026-11-15 against main `b31b165bc92f2734776b608aeba241a6b9dd291e`. Only M0 is authorized in this change. No backend runtime, migrations, provider configuration, frontend behavior changes or deployments are included.
+Updated 2026-11-15. The user reviewed M0 and authorized M1. The NestJS/config/operations/CI foundation is implemented; review [current progress](progress.md), [M1 report](progress-m1.md) and [runnable setup](../../backend/README.md). M2 and later work require another instruction. No domain migrations, Firebase integration or deployment is included.
 
-Start with [progress](progress.md) for executed checks and remaining limitations. Review these decisions before authorizing M1:
+Start with [progress](progress.md) for executed checks and remaining limitations. M0 architectural direction remains the baseline; dependent provider/policy gates remain:
 
 1. Keep NestJS + PostgreSQL + Prisma + Firebase Auth, one API and one PostgreSQL-backed worker.
 2. Farmer phone OTP; invited privileged staff use verified email/password plus SMS MFA through Identity Platform. Native Firebase development-build compatibility must pass M3 before rollout; no phone-primary MFA bypass.
@@ -22,4 +22,4 @@ Start with [progress](progress.md) for executed checks and remaining limitations
 | [Runbook](runbook.md) | Current checks and future operational verification |
 | [Source plan](source-plan.md) | Uploaded planning baseline (trailing blank lines normalized); historical statements remain historical |
 
-These are design contracts, not implemented endpoints or evidence of production readiness. Test IDs in traceability are planned acceptance tests unless progress explicitly records execution. Engineering owner means the next implementer; product/partner decisions require the named decision owner. M1 starts only after the user's review and instruction.
+Domain documents remain design contracts. Only the M1 operations/configuration/security foundation listed in the checkpoint is implemented; this is not production readiness. Test IDs in traceability are planned acceptance tests unless progress explicitly records execution. Engineering owner means the next implementer; product/partner decisions require the named decision owner. M1 is now authorized and delivered for review; M2 waits for the user's next instruction.

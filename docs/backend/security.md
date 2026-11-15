@@ -1,6 +1,6 @@
 # Security design and permissions
 
-M0 threat model and planned controls. No security audit or production authorization implementation has been completed.
+M0 threat model plus M1 foundation controls. M1 implements tested default-deny authentication boundary, configuration guards, safe errors/logging, body/DTO limits, exact CORS, security headers and per-instance rate limiting. The disabled verifier authenticates nobody. Resource permissions below remain planned for later milestones; no security audit or production identity/authorization implementation is complete.
 
 Every permission requires a verified Firebase identity, active Palito account and current relevant membership/grant. `F` = farm-owned/authorized, `V` = verified assigned vet with time-limited care/referral grant, `B`/`I` = own bank/insurer organization and assigned case, `A` = explicit audited support capability. All other access is denied. Admin has no general clinical/financial rewrite permission.
 

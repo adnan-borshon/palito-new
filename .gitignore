@@ -52,3 +52,11 @@ frontend/mobile/android/
 **/test-results/
 **/playwright-report/
 docs/.references/
+
+# Local credentials and generated outputs
+**/.env
+**/.env.*
+!**/.env.example
+**/.next/
+**/dist-test/
+**/openapi.json

@@ -1,6 +1,6 @@
 # Proposed API contract
 
-M0 design; no routes or DTOs implemented. Prefix `/api/v1`. Methods below complement all command mappings in [command inventory](command-inventory.md) and requirement reads in [traceability](requirements-traceability.md). Exact provider DTOs and financial product fields remain gated by [decisions](decisions.md) before their implementation milestone.
+Domain contracts remain M0 design. M1 implements only GET `/api/v1/health/live`, GET `/api/v1/health/ready` and development-only GET `/api/openapi.json`, with the common validation/error/request-safeguard boundary; no domain routes/DTOs are implemented. Prefix `/api/v1`. Methods below complement all command mappings in [command inventory](command-inventory.md) and requirement reads in [traceability](requirements-traceability.md). Exact provider DTOs and financial product fields remain gated by [decisions](decisions.md) before their implementation milestone.
 
 ## Common rules
 

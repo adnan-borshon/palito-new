@@ -1,12 +1,16 @@
 # Architecture and migration design
 
-Status: M0 design for review, 2026-11-15. Source snapshot: `b31b165bc92f2734776b608aeba241a6b9dd291e`.
+Status: M0 target design plus M1 foundation, 2026-11-15. Source snapshot: `b31b165bc92f2734776b608aeba241a6b9dd291e`.
 
-## Current boundaries
+## Historical M0 boundaries
 
 Expo SDK 58 mobile and Next.js 16 web both consume `frontend/shared`. `createDemoRepository` stores the entire domain snapshot on clients, uses an in-process serial queue, and permits public demo/auth controls. This is useful demo behavior, not a server authorization boundary. `backend/.gitkeep` is the only backend file. Root workspaces do not include a backend. There are 495 tracked files under `frontend/web/.next`; no `.github` workflows exist at this snapshot.
 
 The web adapter `frontend/web/src/lib/client.ts` preserves an explicitly supplied request ID but generates a new one on every other execution. A transport adapter alone cannot provide safe retry semantics, scoped queries, pagination or real identity. Mobile's confirmation dialog retains an ID during retry; process restart persistence still needs design and verification.
+
+## Implemented M1 boundary
+
+`backend` now contains an ESM NestJS API with configuration validation, safe logging/errors, global disabled identity verifier, exact-origin CORS, body/DTO limits, security headers, rate limiting, generated OpenAPI and liveness/readiness. `pg` performs only bounded SELECT 1 connectivity checks and closes on shutdown; Prisma schema/domain persistence remain M2. Development Compose targets PostgreSQL 18.7. CI and static/secret/dependency checks are configured; current execution evidence is in progress. Generated `.next` artifacts are no longer tracked. Neither client has switched to the API.
 
 ## Target deployment and trust
 

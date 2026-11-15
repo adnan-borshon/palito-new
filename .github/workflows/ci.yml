@@ -1,0 +1,48 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18.7-alpine
+        env:
+          POSTGRES_USER: palito_ci
+          POSTGRES_PASSWORD: ephemeral-ci-only
+          POSTGRES_DB: palito_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U palito_ci -d palito_ci"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      CI: 'true'
+      NEXT_TELEMETRY_DISABLED: '1'
+      EXPO_NO_TELEMETRY: '1'
+      TEST_DATABASE_URL: postgresql://palito_ci:ephemeral-ci-only@127.0.0.1:5432/palito_ci
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run lint:all
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build:backend
+      - run: npm run test:backend:integration
+      - run: npm run build:web
+      - run: npm run export:web
+      - run: npm audit --omit=dev --audit-level=high

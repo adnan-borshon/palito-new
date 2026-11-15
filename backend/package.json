@@ -1,0 +1,51 @@
+{
+  "name": "@palito/backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "^24.3.0"
+  },
+  "scripts": {
+    "setup:dev": "node scripts/setup-dev.mjs",
+    "db:up": "docker compose --env-file .env up -d --wait",
+    "db:down": "docker compose --env-file .env down",
+    "dev": "npm run build && node --env-file=.env --watch dist/main.js",
+    "start": "node --env-file-if-exists=.env dist/main.js",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src test --max-warnings=0",
+    "build:test": "tsc -p tsconfig.test.json",
+    "test": "npm run build:test && node --test dist-test/test/*.test.js",
+    "test:integration": "npm run build:test && node --test dist-test/test/integration/*.test.js",
+    "openapi": "npm run build && node --env-file-if-exists=.env scripts/export-openapi.mjs",
+    "test:integration:dev": "node --env-file=.env scripts/test-integration-dev.mjs"
+  },
+  "dependencies": {
+    "@nestjs/common": "12.5.0",
+    "@nestjs/core": "12.5.0",
+    "@nestjs/platform-express": "12.5.0",
+    "@nestjs/swagger": "12.1.2",
+    "class-transformer": "0.5.1",
+    "class-validator": "0.15.1",
+    "express": "5.3.0",
+    "express-rate-limit": "8.7.4",
+    "helmet": "8.3.0",
+    "pg": "8.23.1",
+    "pino": "10.4.0",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@nestjs/testing": "12.5.0",
+    "@types/express": "5.0.6",
+    "@types/pg": "8.23.1",
+    "@types/supertest": "7.2.1",
+    "eslint": "9.39.5",
+    "supertest": "7.3.2",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.2"
+  }
+}

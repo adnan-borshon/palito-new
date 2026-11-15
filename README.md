@@ -5,11 +5,11 @@ Bangla-first livestock care, veterinary, insurance, lending, and administration 
 - `frontend/mobile`: Complete Expo SDK 58 + React Native 0.88 + Expo Router + TypeScript mobile application across all five roles.
 - `frontend/shared`: Portable TypeScript domain engine, validation, Bangla/English localization, deterministic fixtures, and versioned local storage repository.
 - `frontend/web`: Existing Next.js App Router web application across all five roles.
-- `backend`: Empty placeholder. Backend milestone 0 is prepared for review; [start here](docs/backend/README.md). Existing authentication, AI, IoT, calls and finance use the local demo repository, regardless of UI copy. No production integration is implemented.
+- `backend`: NestJS M1 foundation with configuration/security, PostgreSQL readiness, OpenAPI and CI. [Run locally](backend/README.md) or [review progress](docs/backend/progress.md). Existing client authentication and domain workflows still use the local demo repository.
 
 ## Current backend review
 
-Only M0 is in scope. See [backend progress](docs/backend/progress.md) for checks actually rerun and [milestone backlog](docs/backend/implementation-plan.md) for later work. M1 requires the user's next instruction. The historical frontend walkthroughs below operate on local records.
+M0 is complete and M1 is delivered for review. See [backend progress](docs/backend/progress.md) for executed checks and limits. M2 requires the user's next instruction. The frontend walkthroughs below still operate on local records.
 
 ## Run locally
 

@@ -1,5 +1,7 @@
 'use client';
 
+import Image from 'next/image';
+
 import { useMemo, useState } from 'react';
 import { hasIoTEvidence, type HealthRecord, type Medicine } from '@palito/shared';
 import { useWebApp } from '@/providers/web-provider.tsx';
@@ -34,14 +36,14 @@ export function VetWebFeature({
       state.appointments.filter(
         (a) => !user?.id || user.role !== 'vet' || a.vetId === user.id,
       ),
-    [state.appointments, user?.id, user?.role],
+    [state.appointments, user],
   );
   const myClaims = useMemo(
     () =>
       state.claims.filter(
         (c) => !user?.id || user.role !== 'vet' || c.vetId === user.id,
       ),
-    [state.claims, user?.id, user?.role],
+    [state.claims, user],
   );
   const linkedAnimals = useMemo(() => {
     if (!user?.id || user.role !== 'vet') return state.animals;
@@ -60,7 +62,7 @@ export function VetWebFeature({
             c.status === 'vet_review',
         ),
     );
-  }, [state.animals, state.appointments, state.claims, user?.id, user?.role]);
+  }, [state.animals, state.appointments, state.claims, user]);
 
   const initialTab =
     screen === 'animals' || screen === 'animal' || screen === 'passport'
@@ -375,7 +377,10 @@ export function VetWebFeature({
                 <Card className="flex flex-col gap-4">
                   <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#E2E8F0] pb-4">
                     <div className="flex items-center gap-3">
-                      <img
+                      <Image
+                unoptimized
+                width={56}
+                height={56}
                         src="/images/cow.jpg"
                         alt={apptAnimal?.name ?? 'Animal'}
                         className="w-14 h-14 rounded-[12px] object-cover border border-[#E2E8F0]"

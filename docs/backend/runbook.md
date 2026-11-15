@@ -1,6 +1,6 @@
 # Baseline and future operations
 
-M0 only. No backend, PostgreSQL service, migrations, provider credentials or deployment exists in this change. The following baseline commands are real existing project commands; future operations below are requirements to implement, not commands to run now.
+M1 is implemented for review. Follow [backend setup](../../backend/README.md) for the executable local workflow and [current progress](progress.md) for actual results. No application migrations, provider credentials or deployment exist. Historical M0 results are in [M0 report](milestone-0-report.md).
 
 ## Reproduce current checks
 
@@ -16,7 +16,7 @@ npm run build:web
 npm run export:web
 ```
 
-`lint:web` currently runs `tsc --noEmit` and is not ESLint; fixing it is M1. Tests are demo/domain and component tests. Static Expo export and Next.js build do not verify native hardware, real SMS, calls, payments, API authorization or database constraints. Builds can modify tracked `.next` output; do not include generated changes in feature PRs. M1 must untrack these outputs without removing source.
+`lint:web` now runs genuine Next.js ESLint with zero warnings allowed; web typecheck generates route types before tsc. Tests are demo/domain and component tests. Static Expo export and Next.js build do not verify native hardware, real SMS, calls, payments, API authorization or database constraints. M1 removed 495 tracked `.next` outputs and ignores regenerated files. Do not commit generated output or local `.env` credentials.
 
 The original SRS can be extracted with `pdftotext -layout docs/srs.pdf <scratch-path>` and rendered with Poppler. Use physical PDF pages, since contents numbering differs. Do not commit extracted personal/title-page data or page images as application assets.
 
@@ -32,7 +32,16 @@ The original SRS can be extracted with `pdftotext -layout docs/srs.pdf <scratch-
 | M4–8 features | Scoped API/database tests, separate-process races, web journeys and physical devices | Include policy versions, fault injection and pending provider states |
 | M9–10 operations | Approved workload/load shape, secret/scanner triage, restore/rollout rehearsal | Report exact environment and residual risks; no production activation by implication |
 
-## Future operational controls
+## Implemented foundation operations
+
+- `npm run setup:backend` creates random ignored development configuration. Existing files are preserved. `backend/.env.example` lists supported configuration keys.
+- From backend, `npm run db:up` starts the current PostgreSQL development image; `npm run dev` compiles and serves the API on loopback. After editing TS, rebuild to trigger the compiled-output watcher. `npm run db:down` stops without dropping the named volume.
+- Monitor `/api/v1/health/live` separately from `/api/v1/health/ready`. Database unavailability gives safe 503; process remains alive. SIGTERM/SIGINT trigger graceful listener/pool closure. No real business jobs exist yet.
+- M1 defaults: max JSON 256KiB, rate 120/minute/IP excluding probes, pool size 5, DB timeout 2s, server request/header timeout 15s/10s, exact-origin CORS, proxy trust disabled. Tune only with tests and measured workload.
+- Domain mutations remain unavailable. All protected controllers are denied until M3 integrates a real verifier and server-owned account/membership checks. Do not enable fixture auth or expose provider secrets to clients.
+- CI has real install/lint/type/test/build/PostgreSQL/audit steps. Security workflow adds CodeQL and full-history Gitleaks; report its actual status. It neither deploys nor sends PR comments.
+
+## Later operational controls
 
 Configuration: separate dev/staging/production projects, database roles, buckets, callback keys and secrets. Production rejects emulators, fixture users/OTP, demo flags and test providers. Secrets stay outside Git and frontend bundles. Document exact required variables when M1/M3 introduces them.
 

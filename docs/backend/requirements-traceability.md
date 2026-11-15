@@ -2,7 +2,7 @@
 
 M0 mapping against main `b31b165bc92f2734776b608aeba241a6b9dd291e`, original `docs/srs.pdf` (49 physical pages), and the existing PAL matrix. All 65 current PAL IDs are preserved. Old matrix pass labels describe earlier demo acceptance, not backend tests. Proposed routes use `/api/v1`; all table names are design only. F/V/B/I/A scopes are defined in [security](security.md). Each row's engineering owner is the implementer of its delivery milestone; unresolved policy owners are in [decisions](decisions.md).
 
-`T-<PAL-ID>` is a planned acceptance test covering the final column plus the applicable cross-account/org denials. No such backend tests exist yet. See [progress](progress.md) for checks actually executed. Read endpoints return allowed projections and bounded pages. Provider-specific DTOs are finalized before the listed feature milestone.
+`T-<PAL-ID>` is a planned acceptance test covering the final column plus the applicable cross-account/org denials. Those domain acceptance test IDs remain planned. M1 foundation tests now exist under `backend/test`; they do not establish domain acceptance. See [progress](progress.md) for checks actually executed. Read endpoints return allowed projections and bounded pages. Provider-specific DTOs are finalized before the listed feature milestone.
 
 | Requirement | Original source (physical PDF pages / plan) | Delivery / backend status | Proposed module/API | Proposed tables | Permission | Planned test / acceptance |
 |---|---|---|---|---|---|---|

@@ -1,16 +1,17 @@
 # Backend implementation backlog
 
-Derived from the uploaded [source plan](source-plan.md), reconciled to source `b31b165bc92f2734776b608aeba241a6b9dd291e` on 2026-11-15. Engineering owns implementation/test evidence; product, clinical and partner policy owners are assigned in decisions. Read traceability for individual PAL IDs and planned acceptance tests. Later milestones remain unimplemented.
+Derived from the uploaded [source plan](source-plan.md), reconciled to source `b31b165bc92f2734776b608aeba241a6b9dd291e` on 2026-11-15. Engineering owns implementation/test evidence; product, clinical and partner policy owners are assigned in decisions. Read traceability for individual PAL IDs and planned acceptance tests. M1 foundation is delivered for review; M2 and later milestones remain unimplemented.
 
 Release A: identity + healthcare + reliable jobs; finance disabled or explicit sandbox. Release B: finance sandbox after approved terms/ledger/contracts. Release C: independently gated telemetry/AI/calls/commerce/reporting/provider pilot. These groups sequence all requirements; they do not remove any SRS/PAL scope. Initial API and conceptual tables are in architecture/API contracts; schema migrations are M2, not M0.
 
 ### M0 — Requirements, tools and technical decisions
-**Status:** review deliverable prepared; user review pending. No M1 implementation.
+**Status:** completed at `bca35e3`; user reviewed and authorized M1 on 2026-11-15.
 **Completed outputs:** original SRS/source reconciliation; 65-row traceability; 53-command migration inventory; architecture/schema/API/permissions design; auth/SDK decisions and provider/policy gaps; reviewed backend guidance; baseline checks and limitations in progress.
 **Exit evidence:** exact requirement/command set equality, no invented test claims, accurate tooling statuses, source/provenance and current check results recorded. See progress for any unavailable checks. Live providers/native hardware remain unverified and explicitly gated rather than claimed complete.
-**Review:** B03–05 staff/native auth, B07 no-charge pilot, financial/clinical policy ownership, SRS gap dispositions. M1 starts only after user instruction.
+**Review:** B03–05 staff/native auth, B07 no-charge pilot, financial/clinical policy ownership, SRS gap dispositions. User instruction to proceed with M1 received; unresolved product/provider policies still gate their dependent milestones.
 
 ### M1 — Backend and CI foundation
+**Status:** implemented for review; see [M1 report](progress-m1.md) and [checkpoint](progress.md) for actual evidence/limits. Stop before M2.
 **Depends on:** M0 architecture.
 **Work:** backend workspace, configuration validation, PostgreSQL development setup, logging/redaction, errors, OpenAPI, request limits, CORS/security headers, health/readiness and shutdown. Establish reusable authentication guard boundary, even before Firebase integration. Untrack generated build output and make web lint genuine.
 **Tests planned:** clean setup, invalid config, safe errors and readiness behavior; CI install/lint/typecheck/unit/build.
@@ -86,6 +87,6 @@ Release A: identity + healthcare + reliable jobs; finance disabled or explicit s
 **Boundary:** preparing a deployment is not permission to activate production or transfer real funds.
 
 
-## Immediate next step after review
+## Immediate next step after M1 review
 
-On explicit authorization, M1 reads this checkpoint, checks current main/PR changes, selects supported NestJS/Prisma/TypeScript versions against official docs, creates the backend workspace and real CI/config/health foundation, fixes genuine web lint and untracks generated `.next` output. Do not begin authentication/database feature implementation merely to complete M1. Recheck historical baseline failures before fixing them.
+On explicit authorization, read the current checkpoint and latest branch diff, then begin M2 database foundation: verify/pin the supported Prisma version, adopt only reviewed relevant PostgreSQL guidance, add identity/membership/farm/animal/clinical prerequisites with reviewed migrations, separate runtime/migration roles and test constraints/clean upgrade paths against real PostgreSQL. Do not implement M3 login as part of M2.

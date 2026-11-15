@@ -15,7 +15,6 @@ import {
   TabsBar,
   TextareaField,
   toneForStatus,
-  WebIcon,
 } from '@/components/ui.tsx';
 
 export function InsurerWebFeature({
