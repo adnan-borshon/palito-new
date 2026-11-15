@@ -1,6 +1,6 @@
 # Baseline and future operations
 
-M1 is implemented for review. Follow [backend setup](../../backend/README.md) for the executable local workflow and [current progress](progress.md) for actual results. No application migrations, provider credentials or deployment exist. Historical M0 results are in [M0 report](milestone-0-report.md).
+M2 is implemented for review. Follow [backend setup](../../backend/README.md) for the executable local workflow and [current progress](progress.md) for actual results. Core Prisma migrations and database roles now exist. No provider credentials or deployment exist. Historical M0 results are in [M0 report](milestone-0-report.md).
 
 ## Reproduce current checks
 
@@ -35,7 +35,7 @@ The original SRS can be extracted with `pdftotext -layout docs/srs.pdf <scratch-
 ## Implemented foundation operations
 
 - `npm run setup:backend` creates random ignored development configuration. Existing files are preserved. `backend/.env.example` lists supported configuration keys.
-- From backend, `npm run db:up` starts the current PostgreSQL development image; `npm run dev` compiles and serves the API on loopback. After editing TS, rebuild to trigger the compiled-output watcher. `npm run db:down` stops without dropping the named volume.
+- From backend, `npm run db:up` starts the current PostgreSQL development image; `npm run db:bootstrap` prepares local roles/schema/extension, `npm run migrate:deploy` applies reviewed migrations, and `npm run dev` compiles/serves the API on loopback. After editing TS, rebuild to trigger the compiled-output watcher. `npm run db:down` stops without dropping the named volume.
 - Monitor `/api/v1/health/live` separately from `/api/v1/health/ready`. Database unavailability gives safe 503; process remains alive. SIGTERM/SIGINT trigger graceful listener/pool closure. No real business jobs exist yet.
 - M1 defaults: max JSON 256KiB, rate 120/minute/IP excluding probes, pool size 5, DB timeout 2s, server request/header timeout 15s/10s, exact-origin CORS, proxy trust disabled. Tune only with tests and measured workload.
 - Domain mutations remain unavailable. All protected controllers are denied until M3 integrates a real verifier and server-owned account/membership checks. Do not enable fixture auth or expose provider secrets to clients.
@@ -54,3 +54,9 @@ Backups/restore: owner and hosting budget unresolved. Candidate RPO <=1h/RTO <=4
 Incident handling: identify on-call owner, freeze affected capability where needed, preserve redacted audit/evidence, rotate relevant secrets, reconcile provider states, repair through audited amendments/reversals and document recovery. Define escalation contacts before pilot.
 
 Deployment: M10 prepares staging rollout/rollback and feature gates for user review. Enabling paid services, production migrations, SMS campaigns, real finance or live deployment needs explicit authorization. Current M0 review does not authorize M1.
+
+## M2 migration/role procedure
+
+Keep admin, migration and runtime URLs separate. Existing M1 environments must retain the current Docker volume administrator password while moving the API URL to the restricted runtime role; see backend README. Bootstrap refuses nonlocal/non-development targets. New database objects are not automatically granted to runtime. Do not grant access to `_prisma_migrations`, use runtime for DDL, or seed during install/startup/migrate.
+
+Before applying a future migration, review its SQL and locking/data effect, run clean and prior-version upgrade tests on disposable PostgreSQL, verify runtime denial and model drift, and retain the immutable published history. If a migration fails, inspect status and affected state with the migration/administrator owner; do not automatically reset or delete real data. Production migration rollout/restore rehearsal remains M10.

@@ -34,6 +34,9 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     throw new ConfigurationError(`Invalid configuration fields: ${fields}`);
   }
   const config = result.data;
+  if (config.NODE_ENV !== 'test' && new URL(config.DATABASE_URL).username !== 'palito_runtime') {
+    throw new ConfigurationError('DATABASE_URL must use the dedicated palito_runtime role');
+  }
   if (config.NODE_ENV === 'production') {
     if (config.SWAGGER_ENABLED || env.FIREBASE_AUTH_EMULATOR_HOST || env.PAYMENT_PROVIDER === 'sandbox') {
       throw new ConfigurationError('Production forbids development documentation, emulators and sandbox providers');

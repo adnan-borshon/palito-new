@@ -20,3 +20,7 @@ Current authorization is M0 only. [Backend review index](backend/README.md), [ch
 ## Backend milestone 1 — 2026-11-15
 
 User reviewed M0 and authorized M1. [M1 report](backend/progress-m1.md) and [current checkpoint](backend/progress.md) describe the implemented foundation and actual checks. The older M0-only authorization note above is historical. M2 waits for user review/instruction.
+
+## Backend milestone 2 — 2026-11-15
+
+User reviewed M1 and authorized M2. Core PostgreSQL/Prisma schema, reviewed migrations, dedicated roles, synthetic fixtures and real database integrity tests are now implemented. [Current checkpoint](backend/progress.md) and [database design](backend/database.md) are authoritative for this phase. Earlier M0/M1-only notes are history. Stop for user review before M3; no Firebase/login or domain endpoints are included.

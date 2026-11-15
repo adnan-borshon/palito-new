@@ -1,6 +1,6 @@
 # Proposed API contract
 
-Domain contracts remain M0 design. M1 implements only GET `/api/v1/health/live`, GET `/api/v1/health/ready` and development-only GET `/api/openapi.json`, with the common validation/error/request-safeguard boundary; no domain routes/DTOs are implemented. Prefix `/api/v1`. Methods below complement all command mappings in [command inventory](command-inventory.md) and requirement reads in [traceability](requirements-traceability.md). Exact provider DTOs and financial product fields remain gated by [decisions](decisions.md) before their implementation milestone.
+Domain contracts remain M0 design. M1 implements only GET `/api/v1/health/live`, GET `/api/v1/health/ready` and development-only GET `/api/openapi.json`, with the common validation/error/request-safeguard boundary; no domain routes/DTOs are implemented. M2 adds the database layer, not additional HTTP endpoints. Prefix `/api/v1`. Methods below complement all command mappings in [command inventory](command-inventory.md) and requirement reads in [traceability](requirements-traceability.md). Exact provider DTOs and financial product fields remain gated by [decisions](decisions.md) before their implementation milestone.
 
 ## Common rules
 
@@ -26,7 +26,7 @@ Domain contracts remain M0 design. M1 implements only GET `/api/v1/health/live`,
 | PATCH /me | `name:text(120)`, `district:text(120)` | Self allowlist; no status/role/verification change |
 | PATCH /me/preferences | `locale:"bn"\|"en"` | Self; client may keep anonymous locale without a server account |
 | PATCH /me/notification-preferences | Allowed channel booleans and explicit consent version | Self; product-defined urgent operational messages handled separately |
-| POST /farms | `name:text(120)`, `district:text(120)`, `address:text(500)`, `size` nonnegative exact bounded number | Create farm/membership for principal; unit documented; return ID/version |
+| POST /farms | `name:text(120)`, `district:text(120)`, `address:text(500)`, `size` positive exact decimal in acres (maps to `areaAcres`) | Create farm/membership for principal; unit documented; return ID/version |
 | PATCH /farms/:id | Same editable fields, `If-Match` | F; cannot change ownership by body field |
 | POST /animals | `farmId`, `name:text(120)`, allowed `species`, `breed:text(120)`, allowed `sex`, `birthDate`, positive bounded `weightKg`, optional `tag:text(80)`, `estimate:Money`, optional authorized `photoFileId` | F; unique stable identity; estimate distinct from verified value; no healthScore/status/approvedValue accepted |
 | PATCH /animals/:id | Same editable attributes except farm transfer, `If-Match` | F; identity/ownership/clinical/encumbrance fields immutable through generic edit |

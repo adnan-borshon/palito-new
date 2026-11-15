@@ -2,9 +2,9 @@
 
 Updated 2026-11-15. **Both `@palito/mobile` (Expo SDK 58) and `@palito/web` (Next.js 16 App Router) are implemented and connected to `@palito/shared`.**
 
-## Backend M1 review checkpoint — 2026-11-15
+## Backend M2 review checkpoint — 2026-11-15
 
-M0 was reviewed and M1 authorized. The NestJS/config/operations/security/CI foundation is implemented; [backend progress](backend/progress.md) records actual current checks and limits. All 65 PAL requirements and 53 commands remain mapped. Domain schema and Firebase are not implemented; stop for user review before M2.
+M0/M1 were reviewed and M2 authorized. The NestJS foundation and core Prisma/PostgreSQL schema/migrations/roles are implemented; [backend progress](backend/progress.md) records actual current checks and limits. All 65 PAL requirements and 53 commands remain mapped. Firebase and domain API workflows are not implemented; stop for user review before M3.
 
 ## Current phase
 

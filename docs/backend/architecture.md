@@ -1,6 +1,6 @@
 # Architecture and migration design
 
-Status: M0 target design plus M1 foundation, 2026-11-15. Source snapshot: `b31b165bc92f2734776b608aeba241a6b9dd291e`.
+Status: M0 target design plus M1/M2 foundations, 2026-11-15. Source snapshot: `b31b165bc92f2734776b608aeba241a6b9dd291e`.
 
 ## Historical M0 boundaries
 
@@ -11,6 +11,10 @@ The web adapter `frontend/web/src/lib/client.ts` preserves an explicitly supplie
 ## Implemented M1 boundary
 
 `backend` now contains an ESM NestJS API with configuration validation, safe logging/errors, global disabled identity verifier, exact-origin CORS, body/DTO limits, security headers, rate limiting, generated OpenAPI and liveness/readiness. `pg` performs only bounded SELECT 1 connectivity checks and closes on shutdown; Prisma schema/domain persistence remain M2. Development Compose targets PostgreSQL 18.7. CI and static/secret/dependency checks are configured; current execution evidence is in progress. Generated `.next` artifacts are no longer tracked. Neither client has switched to the API.
+
+## Implemented M2 boundary
+
+Prisma/client/pg adapter 7.10.1, two reviewed PostgreSQL migrations and separate local administrator/migrator/runtime credentials are implemented. M1 SELECT readiness now uses the typed Prisma-backed database service; it remains a connectivity probe, not a migration-version or domain-readiness claim. Core relationships, clinical/signature history, valuation independence and scheduling integrity are tested against real PostgreSQL. No RLS, Firebase or request-level domain authorization is claimed. Existing clients stay on demo data.
 
 ## Target deployment and trust
 
@@ -25,7 +29,7 @@ Start with one modular API deployment and worker sharing code/database. Do not a
 
 ## Domain ownership and conceptual schema
 
-All IDs are server-generated UUIDs. All tables below are proposals; no Prisma schema/migration exists yet.
+All IDs are server-generated UUIDs. M2 implements the 13 core tables documented in [database foundation](database.md); other tables below remain target design. Prisma migrations and SQL-only integrity controls now exist, while domain endpoints are still unimplemented.
 
 | Module / first delivery | Authoritative tables | Integrity and access boundary |
 |---|---|---|

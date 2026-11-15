@@ -33,6 +33,9 @@
     "lint:all": "npm run lint --workspaces --if-present",
     "test:backend": "npm run test --workspace @palito/backend",
     "test:backend:integration": "npm run test:integration --workspace @palito/backend",
-    "setup:backend": "npm run setup:dev --workspace @palito/backend"
+    "setup:backend": "npm run setup:dev --workspace @palito/backend",
+    "db:bootstrap": "npm run db:bootstrap --workspace @palito/backend",
+    "db:migrate": "npm run migrate:deploy --workspace @palito/backend",
+    "db:seed": "npm run db:seed --workspace @palito/backend"
   }
 }

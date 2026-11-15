@@ -2,7 +2,7 @@
 
 M0 mapping against main `b31b165bc92f2734776b608aeba241a6b9dd291e`, original `docs/srs.pdf` (49 physical pages), and the existing PAL matrix. All 65 current PAL IDs are preserved. Old matrix pass labels describe earlier demo acceptance, not backend tests. Proposed routes use `/api/v1`; all table names are design only. F/V/B/I/A scopes are defined in [security](security.md). Each row's engineering owner is the implementer of its delivery milestone; unresolved policy owners are in [decisions](decisions.md).
 
-`T-<PAL-ID>` is a planned acceptance test covering the final column plus the applicable cross-account/org denials. Those domain acceptance test IDs remain planned. M1 foundation tests now exist under `backend/test`; they do not establish domain acceptance. See [progress](progress.md) for checks actually executed. Read endpoints return allowed projections and bounded pages. Provider-specific DTOs are finalized before the listed feature milestone.
+`T-<PAL-ID>` is a planned acceptance test covering the final column plus the applicable cross-account/org denials. Those domain acceptance test IDs remain planned. M1/M2 tests now exist under `backend/test`; they establish foundation/database integrity only, not domain acceptance. See [progress](progress.md) for checks actually executed. Read endpoints return allowed projections and bounded pages. Provider-specific DTOs are finalized before the listed feature milestone.
 
 | Requirement | Original source (physical PDF pages / plan) | Delivery / backend status | Proposed module/API | Proposed tables | Permission | Planned test / acceptance |
 |---|---|---|---|---|---|---|
@@ -98,3 +98,7 @@ Text was extracted from all 49 physical pages. Diagrams on pp.29,34,36–39 were
 | UC-003 / pp.33–34 | M6 independent valuation -> <=70% expiring quote -> accepted policy version -> bank case review -> confirmed disbursement -> reconciled schedule/repayment/grace. Test estimate changes, competing collateral, expiry races and retry after lost response. |
 
 Every enabled scope needs real API/PostgreSQL evidence on both clients. Existing 18 shared demo tests cover useful domain examples, not production constraints, real providers or hardware.
+
+## M2 database evidence
+
+The [database foundation](database.md) now implements identity/membership, farms/animals, ownership history, valuation and clinical prerequisites. PostgreSQL tests cover clean and versioned upgrade migrations, exact money/date values, duplicate identities/memberships, mismatched organizations/ownership, immutable signed/approved history, independent slot reservation races, rollback and denied runtime DDL/escalation. These are supporting layers for PAL-ACC/FARM/CARE/LOAN and QA; their user workflows and request-level permission tests remain in the original delivery milestones. Invitations, care grants, financial ledgers, files and jobs are explicitly later schema additions, not omitted requirements.

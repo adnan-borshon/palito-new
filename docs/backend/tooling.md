@@ -1,6 +1,6 @@
 # Tooling review and adoption
 
-Updated for M1, 2026-11-15. A guidance file, connected tool and executable dependency are different. M0 status is retained where relevant; M1 installed only the explicit backend/web-lint dependencies and configured development/CI checks. No provider/cloud services were activated.
+Updated for M2, 2026-11-15. A guidance file, connected tool and executable dependency are different. M0 status is retained where relevant; M1 installed only the explicit backend/web-lint dependencies and configured development/CI checks. No provider/cloud services were activated.
 
 | Item | Observed status / provenance | M0 action / next gate |
 |---|---|---|
@@ -9,7 +9,7 @@ Updated for M1, 2026-11-15. A guidance file, connected tool and executable depen
 | Node/npm | Runtime v24.22.1 / npm 11.9.0; repo pins Node 24.22.3, engine accepts ^24.3.0 | Record patch difference; no runtime/manifest upgrade. Exact pinned patch reproduction remains a separate check |
 | Existing frontend/shared tooling | `npm ci --ignore-scripts --no-audit --no-fund` installed lockfile dependencies; no lock changes | Existing TypeScript, Expo ESLint, Jest and Node tests executed; scripts intentionally not run by installation; Next.js resolved to 16.4.6 (manifest ^16.2.1) |
 | Firebase SDK/Admin/CLI/emulator | No Firebase package/configuration in this source baseline; no Firebase tools exposed in this session | Proposed M3. Official docs reviewed; no project inspected, emulator run, SMS sent or Identity Platform upgrade |
-| NestJS / Prisma / PostgreSQL service | NestJS 12.5.0 and pg 8.23.1 installed/locked; development Compose PostgreSQL 18.7; local disposable tests used 18.6 binaries | M1 implemented/tested foundation connectivity. Prisma stable 7.10.1 is an M2 candidate; no Prisma package/schema/migration yet. Docker runtime unavailable locally; see checkpoint for CI evidence |
+| NestJS / Prisma / PostgreSQL service | NestJS 12.5.0 and pg 8.23.1 installed/locked; development Compose PostgreSQL 18.7; local disposable tests used 18.6 binaries | M1 implemented/tested foundation connectivity. Prisma CLI/client/adapter 7.10.1 are installed and locked; two migrations and the core schema are implemented in M2. Docker runtime unavailable locally; see checkpoint for CI evidence |
 | Microsoft postgres-skills | External collection named in source plan; not installed/reviewed at a pinned revision | Deferred before M2: inspect relevant portable guidance, LICENSE, supported agent and exact commit; no Azure assumption or guessed skills-lock entry |
 | Playwright CLI/MCP | No project Playwright runner/configuration; no browser test run | Proposed M4 web journeys; select one route and commit repeatable tests. Node web domain tests are not browser E2E |
 | Maestro / device checks | No attached device evidence or project Maestro setup | Proposed M3/M4/M9; no native lifecycle/accessibility claim from browser export |
@@ -24,8 +24,14 @@ The backend guidance's protected-storage requirement is a release criterion. Do 
 
 ## M1 compatibility/provenance
 
-[NestJS 12 migration guide](https://docs.nestjs.com/migration-guide) documents ESM and TypeScript 6 support; core/common/platform-express/testing 12.5.0 and Swagger 12.1.2 peer ranges were verified with npm metadata. Node 24.22.x meets the supported runtime. The official [Prisma requirements](https://docs.prisma.io/docs/orm/reference/system-requirements) and stable 7.x versions were inspected; 8.0.0-rc.33 was not adopted. No premature schema or generated Prisma client is introduced.
+[NestJS 12 migration guide](https://docs.nestjs.com/migration-guide) documents ESM and TypeScript 6 support; core/common/platform-express/testing 12.5.0 and Swagger 12.1.2 peer ranges were verified with npm metadata. Node 24.22.x meets the supported runtime. The official [Prisma requirements](https://docs.prisma.io/docs/orm/reference/system-requirements) and stable 7.x versions were inspected; 8.0.0-rc.33 was not adopted. M2 now introduces the core schema and explicitly generated ignored client; no unused finance/provider modules are scaffolded.
 
 [Official PostgreSQL image docs](https://github.com/docker-library/docs/blob/master/postgres/README.md) list 18.7-alpine; the 18.x volume mounts at `/var/lib/postgresql`. [Version policy](https://www.postgresql.org/support/versioning/) recommends current minor releases. The temporary binary package `@embedded-postgres/linux-x64@18.6.0-beta.19` contains real PostgreSQL 18.6 and was used only outside the repository for local checks, not added to its dependencies.
 
 Verified action refs on 2026-11-15: checkout v6 `d23441a48e516b6c34aea4fa41551a30e30af803`; setup-node v6 `249970729cb0ef3589644e2896645e5dc5ba9c38`; CodeQL v4 resolved annotated tag to commit `33d7b85da1a04171e211befe2c739303b9a4c066`; Gitleaks v3 `e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e`. Gitleaks comments/artifact uploads are disabled. The [Gitleaks action](https://github.com/gitleaks/gitleaks-action) is available to this personal repository without an organization license; no license/service was bought.
+
+## PostgreSQL guidance reviewed for M2
+
+Reviewed Microsoft postgres-skills at commit `b7908c0b53b2a292fb8286d4d4bdba7ea4690291`: MIT license, plugin packaging supports Codex/Claude/Copilot, and generic advanced-indexing/connection-management references. Adopted portable guidance on scoped multicolumn B-tree ordering, unique/exclusion constraints, pool fan-out and distinct connection/query/idle-transaction limits. Source: [pinned repository](https://github.com/microsoft/postgres-skills/tree/b7908c0b53b2a292fb8286d4d4bdba7ea4690291).
+
+The external plugin's connection workflow depends on postgres-mcp, which is not exposed/installed here. It was reviewed, not installed or claimed operational; no Azure control plane, PostgreSQL MCP connection, telemetry or new personal skill was activated. This task uses the explicitly authorized local/CI PostgreSQL development workflow and official PostgreSQL/Prisma documentation. Primary references: [constraints](https://www.postgresql.org/docs/18/ddl-constraints.html), [Prisma v7 migration customization](https://docs.prisma.io/docs/orm/v7/prisma-migrate/workflows/customizing-migrations), [Prisma generation](https://docs.prisma.io/docs/orm/v7/prisma-client/setup-and-configuration/generating-prisma-client).

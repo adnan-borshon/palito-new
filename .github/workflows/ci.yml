@@ -38,6 +38,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run prisma:validate --workspace @palito/backend
       - run: npm run lint:all
       - run: npm run typecheck
       - run: npm test

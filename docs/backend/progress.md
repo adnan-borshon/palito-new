@@ -1,45 +1,53 @@
-# Backend M1 checkpoint
+# Backend M2 checkpoint
 
-Updated 2026-11-15. **M0 reviewed; M1 foundation implemented for user review. Stop before M2.** Branch/PR: `codex/palito-m0-assessment`, [PR #2](https://github.com/adnan-borshon/palito-new/pull/2). M0 commit: `bca35e33363654c211e8d8a6e8541c51c740f247`. The live PR head identifies the current code/document commit.
+Updated 2026-11-15. **M1 reviewed; M2 database foundation implemented for user review. Stop before M3.** Branch/PR: `codex/palito-m0-assessment`, [PR #2](https://github.com/adnan-borshon/palito-new/pull/2). M1 base: `db0cea1ddd325e67d21cc1704a52e6727e503a3d`. The live PR head identifies this implementation commit.
 
-Read [M1 implementation report](progress-m1.md) for behavior, security boundaries and limitations; [backend setup](../../backend/README.md) for runnable commands. The [M0 report](milestone-0-report.md) preserves the original source assessment and earlier checks. All 65 PAL IDs and 53 commands remain mapped; infrastructure checks do not complete a domain requirement.
+Read [database design](database.md), [backend setup](../../backend/README.md), architecture/decisions and traceability. Earlier [M0 report](milestone-0-report.md) and [M1 checkpoint](milestone-1-checkpoint.md) remain history. M1 hosted CI/security runs passed before M2 began; the final PR description records that evidence. All 65 PAL requirements and 53 commands remain mapped; no user workflow is marked complete merely because its prerequisite tables exist.
 
-## Delivered foundation
+## Implemented
 
-M1 adds the NestJS ESM workspace, validated configuration, random ignored local credentials, PostgreSQL Compose setup, safe Pino logging/error envelopes, generated request IDs, security headers/CORS/body/DTO limits and rate limiting. Liveness/readiness, development OpenAPI and graceful shutdown work. A reusable global identity guard denies all non-public requests; Firebase and real memberships are M3.
+- Pin Prisma CLI/client/pg adapter **7.10.1**; generate an ignored ESM TypeScript client explicitly during build/typecheck/test compilation. The existing database service now uses Prisma/pg for bounded readiness and graceful close.
+- Add **13 core tables** in private schema `palito`: users, organizations, memberships, vet_credentials, farms, farm_memberships, animals, ownership_history, valuations, appointments, health_records, prescriptions and prescription_items.
+- Two versioned transactional migrations implement model structure, unique/FK/check/exclusion constraints, immutable signed/approved history and explicit runtime grants. No database-wide CREATE permission is needed by the migration role.
+- Add local-only role/schema/extension bootstrap. Distinct random administrator/migrator/runtime secrets are generated into ignored configuration. Existing configuration and role passwords are preserved; unexpected privileges/inherited roles are refused. API development/production configuration requires runtime username; CLI migration configuration requires migrator username and never falls back to the runtime URL.
+- Add guarded, atomic, idempotent synthetic fixtures. No default admin membership, working Firebase identity, verified vet or approved valuation is seeded. No seed runs on install/startup/migrate and no frontend demo snapshot is imported.
+- Exact BIGINT BDT minor-unit JSON helpers, safe whole-BDT conversion, strict date-only parsing, UTC instants and exact acres/kg decimals. Farm acres match the existing mobile form. Approved valuations are distinct from editable estimates.
+- Preserve old appointment/clinical/valuation snapshots when current animal ownership changes. Signed prescriptions and their items reject later edits/additions. The actual owner-transfer workflow and permission/consent/encumbrance rules are later milestones.
 
-CI runs actual lint/types/tests/builds and PostgreSQL integration with a high/critical dependency gate; a separate workflow configures CodeQL and Gitleaks. Web lint is genuine Next.js ESLint, existing findings are corrected and route types generated on clean checkouts. All 495 generated `.next` files are untracked/ignored. Application source/assets and local demo workflows remain, with small lint-related web corrections. No Prisma schema, migrations, business endpoints or provider integrations were added.
+No Firebase, membership/session APIs, care/finance endpoints, provider integration, paid activation, deployment or production database change occurred. Both clients remain on their demo repository and M1 default-deny identity guard remains in place.
 
-## Actual local checks
+## Actual checks
 
-Linux, Node **24.22.1**, npm **11.9.0**; CI/repo pin **24.22.3**. Real disposable PostgreSQL binary **18.6** was used locally; Compose/CI target official **18.7-alpine**. Docker is unavailable here, so local Compose execution is unverified.
+Local Linux/Node **24.22.1**/npm **11.9.0**, real disposable PostgreSQL **18.6** binaries. CI pins Node **24.22.3** and PostgreSQL **18.7-alpine**. Docker is unavailable locally; no local Compose-start claim. Test databases are uniquely named, local-only, removed afterward and never the development application database. Existing local role credentials are reused rather than rotated.
 
-| Command / evidence | Result |
+| Check | Actual evidence |
 |---|---|
-| Fresh `npm ci --ignore-scripts --no-audit --no-fund` | Exit 0; 1,542 locked packages installed; install scripts deliberately disabled |
-| `npm run lint:all` after clean install | Exit 0; mobile, genuine web and backend lint; no disabled rules or placeholder check. Shared has no lint script |
-| `npm run typecheck` after clean install | Exit 0; all four workspaces; web route types generated without tracked build artifacts |
-| `npm test` after clean install | Exit 0: mobile 11, web Node 2, shared 18, backend 8 = **39 passed, 0 failed** |
-| `npm run test:backend:integration` with TEST_DATABASE_URL | **3 passed, 0 failed, 0 skipped**, real PostgreSQL readiness/closed pool, bounded unavailable DB and real listener/SIGTERM shutdown |
-| `npm run build:backend` after clean install | Exit 0; runnable ESM TypeScript build |
-| `npm run build:web`; `npm run export:web` | Exit 0; Next.js build and Expo browser export; no native/device/E2E claim |
-| `npm run setup:backend`; backend OpenAPI export | Exit 0; random ignored .env generated, repeated setup preserves it; health spec generated without database dependency |
-| Gitleaks 8.30.1 staged source-tree scan | Exit 0; no leaks found; release checksum verified. Not a full history audit |
-| `npm audit --omit=dev --audit-level=high` | Exit 0; 0 high/critical, 1 low + 20 moderate findings remain. Backend-scoped audit reported one moderate advisory |
-| Workflow YAML/action refs, workspace/lock consistency, one React version, documentation/scope/whitespace | Validated before push; no generated output, .env credentials, schema or migration staged |
+| Fresh npm ci with install scripts disabled and generated client removed | Exit 0; **1,661 packages** installed; explicit Prisma generation rebuilt the client |
+| Prisma validate/generate | Valid schema/client at 7.10.1; no database credentials needed for generation/validation |
+| npm run lint:all | Exit 0: real mobile/web/backend lint, no disabled rules; shared has no lint script |
+| npm run typecheck | Exit 0: all four workspaces, including generated Prisma types and Next route types |
+| npm test | **43 passed, 0 failed**: existing 31 frontend/shared + 12 backend foundation/contract/setup tests |
+| npm run build:backend | Exit 0: generated client plus runnable ESM backend |
+| Real PostgreSQL integration | **16 passed, 0 failed, 0 skipped**, using real Prisma migrate deploy, restricted runtime connections and two independent reservation connections |
+| Clean/upgrade/idempotent migrations | Both migrations applied cleanly; first-version synthetic user survives second migration; repeated deploy has no work; official Prisma model drift diff exits 0 |
+| Runtime role denial | DDL, migration-history access, TRUNCATE, temp tables, role creation and SET ROLE denied; superuser/createdb/createrole/bypass-RLS flags false |
+| Data integrity/history | Duplicate identity/membership, wrong org/owner/farm, invalid dates/money/weight, pending-vet signatures, mismatched clinical links and immutable history rejected; rollback, BIGINT precision, signed-item protection and ownership snapshot retention verified |
+| Synthetic seed/setup | Repeated seed creates no duplicates; production/nonlocal/admin seed targets rejected; fresh credentials distinct/private; existing .env is not overwritten |
+| Gitleaks / dependency audit | Staged source scan: exit 0, no leaks found. Audit gate: exit 0, zero high/critical, 1 low + 20 moderate findings retained. Backend-scoped audit: one moderate advisory |
+| Workflow/source/scope checks | 65 requirements, 53 commands, 13 models, exact Prisma pins, one React, unchanged frontend source, links/tables and staged whitespace validated |
 
-**42 tests passed locally** across default and PostgreSQL integration suites. The original 31 frontend/shared tests remain intact. Foundation tests cover compiled startup rejection without secret disclosure, production config guards, readiness/liveness/draining, forged credentials, DTO allowlisting, malformed/oversized JSON, safe errors, request correlation, CORS/headers, rate limits, log redaction and real database/lifecycle/shutdown.
+The first integration attempt exposed Prisma's redundant CREATE SCHEMA requiring database-wide privileges. The unpublished initial migration now relies on administrator pre-provisioning; privileges were not widened. An ownership FK test was corrected to assert PostgreSQL's specific RESTRICT violation code rather than generic FK code. Tests then passed. Historical relationships use snapshots so later ownership changes retain evidence. These are schema integrity controls, not a completed security audit.
 
-## Hosted CI and limits
+**59 tests passed locally** (43 default + 16 PostgreSQL integration). Runtime tests also verify that newly created tables receive no automatic grants and trigger functions are not publicly executable.
 
-Workflows are configured; hosted run status must be read from the PR rather than inferred from local passes. At this document checkpoint no hosted run has yet been observed. Available runs will be inspected after push and before handoff. Exact Node 24.22.3 and PostgreSQL 18.7 verification depends on hosted CI or a Docker-capable environment.
+## Limits / review boundary
 
-M1 is a development foundation. Default auth remains disabled/fail-closed. Per-instance rate limits and `trust proxy=false` require reviewed proxy/shared-storage policy before replication or internet deployment. No Firebase/MFA/SMS, native hardware, browser E2E, real provider/payment, domain constraints/concurrency, load/restore or full audit evidence is claimed. Lower-severity dependency findings need targeted triage before M9/pilot; no breaking forced Expo/Jest changes were applied.
+No RLS or request-level tenant authorization is claimed. The runtime database role is a trusted API role; M3/M4 must enforce active accounts, memberships, assignment and consent on each scoped request. Valuation authority and financial terms remain partner policy gates. Role/bootstrap tests are local development work, not production migrations. Existing lower-severity dependency findings remain for targeted triage; the dependency gate rejects high/critical issues.
 
-Initial tests exposed a malformed-URL refinement error; guarded URL parsing and a compiled-startup regression fixed it. Real web lint findings were corrected without lowering checks. Earlier PostgreSQL attempts across isolated command-network sessions were corrected by running PostgreSQL/tests together; only successful actual integration results count.
+At this code checkpoint hosted M2 runs have not yet been observed; available runs are inspected after push and the PR description records their subsequent status. Local PostgreSQL 18.6 results must not be mislabeled as hosted 18.7 evidence. No native/provider/load/restore or production-readiness claim is made.
 
 ## Resume exactly here
 
-1. Inspect current branch/PR checks and user feedback. Read AGENTS, this checkpoint, M1 report, architecture/decisions and traceability. Preserve M0 evidence as history.
-2. **Wait for the user's M1 review and next instruction; do not start M2 automatically.** Neither PR #1 nor PR #2 has been merged by this work.
-3. On authorization, M2 verifies/pins supported Prisma, reviews PostgreSQL guidance, introduces core schema/reviewed migrations, separates runtime/migration roles and tests clean/upgrade constraints on real PostgreSQL. Firebase implementation stays M3.
+1. Read AGENTS, this checkpoint, database design, current PR checks and user feedback; inspect the actual branch/diff.
+2. **Wait for the user's M2 review and explicit next instruction. Do not start M3 automatically or merge either PR.**
+3. Once authorized, M3 integrates Firebase token/session verification, active server-owned accounts/memberships, suspension/recovery and approved staff MFA, with emulator/provider/native evidence separated. Never use synthetic UIDs or database fixtures as a production auth bypass. M4/M6 workflows remain later scope.

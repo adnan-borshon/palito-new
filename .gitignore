@@ -60,3 +60,5 @@ docs/.references/
 **/.next/
 **/dist-test/
 **/openapi.json
+backend/src/generated/
+backend/.migration-test-*/

@@ -1,6 +1,6 @@
 # Backend implementation backlog
 
-Derived from the uploaded [source plan](source-plan.md), reconciled to source `b31b165bc92f2734776b608aeba241a6b9dd291e` on 2026-11-15. Engineering owns implementation/test evidence; product, clinical and partner policy owners are assigned in decisions. Read traceability for individual PAL IDs and planned acceptance tests. M1 foundation is delivered for review; M2 and later milestones remain unimplemented.
+Derived from the uploaded [source plan](source-plan.md), reconciled to source `b31b165bc92f2734776b608aeba241a6b9dd291e` on 2026-11-15. Engineering owns implementation/test evidence; product, clinical and partner policy owners are assigned in decisions. Read traceability for individual PAL IDs and planned acceptance tests. M1 was reviewed and M2 database foundation is delivered for review; M3 and later remain unimplemented.
 
 Release A: identity + healthcare + reliable jobs; finance disabled or explicit sandbox. Release B: finance sandbox after approved terms/ledger/contracts. Release C: independently gated telemetry/AI/calls/commerce/reporting/provider pilot. These groups sequence all requirements; they do not remove any SRS/PAL scope. Initial API and conceptual tables are in architecture/API contracts; schema migrations are M2, not M0.
 
@@ -11,7 +11,7 @@ Release A: identity + healthcare + reliable jobs; finance disabled or explicit s
 **Review:** B03–05 staff/native auth, B07 no-charge pilot, financial/clinical policy ownership, SRS gap dispositions. User instruction to proceed with M1 received; unresolved product/provider policies still gate their dependent milestones.
 
 ### M1 — Backend and CI foundation
-**Status:** implemented for review; see [M1 report](progress-m1.md) and [checkpoint](progress.md) for actual evidence/limits. Stop before M2.
+**Status:** complete at `db0cea1`; user reviewed and authorized M2. See [M1 report](progress-m1.md) and [archived checkpoint](milestone-1-checkpoint.md).
 **Depends on:** M0 architecture.
 **Work:** backend workspace, configuration validation, PostgreSQL development setup, logging/redaction, errors, OpenAPI, request limits, CORS/security headers, health/readiness and shutdown. Establish reusable authentication guard boundary, even before Firebase integration. Untrack generated build output and make web lint genuine.
 **Tests planned:** clean setup, invalid config, safe errors and readiness behavior; CI install/lint/typecheck/unit/build.
@@ -19,6 +19,7 @@ Release A: identity + healthcare + reliable jobs; finance disabled or explicit s
 **Skills:** Palito backend; GitHub CI tooling.
 
 ### M2 — Database foundation
+**Status:** implemented for review; see [database design](database.md) and [checkpoint](progress.md). Stop before M3.
 **Depends on:** M1.
 **Work:** identity, membership, farm, animal and clinical prerequisites; migrations; constraints; database roles; synthetic seeds; monetary/date contracts. Document later financial schema without building unused modules.
 **Tests planned:** clean migration, upgrade from prior version, foreign keys, duplicate identity/membership and invalid ownership.
@@ -87,6 +88,6 @@ Release A: identity + healthcare + reliable jobs; finance disabled or explicit s
 **Boundary:** preparing a deployment is not permission to activate production or transfer real funds.
 
 
-## Immediate next step after M1 review
+## Immediate next step after M2 review
 
-On explicit authorization, read the current checkpoint and latest branch diff, then begin M2 database foundation: verify/pin the supported Prisma version, adopt only reviewed relevant PostgreSQL guidance, add identity/membership/farm/animal/clinical prerequisites with reviewed migrations, separate runtime/migration roles and test constraints/clean upgrade paths against real PostgreSQL. Do not implement M3 login as part of M2.
+On explicit authorization, M3 integrates Firebase verification and server-owned account/membership permissions, then real client session lifecycle and approved staff MFA. Review current provider prerequisites, emulator/project configuration, native SDK/device compatibility and the original B03–B06 gates. Do not treat synthetic UIDs, pending vet fixtures or database access as real identity verification. M3 must not silently implement all M4 care or M6 finance workflows.

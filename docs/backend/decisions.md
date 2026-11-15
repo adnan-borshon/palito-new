@@ -23,7 +23,7 @@ Status: engineering design prepared for user review, 2026-11-15. A proposed prod
 | B17 | Lower-end Android target, supported iOS scope, expected workload, recovery budget | Proposed workload: 100 farms x 5 animals, 10 staff + 20 farmer concurrent sessions; not a capacity claim; product | Confirm before M9 load/device plan. 500-device telemetry assumes 5-minute samples only as a sizing placeholder, not a clinical requirement |
 | B18 | Read p95 <=500ms, write p95 <=800ms excluding provider time; queue start <=60s; candidate RPO 1h/RTO 4h | Proposed targets at B17 workload; engineering/product | M9/M10; measure realistic fixtures and restore; budget may change recovery target |
 | B19 | PR #1 backend guidance reviewed at head 859a3445b9adc59edd66b8c88e021d67fabf5d8c; adopt on M0 branch with YAML metadata | Adopted repository guidance; original PR remains unmerged | No external tools installed by this file. Direct AGENTS link is fallback; client auto-discovery not claimed |
-| B20 | Mobile phase approval recorded in existing plan (2026-11-15), web exists; historical demo decisions remain history | Reconciled; engineering | M0 reviewed; user authorized M1 on 2026-11-15. M2 requires another instruction |
+| B20 | Mobile phase approval recorded in existing plan (2026-11-15), web exists; historical demo decisions remain history | Reconciled; engineering | M0 reviewed; user authorized M1 on 2026-11-15. M1 reviewed; user authorized M2. M3 requires another instruction |
 
 Native SDK choice is a design decision, not a compatibility result. If B04 cannot support staff MFA and secure lifecycle on target devices, privileged native API access stays disabled while the design is revisited; phone-only access must not gain privileged capabilities.
 
@@ -43,3 +43,13 @@ B21: Use NestJS 12.5.0 ESM + existing TypeScript 6, the official Express adapter
 B22: Local development/CI use PostgreSQL 18.7 with loopback-only development exposure. Development superuser credentials are generated randomly, not committed; separate application/migration roles require M2. The current single-instance limiter is in memory and proxy trust stays false. Shared rate limiting/trusted proxy design precedes replication or internet deployment.
 
 B23: Replace web typecheck-only lint with official Next.js ESLint; fix existing findings without disabling rules. Generate Next.js route types during typecheck and untrack `.next` output. Use existing Node test runner + Nest testing utilities and Supertest for the backend, preserving current frontend Jest/Node tests.
+
+## M2 implementation decisions
+
+B24: Pin Prisma CLI/client/pg adapter together at stable 7.10.1; generated ESM client is ignored and rebuilt explicitly. Use the private `palito` schema, administrator-provisioned btree_gist, and hand-reviewed SQL for constraints/triggers/grants. The migration role owns this schema but does not receive database-wide CREATE. Published migrations are immutable; later changes get a new migration.
+
+B25: Keep appointment/valuation owner fields as historical snapshots validated at creation. Current animal farm/owner changes preserve prior clinical and financial evidence. Actual transfer authorization/consent/collateral checks remain future services. Clinical records and ownership events are append-only; prescriptions are editable only before signing. Role status/MFA/relationship authorization remains M3/M4 rather than a claimed RLS implementation.
+
+B26: Preserve acres as the farm area unit because the existing mobile form explicitly labels acres. Store exact acres/weight decimals and date-only births; BDT money uses BIGINT minor units with canonical string JSON and explicit whole-BDT x100 conversion. No production financial terms or vaccination thresholds are inferred.
+
+B27: Local bootstrap only, with separate distinct random administrator/migrator/runtime secrets; application development/production startup requires runtime username, while CLI migration URL requires migrator username. Synthetic seed is explicit, local-only, transaction/idempotency guarded and never runs on startup/install/migrate. It creates no administrator membership, working Firebase credential, verified vet or approved valuation.
