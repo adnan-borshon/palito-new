@@ -191,6 +191,7 @@ export default function CarePage() {
         <nav className="flex flex-wrap gap-5">
           <Link href="/identity">Sign-in & account</Link>
           <Link href="/identity/staff">Vet MFA sign-in</Link>
+          <Link href="/finance">স্যান্ডবক্স ঋণ ও লেজার · Finance sandbox</Link>
           <button
             disabled={view.busy}
             onClick={() => void workspace.act(() => workspace.home())}

@@ -48,7 +48,7 @@ export default function IdentityPage() {
   }
   return <main className="mx-auto max-w-lg p-8 space-y-5">
     {profile?.memberships.some(m=>m.role==='ADMIN')&&<Link href="/identity/admin">Identity administration</Link>} <Link href="/identity/account">Account security</Link> <Link href="/identity/staff">Staff invitation / MFA sign-in</Link><h1 className="text-2xl font-bold">পালিতো · Palito sign-in</h1>
-    {profile ? <><p>স্বাগতম · Welcome, {profile.displayName}</p><p>Your account is connected.</p><Link href="/care">খামার ও চিকিৎসা · Farm & care</Link><button disabled={busy} onClick={() => void act(logout)}>সাইন আউট · Sign out</button></> : <>
+    {profile ? <><p>স্বাগতম · Welcome, {profile.displayName}</p><p>Your account is connected.</p><Link href="/care">খামার ও চিকিৎসা · Farm & care</Link> <Link href="/finance">স্যান্ডবক্স ঋণ ও লেজার · Finance sandbox</Link><button disabled={busy} onClick={() => void act(logout)}>সাইন আউট · Sign out</button></> : <>
       <label className="block">নাম · Name<input className="block border p-2 w-full" maxLength={120} value={name} onChange={e => setName(e.target.value)} autoComplete="name" /></label>
       <label className="block">ফোন · Phone (+880)<input className="block border p-2 w-full" type="tel" value={phone} onChange={e => setPhone(e.target.value)} autoComplete="tel" /></label>
       <label className="block"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} /> I agree to receive a verification SMS. Message rates may apply.</label>

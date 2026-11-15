@@ -23,6 +23,13 @@ const schema = z.object({
   FIREBASE_PROJECT_ID: z.string().regex(/^[a-z][a-z0-9-]{4,62}$/).default('demo-palito'),
   WEB_ORIGIN: origin.default('http://localhost:3000'),
   HEALTHCARE_NO_CHARGE_PILOT: z.enum(['true','false']).default('false').transform(value=>value==='true'),
+  FINANCE_SANDBOX_ENABLED: z.enum(['true', 'false']).default('false').transform(value => value === 'true'),
+  PAYMENT_PROVIDER: z.enum(['disabled', 'sandbox']).default('disabled'),
+  SANDBOX_WEBHOOK_SECRET: z.string().min(16).max(256).optional(),
+  NOTIFICATION_CHANNEL_MODE: z.enum(['in-app-only', 'sandbox']).default('in-app-only'),
+  WORKER_ENABLED: z.enum(['true', 'false']).default('false').transform(value => value === 'true'),
+  WORKER_POLL_MS: integer(5000, 500, 60000),
+  WORKER_BATCH_SIZE: integer(25, 1, 100),
   DEMO_MODE: z.literal('false').default('false'),
 });
 
@@ -46,7 +53,14 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     throw new ConfigurationError('DATABASE_URL must use the dedicated palito_runtime role');
   }
   if (config.NODE_ENV === 'production') {
-    if (config.SWAGGER_ENABLED || env.FIREBASE_AUTH_EMULATOR_HOST || env.PAYMENT_PROVIDER === 'sandbox') {
+    if (
+      config.SWAGGER_ENABLED ||
+      env.FIREBASE_AUTH_EMULATOR_HOST ||
+      config.PAYMENT_PROVIDER === 'sandbox' ||
+      config.FINANCE_SANDBOX_ENABLED ||
+      config.NOTIFICATION_CHANNEL_MODE === 'sandbox' ||
+      config.SANDBOX_WEBHOOK_SECRET
+    ) {
       throw new ConfigurationError('Production forbids development documentation, emulators and sandbox providers');
     }
     if (config.CORS_ORIGINS.some(value => !value.startsWith('https://'))) throw new ConfigurationError('Production requires HTTPS CORS origins');

@@ -14,6 +14,7 @@ import { DatabaseService } from "../platform/database.js";
 import { APP_CONFIG, type AppConfig } from "../platform/config.js";
 import type { AccountPrincipal } from "../identity/accounts.js";
 import { dateOnly, parseMinorUnits } from "../platform/data-contracts.js";
+import { OutboxWorkerService } from "../ops/outbox.worker.js";
 import type {
   AmendmentDto,
   AnimalDto,
@@ -943,6 +944,17 @@ export class CareService {
       await this.event(tx, p, animal.id, "APPOINTMENT_REQUESTED", {
         appointmentId: appointment.id,
       });
+      await OutboxWorkerService.enqueue(tx, {
+        topic: "APPOINTMENT_BOOKED",
+        dedupeKey: `appointment-booked:${appointment.id}`,
+        aggregateKind: "appointment",
+        aggregateId: appointment.id,
+        payload: {
+          recipientId: slot.vetId,
+          linkKind: "appointment",
+          linkId: appointment.id,
+        },
+      });
       return {
         id: appointment.id,
         version: 1,
@@ -1023,6 +1035,20 @@ export class CareService {
           appointmentId: id,
           decision: d.decision,
         });
+        await OutboxWorkerService.enqueue(tx, {
+          topic:
+            d.decision === "accept"
+              ? "APPOINTMENT_ACCEPTED"
+              : "APPOINTMENT_REJECTED",
+          dedupeKey: `appointment-decided:${id}:${version + 1}`,
+          aggregateKind: "appointment",
+          aggregateId: id,
+          payload: {
+            recipientId: row.farmerId,
+            linkKind: "appointment",
+            linkId: id,
+          },
+        });
         return { id, version: version + 1 };
       },
     );
@@ -1067,6 +1093,17 @@ export class CareService {
         });
         await this.event(tx, p, row.animalId, "APPOINTMENT_CANCELLED", {
           appointmentId: id,
+        });
+        await OutboxWorkerService.enqueue(tx, {
+          topic: "APPOINTMENT_CANCELLED",
+          dedupeKey: `appointment-cancelled:${id}:${version + 1}`,
+          aggregateKind: "appointment",
+          aggregateId: id,
+          payload: {
+            recipientId: row.farmerId === p.userId ? row.vetId : row.farmerId,
+            linkKind: "appointment",
+            linkId: id,
+          },
         });
         return { id, version: version + 1 };
       },
@@ -1275,6 +1312,17 @@ export class CareService {
           recordId: record.id,
           prescriptionId: prescription.id,
         });
+        await OutboxWorkerService.enqueue(tx, {
+          topic: "CONSULTATION_COMPLETED",
+          dedupeKey: `consultation-completed:${id}`,
+          aggregateKind: "prescription",
+          aggregateId: prescription.id,
+          payload: {
+            recipientId: row.farmerId,
+            linkKind: "prescription",
+            linkId: prescription.id,
+          },
+        });
         return {
           id,
           version: version + 1,
@@ -1346,6 +1394,12 @@ export class CareService {
     }
     const rows = await this.db.prisma.careReminder.findMany({
       where: { ownerId: p.userId, animal: { ownerId: p.userId }, ...after },
+      include: {
+        adherenceEvents: {
+          orderBy: [{ recordedAt: "desc" }, { id: "desc" }],
+          take: 5,
+        },
+      },
       orderBy: [{ dueAt: "asc" }, { id: "asc" }],
       take: limit + 1,
     });
@@ -1359,7 +1413,7 @@ export class CareService {
               JSON.stringify([last.dueAt.toISOString(), last.id]),
             ).toString("base64url")
           : null,
-      delivery: "NOT_ENABLED_M5",
+      delivery: "OUTBOX_WORKER_M5",
     });
   }
 

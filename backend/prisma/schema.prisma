@@ -86,6 +86,18 @@ model User {
   patientFiles PrivateFile[] @relation("FileOwner")
   careReminders CareReminder[]
   consents CareGrant[]
+  notificationPreference NotificationPreference?
+  notifications Notification[]
+  adherenceEvents ReminderAdherenceEvent[]
+  auditEvents AuditEvent[]
+  ledgerAccounts LedgerAccount[]
+  paymentIntents PaymentIntent[]
+  financeCommands FinanceCommand[]
+  loanQuotes LoanQuote[]
+  loansAsFarmer Loan[] @relation("LoanFarmer")
+  loansAsOfficer Loan[] @relation("LoanAssignedOfficer")
+  loansDecided Loan[] @relation("LoanDecider")
+  collateralReservations CollateralReservation[]
 
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tokensRevokedAfter DateTime? @map("tokens_revoked_after") @db.Timestamptz(3)
@@ -122,6 +134,11 @@ model User {
 model Organization {
   invitations StaffInvitation[]
   identityAudits IdentityAudit[]
+  valuations Valuation[]
+  ledgerAccounts LedgerAccount[]
+  loanQuotes LoanQuote[]
+  loans Loan[]
+  collateralReservations CollateralReservation[]
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   kind OrganizationKind
   name String @db.VarChar(160)
@@ -207,6 +224,9 @@ model Animal {
   files PrivateFile[] @relation("PatientFiles")
   careEvents CareEvent[]
   reminders CareReminder[]
+  loanQuotes LoanQuote[]
+  loans Loan[]
+  collateralReservations CollateralReservation[]
 
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   farmId String @map("farm_id") @db.Uuid
@@ -255,6 +275,8 @@ model Valuation {
   ownerAtAssessmentId String @map("owner_at_assessment_id") @db.Uuid
   assessorId String @map("assessor_id") @db.Uuid
   approvedById String? @map("approved_by_id") @db.Uuid
+  organizationId String? @map("organization_id") @db.Uuid
+  notes String @default("") @db.VarChar(1000)
   version Int
   status ValuationStatus @default(DRAFT)
   amountMinor BigInt @map("amount_minor")
@@ -266,6 +288,8 @@ model Valuation {
   owner User @relation("ValuationOwner", fields: [ownerAtAssessmentId], references: [id], onDelete: Restrict)
   assessor User @relation("ValuationAssessor", fields: [assessorId], references: [id], onDelete: Restrict)
   approver User? @relation("ValuationApprover", fields: [approvedById], references: [id], onDelete: Restrict)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  loanQuotes LoanQuote[]
   @@unique([animalId, version])
   @@index([animalId, status, expiresAt])
   @@map("valuations")
@@ -481,10 +505,13 @@ model CareReminder {
   recordId String @unique @map("record_id") @db.Uuid
   dueAt DateTime @map("due_at") @db.Timestamptz(3)
   enabled Boolean @default(true)
+  dispatchedAt DateTime? @map("dispatched_at") @db.Timestamptz(3)
+  escalatedAt DateTime? @map("escalated_at") @db.Timestamptz(3)
   version Int @default(1)
   animal Animal @relation(fields:[animalId],references:[id],onDelete:Restrict,onUpdate:NoAction)
   owner User @relation(fields:[ownerId],references:[id],onDelete:Restrict,onUpdate:NoAction)
   record HealthRecord @relation(fields:[recordId,animalId],references:[id,animalId],onDelete:Restrict,onUpdate:NoAction)
+  adherenceEvents ReminderAdherenceEvent[]
   @@index([ownerId,dueAt,id])
   @@map("care_reminders")
   @@schema("palito")
@@ -525,4 +552,337 @@ model VetProfile {
  vet VetCredential @relation(fields:[vetId],references:[userId],onDelete:Restrict,onUpdate:Cascade)
  @@map("vet_profiles")
  @@schema("palito")
+}
+
+model NotificationPreference {
+  userId String @id @map("user_id") @db.Uuid
+  inAppEnabled Boolean @default(true) @map("in_app_enabled")
+  smsEnabled Boolean @default(false) @map("sms_enabled")
+  pushEnabled Boolean @default(false) @map("push_enabled")
+  consentVersion String @default("notify-v1") @map("consent_version") @db.VarChar(20)
+  version Int @default(1)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(3)
+  user User @relation(fields:[userId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  @@map("notification_preferences")
+  @@schema("palito")
+}
+
+model Notification {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  recipientId String @map("recipient_id") @db.Uuid
+  category String @db.VarChar(32)
+  title String @db.VarChar(160)
+  body String @db.VarChar(1000)
+  linkKind String? @map("link_kind") @db.VarChar(40)
+  linkId String? @map("link_id") @db.Uuid
+  dedupeKey String @map("dedupe_key") @db.VarChar(160)
+  readAt DateTime? @map("read_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  recipient User @relation(fields:[recipientId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  @@unique([recipientId, dedupeKey])
+  @@index([recipientId, createdAt, id])
+  @@index([recipientId, readAt])
+  @@map("notifications")
+  @@schema("palito")
+}
+
+model OutboxEvent {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  topic String @db.VarChar(80)
+  dedupeKey String @unique @map("dedupe_key") @db.VarChar(180)
+  aggregateKind String @map("aggregate_kind") @db.VarChar(40)
+  aggregateId String @map("aggregate_id") @db.Uuid
+  payload Json @db.JsonB
+  status String @default("PENDING") @db.VarChar(20)
+  attempts Int @default(0)
+  maxAttempts Int @default(5) @map("max_attempts")
+  nextAttemptAt DateTime @default(now()) @map("next_attempt_at") @db.Timestamptz(3)
+  lockedUntil DateTime? @map("locked_until") @db.Timestamptz(3)
+  lockOwner String? @map("lock_owner") @db.VarChar(120)
+  lastErrorCode String? @map("last_error_code") @db.VarChar(80)
+  processedAt DateTime? @map("processed_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  jobAttempts JobAttempt[]
+  @@index([status, nextAttemptAt, id])
+  @@index([aggregateKind, aggregateId])
+  @@map("outbox_events")
+  @@schema("palito")
+}
+
+model JobAttempt {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  outboxEventId String @map("outbox_event_id") @db.Uuid
+  attemptNumber Int @map("attempt_number")
+  workerId String @map("worker_id") @db.VarChar(120)
+  outcome String @default("STARTED") @db.VarChar(20)
+  providerRef String? @map("provider_ref") @db.VarChar(120)
+  errorCode String? @map("error_code") @db.VarChar(80)
+  startedAt DateTime @default(now()) @map("started_at") @db.Timestamptz(3)
+  finishedAt DateTime? @map("finished_at") @db.Timestamptz(3)
+  outboxEvent OutboxEvent @relation(fields:[outboxEventId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  @@unique([outboxEventId, attemptNumber])
+  @@map("job_attempts")
+  @@schema("palito")
+}
+
+model ReminderAdherenceEvent {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  reminderId String @map("reminder_id") @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  localDate DateTime @map("local_date") @db.Date
+  status String @db.VarChar(12)
+  recordedAt DateTime @default(now()) @map("recorded_at") @db.Timestamptz(3)
+  reminder CareReminder @relation(fields:[reminderId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  owner User @relation(fields:[ownerId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  @@unique([reminderId, localDate])
+  @@index([ownerId, recordedAt])
+  @@map("reminder_adherence_events")
+  @@schema("palito")
+}
+
+model AuditEvent {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId String? @map("actor_id") @db.Uuid
+  actorKind String @map("actor_kind") @db.VarChar(20)
+  action String @db.VarChar(80)
+  targetKind String @map("target_kind") @db.VarChar(40)
+  targetId String? @map("target_id") @db.Uuid
+  metadata Json @default("{}") @db.JsonB
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  actor User? @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  @@index([targetKind, targetId, createdAt])
+  @@index([createdAt, id])
+  @@map("audit_events")
+  @@schema("palito")
+}
+
+model LedgerAccount {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountKind String @map("account_kind") @db.VarChar(30)
+  ownerUserId String? @map("owner_user_id") @db.Uuid
+  organizationId String? @map("organization_id") @db.Uuid
+  currency String @default("BDT") @db.Char(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  owner User? @relation(fields:[ownerUserId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  organization Organization? @relation(fields:[organizationId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  entries LedgerEntry[]
+  @@map("ledger_accounts")
+  @@schema("palito")
+}
+
+model LedgerTransaction {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  referenceKind String @map("reference_kind") @db.VarChar(40)
+  referenceId String @map("reference_id") @db.Uuid
+  currency String @default("BDT") @db.Char(3)
+  description String @db.VarChar(300)
+  reversesTxId String? @unique @map("reverses_tx_id") @db.Uuid
+  idempotencyKey String @unique @map("idempotency_key") @db.VarChar(180)
+  postedAt DateTime @default(now()) @map("posted_at") @db.Timestamptz(3)
+  reverses LedgerTransaction? @relation("LedgerReversal",fields:[reversesTxId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  reversedBy LedgerTransaction? @relation("LedgerReversal")
+  entries LedgerEntry[]
+  paymentIntent PaymentIntent?
+  @@index([referenceKind, referenceId])
+  @@map("ledger_transactions")
+  @@schema("palito")
+}
+
+model LedgerEntry {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  transactionId String @map("transaction_id") @db.Uuid
+  accountId String @map("account_id") @db.Uuid
+  direction String @db.VarChar(10)
+  amountMinor BigInt @map("amount_minor")
+  currency String @default("BDT") @db.Char(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  transaction LedgerTransaction @relation(fields:[transactionId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  account LedgerAccount @relation(fields:[accountId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  @@index([accountId, createdAt, id])
+  @@index([transactionId])
+  @@map("ledger_entries")
+  @@schema("palito")
+}
+
+model PaymentIntent {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId String @map("actor_id") @db.Uuid
+  kind String @db.VarChar(30)
+  targetKind String @map("target_kind") @db.VarChar(30)
+  targetId String @map("target_id") @db.Uuid
+  provider String @db.VarChar(30)
+  currency String @default("BDT") @db.Char(3)
+  amountMinor BigInt @map("amount_minor")
+  status String @default("PENDING") @db.VarChar(24)
+  providerRef String? @unique @map("provider_ref") @db.VarChar(120)
+  idempotencyKey String @map("idempotency_key") @db.VarChar(180)
+  ledgerTxId String? @unique @map("ledger_tx_id") @db.Uuid
+  failureReason String? @map("failure_reason") @db.VarChar(300)
+  version Int @default(1)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  confirmedAt DateTime? @map("confirmed_at") @db.Timestamptz(3)
+  actor User @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  ledgerTx LedgerTransaction? @relation(fields:[ledgerTxId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  providerEvents ProviderEvent[]
+  allocations RepaymentAllocation[]
+  @@unique([actorId, kind, idempotencyKey])
+  @@index([targetKind, targetId, createdAt])
+  @@map("payment_intents")
+  @@schema("palito")
+}
+
+model ProviderEvent {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider String @db.VarChar(30)
+  externalEventId String @map("external_event_id") @db.VarChar(160)
+  paymentIntentId String? @map("payment_intent_id") @db.Uuid
+  eventType String @map("event_type") @db.VarChar(40)
+  amountMinor BigInt @map("amount_minor")
+  currency String @default("BDT") @db.Char(3)
+  payload Json @db.JsonB
+  signatureVerified Boolean @map("signature_verified")
+  processedAt DateTime? @map("processed_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  paymentIntent PaymentIntent? @relation(fields:[paymentIntentId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  @@unique([provider, externalEventId])
+  @@index([paymentIntentId])
+  @@map("provider_events")
+  @@schema("palito")
+}
+
+model LoanQuote {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  animalId String @map("animal_id") @db.Uuid
+  farmerId String @map("farmer_id") @db.Uuid
+  valuationId String @map("valuation_id") @db.Uuid
+  valuationVersion Int @map("valuation_version")
+  bankOrganizationId String @map("bank_organization_id") @db.Uuid
+  termVersion String @default("sandbox-v1") @map("term_version") @db.VarChar(32)
+  approvedValueMinor BigInt @map("approved_value_minor")
+  maxPrincipalMinor BigInt @map("max_principal_minor")
+  requestedPrincipalMinor BigInt @map("requested_principal_minor")
+  annualRateBps Int @map("annual_rate_bps")
+  feeMinor BigInt @default(0) @map("fee_minor")
+  termMonths Int @map("term_months")
+  currency String @default("BDT") @db.Char(3)
+  status String @default("ACTIVE") @db.VarChar(20)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  animal Animal @relation(fields:[animalId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  farmer User @relation(fields:[farmerId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  valuation Valuation @relation(fields:[valuationId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  bank Organization @relation(fields:[bankOrganizationId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  loan Loan?
+  collateralReservation CollateralReservation?
+  @@index([animalId, createdAt])
+  @@index([farmerId, status])
+  @@map("loan_quotes")
+  @@schema("palito")
+}
+
+model Loan {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  quoteId String @unique @map("quote_id") @db.Uuid
+  animalId String @map("animal_id") @db.Uuid
+  farmerId String @map("farmer_id") @db.Uuid
+  bankOrganizationId String @map("bank_organization_id") @db.Uuid
+  assignedOfficerId String? @map("assigned_officer_id") @db.Uuid
+  purpose String @db.VarChar(500)
+  repaymentSource String @map("repayment_source") @db.VarChar(500)
+  termVersion String @map("term_version") @db.VarChar(32)
+  principalMinor BigInt @map("principal_minor")
+  totalPayableMinor BigInt @map("total_payable_minor")
+  outstandingMinor BigInt @map("outstanding_minor")
+  termMonths Int @map("term_months")
+  currency String @default("BDT") @db.Char(3)
+  status String @default("SUBMITTED") @db.VarChar(24)
+  decisionNote String @default("") @map("decision_note") @db.VarChar(1000)
+  decidedById String? @map("decided_by_id") @db.Uuid
+  decidedAt DateTime? @map("decided_at") @db.Timestamptz(3)
+  disbursedAt DateTime? @map("disbursed_at") @db.Timestamptz(3)
+  acceptedTermsAt DateTime @default(now()) @map("accepted_terms_at") @db.Timestamptz(3)
+  version Int @default(1)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  quote LoanQuote @relation(fields:[quoteId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  animal Animal @relation(fields:[animalId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  farmer User @relation("LoanFarmer",fields:[farmerId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  bank Organization @relation(fields:[bankOrganizationId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  assignedOfficer User? @relation("LoanAssignedOfficer",fields:[assignedOfficerId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  decidedBy User? @relation("LoanDecider",fields:[decidedById],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  collateralReservation CollateralReservation?
+  installments LoanInstallment[]
+  allocations RepaymentAllocation[]
+  @@index([farmerId, createdAt, id])
+  @@index([bankOrganizationId, status, createdAt])
+  @@map("loans")
+  @@schema("palito")
+}
+
+model CollateralReservation {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  animalId String @map("animal_id") @db.Uuid
+  loanId String? @unique @map("loan_id") @db.Uuid
+  quoteId String? @unique @map("quote_id") @db.Uuid
+  farmerId String @map("farmer_id") @db.Uuid
+  bankOrganizationId String @map("bank_organization_id") @db.Uuid
+  status String @default("HELD") @db.VarChar(20)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  releasedAt DateTime? @map("released_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  animal Animal @relation(fields:[animalId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  loan Loan? @relation(fields:[loanId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  quote LoanQuote? @relation(fields:[quoteId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  farmer User @relation(fields:[farmerId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  bank Organization @relation(fields:[bankOrganizationId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  @@index([animalId, status])
+  @@map("collateral_reservations")
+  @@schema("palito")
+}
+
+model LoanInstallment {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  loanId String @map("loan_id") @db.Uuid
+  installmentNumber Int @map("installment_number")
+  dueAt DateTime @map("due_at") @db.Timestamptz(3)
+  principalMinor BigInt @map("principal_minor")
+  feeMinor BigInt @default(0) @map("fee_minor")
+  paidMinor BigInt @default(0) @map("paid_minor")
+  status String @default("DUE") @db.VarChar(20)
+  graceReason String? @map("grace_reason") @db.VarChar(500)
+  graceUntil DateTime? @map("grace_until") @db.Timestamptz(3)
+  version Int @default(1)
+  loan Loan @relation(fields:[loanId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  allocations RepaymentAllocation[]
+  @@unique([loanId, installmentNumber])
+  @@map("loan_installments")
+  @@schema("palito")
+}
+
+model RepaymentAllocation {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  paymentIntentId String @map("payment_intent_id") @db.Uuid
+  loanId String @map("loan_id") @db.Uuid
+  installmentId String @map("installment_id") @db.Uuid
+  amountMinor BigInt @map("amount_minor")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  paymentIntent PaymentIntent @relation(fields:[paymentIntentId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  loan Loan @relation(fields:[loanId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  installment LoanInstallment @relation(fields:[installmentId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  @@index([loanId, createdAt])
+  @@index([paymentIntentId])
+  @@map("repayment_allocations")
+  @@schema("palito")
+}
+
+model FinanceCommand {
+  actorId String @map("actor_id") @db.Uuid
+  key String @db.VarChar(100)
+  operation String @db.VarChar(160)
+  payloadHash String @map("payload_hash") @db.Char(64)
+  result Json @db.JsonB
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  actor User @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  @@id([actorId, key])
+  @@map("finance_commands")
+  @@schema("palito")
 }

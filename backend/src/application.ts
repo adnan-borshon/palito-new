@@ -33,7 +33,7 @@ export function configureApplication(app: INestApplication, config: AppConfig, l
     },
     credentials: true,
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'If-Match', 'X-CSRF-Token'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'If-Match', 'X-CSRF-Token', 'X-Palito-Signature'],
     exposedHeaders: ['X-Request-Id'],
     maxAge: 600,
   });
@@ -62,8 +62,8 @@ export function configureApplication(app: INestApplication, config: AppConfig, l
 }
 
 export function createOpenApi(app: INestApplication) {
-  const options = new DocumentBuilder().setTitle('Palito API').setVersion('0.1.0')
-    .setDescription('Identity, owner-scoped healthcare, consented veterinary care and operational health. Booking requires explicit no-charge pilot configuration; finance and notification delivery remain gated.')
+  const options = new DocumentBuilder().setTitle('Palito API').setVersion('0.2.0')
+    .setDescription('Identity, owner-scoped healthcare, durable notifications/outbox worker, and lending/ledger sandbox. Finance features remain explicitly gated to non-production sandbox configuration.')
     .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'Firebase ID token' }, 'firebase').build();
   return SwaggerModule.createDocument(app, options);
 }

@@ -5,3 +5,4 @@ export { demoBalance } from './domain-context.ts';
 export { demoLoanQuote, hasIoTEvidence } from './finance.ts';
 export * from './validation.ts';
 export * from './care.ts';
+export * from './finance-workspace.ts';

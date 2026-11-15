@@ -15,19 +15,47 @@ import { Sessions } from './identity/sessions.js';
 import { Staff } from './identity/staff.js';
 import { StaffController } from './identity/staff.controller.js';
 import { IdentityController } from './identity/identity.controller.js';
+import { OutboxWorkerService } from './ops/outbox.worker.js';
+import { OpsService } from './ops/ops.service.js';
+import { OpsController } from './ops/ops.controller.js';
+import { FinanceService } from './finance/finance.service.js';
+import { FinanceController } from './finance/finance.controller.js';
 
 @Module({})
 export class AppModule {
   static register(config: AppConfig, logger: Logger): DynamicModule {
     return {
       module: AppModule,
-      controllers: [HealthController, IdentityController, StaffController, CareController],
+      controllers: [
+        HealthController,
+        IdentityController,
+        StaffController,
+        CareController,
+        OpsController,
+        FinanceController,
+      ],
       providers: [
-        { provide: APP_CONFIG, useValue: config }, { provide: APP_LOGGER, useValue: logger },
-        DatabaseService, FirebaseIdentity, Accounts, Sessions, Staff, CareService, { provide: IDENTITY_VERIFIER, useClass: config.AUTH_MODE === 'disabled' ? DisabledIdentityVerifier : FirebaseVerifier },
+        { provide: APP_CONFIG, useValue: config },
+        { provide: APP_LOGGER, useValue: logger },
+        DatabaseService,
+        FirebaseIdentity,
+        Accounts,
+        Sessions,
+        Staff,
+        CareService,
+        OutboxWorkerService,
+        OpsService,
+        FinanceService,
+        {
+          provide: IDENTITY_VERIFIER,
+          useClass:
+            config.AUTH_MODE === 'disabled'
+              ? DisabledIdentityVerifier
+              : FirebaseVerifier,
+        },
         { provide: APP_GUARD, useClass: IdentityGuard },
       ],
-      exports: [DatabaseService],
+      exports: [DatabaseService, OutboxWorkerService],
     };
   }
 }

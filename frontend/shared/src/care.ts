@@ -63,7 +63,33 @@ export interface CareReminder {
   animalId: string;
   dueAt: string;
   enabled: boolean;
+  dispatchedAt?: string | null;
+  escalatedAt?: string | null;
+  adherenceEvents?: {
+    id: string;
+    localDate: string;
+    status: "taken" | "skipped";
+    recordedAt: string;
+  }[];
   version: number;
+}
+export interface CareNotification {
+  id: string;
+  category: string;
+  title: string;
+  body: string;
+  linkKind: string | null;
+  linkId: string | null;
+  readAt: string | null;
+  createdAt: string;
+}
+export interface CareNotificationPrefs {
+  inAppEnabled: boolean;
+  smsEnabled: boolean;
+  pushEnabled: boolean;
+  consentVersion: string;
+  version: number;
+  channelMode?: string;
 }
 export interface CarePrescription {
   id: string;
@@ -148,6 +174,9 @@ const CONSENT =
   "I allow this assigned vet to read this animal’s passport, history, visit address and current-owner files until 72 hours after the appointment ends. I can withdraw access at any time.";
 export function careTime(value: string) {
   return `${new Date(value).toLocaleString("en-GB", { timeZone: "Asia/Dhaka", dateStyle: "medium", timeStyle: "short" })} (Dhaka, UTC+6)`;
+}
+export function careDhakaDate(instant: Date = new Date()): string {
+  return new Date(instant.getTime() + 6 * 3600000).toISOString().slice(0, 10);
 }
 const f = (
   key: string,
@@ -344,13 +373,17 @@ export class CareWorkspace {
       form: null,
       uploadAnimalId: null,
       notice:
-        "No-charge pilot only. No payment is taken. Reminders are saved; message delivery starts in a later milestone.",
+        "No-charge pilot only. No payment is taken. Reminders and notifications are delivered via the M5 outbox worker.",
       actions: [
         this.action("খামার যোগ · Add farm", async () => this.farmForm()),
         this.action("পশু নিবন্ধন · Register animal", async () =>
           this.animalForm(farms),
         ),
         this.action("পশু চিকিৎসক · Find a vet", () => this.directory(animals)),
+        this.action("বিজ্ঞপ্তি · Notifications", () => this.notifications()),
+        this.action("বিজ্ঞপ্তি পছন্দ · Notification prefs", () =>
+          this.preferencesForm(),
+        ),
         ...(profile.memberships.some((m) => m.role === "VET")
           ? [
               this.action("Professional profile", () =>
@@ -407,7 +440,17 @@ export class CareWorkspace {
           title: "পরবর্তী চিকিৎসা · Follow-up",
           lines: [
             careTime(row.dueAt),
-            row.enabled ? "Enabled · delivery pending" : "Disabled",
+            row.enabled ? "Enabled · Outbox worker active" : "Disabled",
+            ...(row.escalatedAt
+              ? [`Escalated at ${careTime(row.escalatedAt)}`]
+              : row.dispatchedAt
+                ? [`Dispatched at ${careTime(row.dispatchedAt)}`]
+                : []),
+            ...(row.adherenceEvents?.length
+              ? [
+                  `Latest adherence: ${row.adherenceEvents[0]!.status} (${row.adherenceEvents[0]!.localDate.slice(0, 10)})`,
+                ]
+              : []),
           ],
           actions: [
             this.action(
@@ -422,6 +465,20 @@ export class CareWorkspace {
                 await this.home();
               },
             ),
+            this.action("Taken today", async () => {
+              await this.write(`/reminders/${row.id}/adherence-events`, {
+                status: "taken",
+                localDate: careDhakaDate(),
+              });
+              await this.home();
+            }),
+            this.action("Skipped today", async () => {
+              await this.write(`/reminders/${row.id}/adherence-events`, {
+                status: "skipped",
+                localDate: careDhakaDate(),
+              });
+              await this.home();
+            }),
           ],
         })),
       ],
@@ -1081,6 +1138,94 @@ export class CareWorkspace {
           { startsAt },
           schedule.version,
           "PUT",
+        );
+        await this.home();
+      },
+    );
+  }
+  async notifications() {
+    const page = await this.request<{
+      items: CareNotification[];
+      unreadCount?: number;
+      nextCursor: string | null;
+    }>("/notifications?limit=25");
+    const unreadIds = page.items.filter((n) => !n.readAt).map((n) => n.id);
+    this.returnTo = () => this.notifications();
+    this.emit({
+      title: `বিজ্ঞপ্তি · Notifications (${page.unreadCount ?? unreadIds.length} unread)`,
+      uploadAnimalId: null,
+      form: null,
+      image: null,
+      actions: [
+        this.action("Back to workspace", () => this.home()),
+        ...(unreadIds.length
+          ? [
+              this.action("Mark all read", async () => {
+                await this.write("/notifications/read", { ids: unreadIds });
+                await this.notifications();
+              }),
+            ]
+          : []),
+      ],
+      cards: page.items.map((item) => ({
+        id: item.id,
+        title: `${item.title} · ${item.readAt ? "Read" : "Unread"}`,
+        lines: [
+          careTime(item.createdAt),
+          item.body,
+          `Category: ${item.category}`,
+        ],
+        actions: item.readAt
+          ? []
+          : [
+              this.action("Mark read", async () => {
+                await this.write("/notifications/read", { ids: [item.id] });
+                await this.notifications();
+              }),
+            ],
+      })),
+    });
+  }
+  async preferencesForm() {
+    const prefs = await this.request<CareNotificationPrefs>(
+      "/me/notification-preferences",
+    );
+    this.form(
+      "বিজ্ঞপ্তি পছন্দ · Notification preferences (SMS/Push simulated in M5)",
+      [
+        f(
+          "inAppEnabled",
+          "In-app notifications enabled",
+          String(prefs.inAppEnabled),
+          "check",
+          true,
+        ),
+        f(
+          "smsEnabled",
+          "SMS notifications opt-in (simulated adapter; no live SMS sent)",
+          String(prefs.smsEnabled),
+          "check",
+          true,
+        ),
+        f(
+          "pushEnabled",
+          "Push notifications opt-in (simulated adapter; no live push sent)",
+          String(prefs.pushEnabled),
+          "check",
+          true,
+        ),
+      ],
+      async (v) => {
+        await this.write(
+          "/me/notification-preferences",
+          {
+            inAppEnabled: v.inAppEnabled === "true",
+            smsEnabled: v.smsEnabled === "true",
+            pushEnabled: v.pushEnabled === "true",
+            consentVersion: "notify-v1",
+          },
+          prefs.version,
+          "PATCH",
         );
         await this.home();
       },
