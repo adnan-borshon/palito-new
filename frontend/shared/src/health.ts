@@ -96,8 +96,16 @@ export function handleHealth(state: DemoState, command: DemoCommand): { id?: str
       return { id };
     }
     case 'alert.acknowledge': {
-      const alert = findById(state.alerts, command.alertId); ownedAnimal(state, alert.animalId);
-      assertDomain(['open', 'escalated'].includes(alert.status), 'invalid_transition'); alert.status = 'acknowledged'; return { id: alert.id };
+      const alert = findById(state.alerts, command.alertId);
+      const user = actor(state, ['farmer', 'vet']);
+      if (user.role === 'farmer') ownedAnimal(state, alert.animalId);
+      assertDomain(['open', 'escalated'].includes(alert.status), 'invalid_transition');
+      alert.status = 'acknowledged';
+      if (user.role === 'vet') {
+        const animal = findById(state.animals, alert.animalId);
+        notify(state, animal.ownerId, bilingual('পশুচিকিৎসক সতর্কতা দেখেছেন', 'Veterinarian reviewed alert'), bilingual('পশুচিকিৎসক আপনার প্রাণীর সতর্কতাটি পর্যালোচনা ও গ্রহণ করেছেন।', 'A veterinarian has reviewed and acknowledged your animal’s alert.'), 'alerts', alert.id);
+      }
+      return { id: alert.id };
     }
     case 'appointment.book': {
       const animal = activeAnimal(state, command.animalId); const vet = findById(state.users, command.vetId);
@@ -118,7 +126,14 @@ export function handleHealth(state: DemoState, command: DemoCommand): { id?: str
       assertDomain(appointment.vetId === vet.id, 'unauthorized'); assertDomain(appointment.status === 'requested', 'invalid_transition');
       assertDomain(command.accept || hasText(command.note, 3, 1000));
       appointment.status = command.accept ? 'accepted' : 'rejected'; appointment.decisionNote = command.note;
-      if (!command.accept && appointment.alertId) { const alert = findById(state.alerts, appointment.alertId); alert.appointmentId = undefined; alert.status = 'escalated'; }
+      if (appointment.alertId) {
+        const alert = findById(state.alerts, appointment.alertId);
+        if (command.accept) {
+          if (['open', 'escalated'].includes(alert.status)) alert.status = 'acknowledged';
+        } else {
+          alert.appointmentId = undefined; alert.status = 'escalated';
+        }
+      }
       notify(state, appointment.farmerId, bilingual('বুকিং আপডেট', 'Appointment updated'), command.accept ? bilingual('পশুচিকিৎসক বুকিং গ্রহণ করেছেন।', 'The veterinarian accepted the booking.') : bilingual('বুকিং প্রত্যাখ্যান করা হয়েছে। অন্য সময় বেছে নিন।', 'The booking was declined. Choose another time.'), 'appointments', appointment.id); return { id: appointment.id };
     }
     case 'appointment.cancel':
@@ -143,6 +158,7 @@ export function handleHealth(state: DemoState, command: DemoCommand): { id?: str
       state.records.push({ id: nextId(state, 'record'), animalId: appointment.animalId, vetId: vet.id, appointmentId: appointment.id, kind: 'treatment', title: bilingual('পশুচিকিৎসকের পরামর্শ ও চিকিৎসা', 'Veterinary consultation & treatment'), note: `${command.diagnosis}\n${command.advice}`, createdAt: state.now });
       for (const medicine of command.medicines) state.reminders.push({ id: nextId(state, 'reminder'), prescriptionId: id, animalId: appointment.animalId, medicine: medicine.name, time: '08:00', takenDates: [], enabled: true });
       if (appointment.alertId) findById(state.alerts, appointment.alertId).status = 'resolved';
+      for (const alert of state.alerts.filter(item => item.animalId === appointment.animalId && item.kind !== 'disconnected' && ['open', 'escalated', 'acknowledged'].includes(item.status))) alert.status = 'resolved';
       const animal = findById(state.animals, appointment.animalId); if (!['deceased', 'sold'].includes(animal.status)) animal.status = 'attention';
       notify(state, appointment.farmerId, bilingual('পরামর্শ সম্পন্ন', 'Consultation complete'), bilingual('প্রেসক্রিপশন ও স্বাস্থ্য রেকর্ড আপডেট হয়েছে।', 'Your prescription and health record have been updated.'), 'prescriptions', id);
       for (const policy of state.policies.filter(item => item.animalId === animal.id && item.status === 'active')) notify(state, policy.insurerId, bilingual('প্রতিরোধমূলক যত্নের রেকর্ড', 'Preventive care recorded'), bilingual('প্রাণীর ডিজিটাল স্বাস্থ্য পাসপোর্টে নতুন চিকিৎসা রেকর্ড যুক্ত হয়েছে।', 'A new clinical treatment record has been added to the animal health passport.'), 'policies', policy.id);

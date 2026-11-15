@@ -1,8 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { hasIoTEvidence } from '@palito/shared';
 import { useWebApp } from '@/providers/web-provider.tsx';
+import { webHref } from '@/navigation.ts';
 import {
   Badge,
   Button,
@@ -12,7 +14,6 @@ import {
   KpiCard,
   SelectField,
   SplitWorkbench,
-  TabsBar,
   TextareaField,
   toneForStatus,
 } from '@/components/ui.tsx';
@@ -24,6 +25,7 @@ export function InsurerWebFeature({
   screen: string;
   id?: string;
 }) {
+  const router = useRouter();
   const { state, locale, t, money, date, dateTime, run, busy, openMobileHandoff, user } =
     useWebApp();
 
@@ -34,22 +36,21 @@ export function InsurerWebFeature({
     (p) => !user?.id || user.role !== 'insurer' || p.insurerId === user.id,
   );
 
-  const initialTab =
+  const tab: 'claims' | 'policies' | 'passport' =
     screen === 'applications' || screen === 'policies' || screen === 'policy'
       ? 'policies'
       : screen === 'passport'
         ? 'passport'
         : 'claims';
-  const [tab, setTab] = useState<'claims' | 'policies' | 'passport'>(initialTab);
 
   const [selectedClaimId, setSelectedClaimId] = useState<string>(
-    initialTab === 'claims' && id ? id : (myClaims[0]?.id ?? ''),
+    tab === 'claims' && id ? id : (myClaims[0]?.id ?? ''),
   );
   const [selectedPolicyId, setSelectedPolicyId] = useState<string>(
-    initialTab === 'policies' && id ? id : (myPolicies[0]?.id ?? ''),
+    tab === 'policies' && id ? id : (myPolicies[0]?.id ?? ''),
   );
   const [selectedPassportAnimalId, setSelectedPassportAnimalId] = useState<string>(
-    initialTab === 'passport' && id ? id : '',
+    tab === 'passport' && id ? id : '',
   );
   const vets = state.users.filter((u) => u.role === 'vet' && u.status === 'active');
   const [referVetId, setReferVetId] = useState<string>(vets[0]?.id ?? '');
@@ -136,34 +137,11 @@ export function InsurerWebFeature({
         <KpiCard
           label={t('পরিশোধিত দাবি (ডেট-ফার্স্ট)', 'Total Claims Paid')}
           value={money(totalPaidClaims)}
-          hint={t('UC-002 স্বয়ংক্রিয় ঋণ সমন্বয়সহ', 'Includes automatic bank debt routing')}
+          hint={t('স্বয়ংক্রিয় ঋণ সমন্বয়সহ', 'Includes automatic bank debt routing')}
           tone="success"
           icon="check"
         />
       </div>
-
-      <TabsBar
-        ariaLabel={t('বীমা ওয়ার্কবেঞ্চ ট্যাব', 'Insurer workbench tabs')}
-        active={tab}
-        onChange={setTab}
-        tabs={[
-          {
-            id: 'claims',
-            label: t('দাবি যাচাই, ভেট রেফারেল ও ডেট-ফার্স্ট পেআউট (UC-002)', 'Claims Verification & Debt-First Payouts'),
-            count: myClaims.length,
-          },
-          {
-            id: 'policies',
-            label: t('পলিসি আবেদন ও সক্রিয় পলিসি ডিরেক্টরি', 'Policy Underwriting & Active Policies'),
-            count: myPolicies.length,
-          },
-          {
-            id: 'passport',
-            label: t('ডিজিটাল স্বাস্থ্য পাসপোর্ট', 'Insured Animal Health Passport'),
-            count: state.animals.length,
-          },
-        ]}
-      />
 
       {tab === 'claims' ? (
         <SplitWorkbench
@@ -331,8 +309,8 @@ export function InsurerWebFeature({
                   <div className="rounded-[12px] border border-[#D8E9DE] bg-[#EBF4EE]/60 p-4 flex flex-col gap-2">
                     <div className="text-sm font-bold text-[#0A401E]">
                       {t(
-                        'স্বয়ংক্রিয় জামানত ঋণ সমন্বয় ও পেআউট বিভাজন (UC-002)',
-                        'Debt-First Collateral Settlement Routing (UC-002)',
+                        'স্বয়ংক্রিয় জামানত ঋণ সমন্বয় ও পেআউট বিভাজন',
+                        'Debt-First Collateral Settlement Routing',
                       )}
                     </div>
                     <div className="grid grid-cols-3 gap-3 text-xs tabular-nums pt-1">
@@ -561,8 +539,7 @@ export function InsurerWebFeature({
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          setSelectedPassportAnimalId(policyAnimal.id);
-                          setTab('passport');
+                          router.push(webHref('insurer', 'passport', policyAnimal.id));
                         }}
                       >
                         {t('স্বাস্থ্য পাসপোর্ট দেখুন', 'Open Health Passport')}
@@ -662,6 +639,15 @@ export function InsurerWebFeature({
         <Card className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
+              <div className="mb-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => router.push(webHref('insurer', 'claims'))}
+                >
+                  ← {t('দাবি কিউতে ফিরুন', 'Back to Claims')}
+                </Button>
+              </div>
               <h2 className="text-base font-bold text-[#1F2937]">
                 {t('বীমাকৃত প্রাণীর ডিজিটাল স্বাস্থ্য পাসপোর্ট', 'Insured Animal Digital Health Passport')}
               </h2>

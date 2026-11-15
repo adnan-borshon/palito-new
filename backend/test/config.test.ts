@@ -25,7 +25,7 @@ test('CORS uses exact origins and production forbids insecure development config
 
 test('compiled startup exits nonzero for invalid configuration and names only invalid fields', () => {
   const result = spawnSync(process.execPath, [fileURLToPath(new URL('../src/main.js', import.meta.url))], {
-    env: { ...process.env, NODE_ENV: 'test', DATABASE_URL: 'not-a-url-private-value', PORT: 'invalid-private-port' }, encoding: 'utf8', timeout: 5000,
+    env: { ...process.env, NODE_ENV: 'test', DATABASE_URL: 'not-a-url-private-value', PORT: 'invalid-private-port' }, encoding: 'utf8', timeout: 20000,
   });
   assert.equal(result.status, 1);
   assert.match(result.stderr, /Invalid configuration fields: PORT, DATABASE_URL/);

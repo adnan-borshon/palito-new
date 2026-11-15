@@ -15,7 +15,7 @@ export default function RoleWorkspacePage({
 }) {
   const resolved = use(params);
   const router = useRouter();
-  const { ready, user, run } = useWebApp();
+  const { ready, state, user, run } = useWebApp();
 
   const validRole = isRole(resolved.role) ? resolved.role : null;
   const screen = resolved.slug?.[0] ?? 'home';
@@ -49,7 +49,7 @@ export default function RoleWorkspacePage({
   return (
     <AppShell role={validRole} activeScreen={screen} activeId={id}>
       <WebFeatureRegistry
-        key={`${validRole}:${screen}:${id ?? ''}`}
+        key={`${validRole}:${user?.id ?? 'anon'}:${state.settings.scenario}:${screen}:${id ?? ''}`}
         role={validRole}
         screen={screen}
         id={id}

@@ -35,7 +35,7 @@ export function CommonWebFeature({
 }
 
 function NotificationsWorkspace({ id }: { id?: string }) {
-  const { state, user, role, locale, t, dateTime, run, busy } = useWebApp();
+  const { state, user, role, locale, t, dateTime, run, busy, clearError, clearFeedback } = useWebApp();
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const owned = state.notifications.filter((n) => n.userId === user?.id);
   const unread = owned.filter((n) => !n.read).length;
@@ -158,8 +158,13 @@ function NotificationsWorkspace({ id }: { id?: string }) {
                     <Link
                       href={webHref(role, targetScreen, item.entityId)}
                       onClick={() => {
+                        clearError();
+                        clearFeedback();
                         if (!item.read) {
-                          void run({ type: 'notification.read', notificationId: item.id });
+                          void run(
+                            { type: 'notification.read', notificationId: item.id },
+                            { silent: true },
+                          );
                         }
                       }}
                       className="inline-flex items-center gap-1 rounded-[8px] bg-[#EBF4EE] px-3 py-1.5 text-xs font-semibold text-[#0F602D] hover:bg-[#D8E9DE]"

@@ -203,3 +203,86 @@ test('web client executes end-to-end 5-role workflows with automatic requestId',
   });
   assert.equal(payRes.ok, true);
 });
+
+test('vet emergency acceptance, alert triage acknowledge, and notification read update state properly', async () => {
+  const client = createPalitoWebClient({
+    storage: createMemoryStorage(),
+    latencyMs: 0,
+  });
+  await client.hydrate();
+
+  // Farmer triggers emergency dispatch on healthy animal
+  await client.execute({ type: 'auth.switch', userId: DEMO_IDS.farmer });
+  const simRes = await client.execute({
+    type: 'alert.simulate',
+    animalId: DEMO_IDS.healthy,
+    kind: 'emergency',
+    severity: 'critical',
+  });
+  assert.equal(simRes.ok, true);
+  const emergencyAlert = client
+    .getSnapshot()
+    .alerts.find((a) => a.animalId === DEMO_IDS.healthy && a.kind === 'emergency');
+  assert.ok(emergencyAlert);
+  assert.equal(emergencyAlert.status, 'open');
+
+  // Switch to Vet: accepting the linked emergency appointment moves alert to acknowledged
+  await client.execute({ type: 'auth.switch', userId: DEMO_IDS.vet });
+  const emergencyAppt = client
+    .getSnapshot()
+    .appointments.find((a) => a.alertId === emergencyAlert.id);
+  assert.ok(emergencyAppt);
+  const decideRes = await client.execute({
+    type: 'appointment.decide',
+    appointmentId: emergencyAppt.id,
+    accept: true,
+    note: 'Emergency visit accepted',
+  });
+  assert.equal(decideRes.ok, true);
+  assert.equal(
+    client.getSnapshot().alerts.find((a) => a.id === emergencyAlert.id)?.status,
+    'acknowledged',
+  );
+
+  // Vet can also directly acknowledge an open/escalated alert (e.g. alert-temperature)
+  const ackRes = await client.execute({
+    type: 'alert.acknowledge',
+    alertId: 'alert-temperature',
+  });
+  assert.equal(ackRes.ok, true);
+  assert.equal(
+    client.getSnapshot().alerts.find((a) => a.id === 'alert-temperature')?.status,
+    'acknowledged',
+  );
+
+  // Completing consultation resolves the linked alert
+  await client.execute({ type: 'consultation.start', appointmentId: emergencyAppt.id });
+  const completeRes = await client.execute({
+    type: 'consultation.complete',
+    appointmentId: emergencyAppt.id,
+    diagnosis: 'Emergency fever stabilized',
+    advice: 'Hydration and antipyretic regimen',
+    medicines: [{ name: 'Antipyretic', dose: '15ml', frequency: 'Twice daily', days: 3 }],
+  });
+  assert.equal(completeRes.ok, true);
+  assert.equal(
+    client.getSnapshot().alerts.find((a) => a.id === emergencyAlert.id)?.status,
+    'resolved',
+  );
+
+  // Farmer unread notifications decrease cleanly when marked read
+  await client.execute({ type: 'auth.switch', userId: DEMO_IDS.farmer });
+  const unreadBefore = client
+    .getSnapshot()
+    .notifications.filter((n) => n.userId === DEMO_IDS.farmer && !n.read);
+  assert.ok(unreadBefore.length > 0);
+  const readOne = await client.execute({
+    type: 'notification.read',
+    notificationId: unreadBefore[0].id,
+  });
+  assert.equal(readOne.ok, true);
+  const unreadAfterOne = client
+    .getSnapshot()
+    .notifications.filter((n) => n.userId === DEMO_IDS.farmer && !n.read);
+  assert.equal(unreadAfterOne.length, unreadBefore.length - 1);
+});

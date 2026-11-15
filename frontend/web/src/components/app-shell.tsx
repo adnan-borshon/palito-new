@@ -168,6 +168,10 @@ export function AppShell({
                 <Link
                   key={item.screen}
                   href={webHref(role, item.screen)}
+                  onClick={() => {
+                    clearError();
+                    clearFeedback();
+                  }}
                   aria-current={isActive ? 'page' : undefined}
                   className={`flex items-center justify-between gap-2.5 rounded-[10px] px-3 py-2.5 text-sm font-semibold whitespace-nowrap transition-colors ${
                     isActive
@@ -252,8 +256,19 @@ export function AppShell({
         <header className="sticky top-0 z-20 h-16 border-b border-[#E2E8F0] bg-white/95 backdrop-blur-xs px-4 lg:px-8 flex items-center justify-between gap-4">
           <div className="min-w-0">
             <div className="text-base font-bold text-[#1F2937] truncate">
-              {navItems.find((i) => i.screen === activeScreen)?.label[locale] ??
-                roleNames[role][locale]}
+              {activeScreen === 'emergency'
+                ? t('জরুরি ট্রায়াজ কিউ', 'Emergency Alert Triage')
+                : activeScreen === 'passport'
+                  ? t('ডিজিটাল স্বাস্থ্য পাসপোর্ট', 'Digital Health Passport')
+                  : activeScreen === 'schedule'
+                    ? t('চেম্বার সময়সূচি ও প্রাপ্যতা', 'Clinic Schedule & Availability')
+                    : activeScreen === 'demo'
+                      ? t('ডেমো ও পরিবেশ নিয়ন্ত্রণ', 'Account & Environment Controls')
+                      : activeScreen === 'support'
+                        ? t('সহায়তা কেন্দ্র', 'Support Desk')
+                        : navItems.find((i) => i.screen === activeScreen)?.label[locale] ??
+                          navItems.find((i) => i.screen === highlightedScreen)?.label[locale] ??
+                          roleNames[role][locale]}
             </div>
             <div className="text-xs text-[#64748B] truncate hidden sm:block">
               {roleSubtitles[role][locale]}
@@ -292,7 +307,7 @@ export function AppShell({
             >
               <button
                 type="button"
-                onClick={() => void run({ type: 'session.locale', locale: 'bn' })}
+                onClick={() => void run({ type: 'session.locale', locale: 'bn' }, { silent: true })}
                 className={`rounded-[8px] px-2.5 py-1 text-xs font-bold cursor-pointer ${
                   locale === 'bn'
                     ? 'bg-[#15803D] text-white'
@@ -303,7 +318,7 @@ export function AppShell({
               </button>
               <button
                 type="button"
-                onClick={() => void run({ type: 'session.locale', locale: 'en' })}
+                onClick={() => void run({ type: 'session.locale', locale: 'en' }, { silent: true })}
                 className={`rounded-[8px] px-2.5 py-1 text-xs font-bold cursor-pointer ${
                   locale === 'en'
                     ? 'bg-[#15803D] text-white'
@@ -317,6 +332,10 @@ export function AppShell({
             {/* Notifications Shortcut */}
             <Link
               href={webHref(role, 'notifications')}
+              onClick={() => {
+                clearError();
+                clearFeedback();
+              }}
               aria-label={t('বিজ্ঞপ্তি দেখুন', 'View notifications')}
               className="relative rounded-[10px] border border-[#E2E8F0] bg-white p-2 text-[#475569] hover:bg-[#F8FAFC] hover:text-[#1F2937]"
             >
@@ -451,7 +470,7 @@ export function AppShell({
                 icon="clock"
                 onClick={() => void run({ type: 'demo.advanceTime', hours: 24 * 7 })}
               >
-                {t('+৭ দিন (দাবি ফলোআপ)', '+7 Days (Claim SLA)')}
+                {t('+৭ দিন (দাবি ফলোআপ)', '+7 Days (Claim Follow-up)')}
               </Button>
               <Button
                 variant={state.settings.offline ? 'danger' : 'outline'}

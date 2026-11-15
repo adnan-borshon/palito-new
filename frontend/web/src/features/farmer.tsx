@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 
 import { useMemo, useState } from 'react';
 import {
@@ -14,6 +15,7 @@ import {
   type Severity,
 } from '@palito/shared';
 import { useWebApp } from '@/providers/web-provider.tsx';
+import { webHref } from '@/navigation.ts';
 import {
   Badge,
   Button,
@@ -46,6 +48,7 @@ export function FarmerWebFeature({
   screen: string;
   id?: string;
 }) {
+  const router = useRouter();
   const { state, user, locale, t, money, date, dateTime, run, busy, openMobileHandoff } =
     useWebApp();
 
@@ -95,7 +98,7 @@ export function FarmerWebFeature({
                 ? 'education'
                 : 'home';
 
-  const [section, setSection] = useState<FarmerSection>(mappedInitial);
+  const section: FarmerSection = mappedInitial;
 
   const myAnimals = state.animals.filter(
     (a) => a.ownerId === user?.id && a.status !== 'sold',
@@ -113,8 +116,28 @@ export function FarmerWebFeature({
   const walletBalance = user ? demoBalance(state, user.id) : 0;
 
   // Animal & Passport state
+  const resolvedAnimalFromId = (() => {
+    if (!id) return undefined;
+    if (myAnimals.some((a) => a.id === id)) return id;
+    const matchedAlert = myAlerts.find((a) => a.id === id);
+    if (matchedAlert) return matchedAlert.animalId;
+    const matchedDevice = state.devices.find((d) => d.id === id && myAnimalIds.has(d.animalId));
+    if (matchedDevice) return matchedDevice.animalId;
+    const matchedAppt = myAppointments.find((a) => a.id === id);
+    if (matchedAppt) return matchedAppt.animalId;
+    const matchedRx = myPrescriptions.find((p) => p.id === id);
+    if (matchedRx) return matchedRx.animalId;
+    const matchedLoan = myLoans.find((l) => l.id === id);
+    if (matchedLoan) return matchedLoan.animalId;
+    const matchedPolicy = myPolicies.find((p) => p.id === id);
+    if (matchedPolicy) return matchedPolicy.animalId;
+    const matchedClaim = myClaims.find((c) => c.id === id);
+    if (matchedClaim) return matchedClaim.animalId;
+    return undefined;
+  })();
+
   const [selectedAnimalId, setSelectedAnimalId] = useState<string>(
-    (mappedInitial === 'animals' && id ? id : undefined) ?? myAnimals[0]?.id ?? '',
+    resolvedAnimalFromId ?? myAnimals[0]?.id ?? '',
   );
   const [passportSubTab, setPassportSubTab] = useState<'overview' | 'records' | 'gallery'>(
     screen === 'record-add' ? 'records' : 'overview',
@@ -142,7 +165,9 @@ export function FarmerWebFeature({
   const [collarSerial, setCollarSerial] = useState('PLT-CLR-908');
   const [simKind, setSimKind] = useState<HealthAlert['kind']>('temperature');
   const [simSeverity, setSimSeverity] = useState<Severity>('critical');
-  const [selectedAlertId, setSelectedAlertId] = useState<string>('');
+  const [selectedAlertId] = useState<string>(
+    screen === 'care' && id && myAlerts.some((a) => a.id === id) ? id : '',
+  );
 
   // Vet Care & Reminders state
   const vets = state.users.filter((u) => u.role === 'vet' && u.status === 'active');
@@ -265,11 +290,14 @@ export function FarmerWebFeature({
           icon="paw"
         />
         <KpiCard
-          label={t('খোলা স্বাস্থ্য সতর্কতা', 'Active Health Alerts')}
-          value={myAlerts.filter((a) => a.status !== 'resolved').length}
-          hint={t('২৪/৭ আইওটি কলার পর্যবেক্ষণ', '24/7 IoT collar monitoring')}
+          label={t('খোলা স্বাস্থ্য সতর্কতা', 'Open Health Alerts')}
+          value={myAlerts.filter((a) => ['open', 'escalated'].includes(a.status)).length}
+          hint={t(
+            `${myAlerts.filter((a) => a.status !== 'resolved').length}টি অমীমাংসিত · ২৪/৭ আইওটি পর্যবেক্ষণ`,
+            `${myAlerts.filter((a) => a.status !== 'resolved').length} unresolved · 24/7 IoT monitoring`,
+          )}
           tone={
-            myAlerts.some((a) => a.status !== 'resolved') ? 'danger' : 'success'
+            myAlerts.some((a) => ['open', 'escalated'].includes(a.status)) ? 'danger' : 'success'
           }
           icon="radio"
         />
@@ -282,53 +310,12 @@ export function FarmerWebFeature({
         />
         <KpiCard
           label={t('সক্রিয় ঋণ ও বীমা পলিসি', 'Active Loans & Policies')}
-          value={`${myLoans.length} / ${myPolicies.length}`}
+          value={`${myLoans.filter((l) => ['submitted', 'offered', 'approved', 'active'].includes(l.status)).length} / ${myPolicies.filter((p) => ['submitted', 'active'].includes(p.status)).length}`}
           hint={t('৭০% জামানত ঋণ ও সুরক্ষা', '70% LTV credit & livestock cover')}
           tone="info"
           icon="shield-check"
         />
       </div>
-
-      {/* Full Mobile Workflow Navigation Bar */}
-      <TabsBar
-        ariaLabel={t('খামারি পোর্টাল বিভাগসমূহ', 'Farmer workspace sections')}
-        active={section}
-        onChange={setSection}
-        tabs={[
-          { id: 'home', label: t('হোম ও সারাংশ', 'Overview') },
-          {
-            id: 'animals',
-            label: t('আমার প্রাণী ও পাসপোর্ট', 'Animals & Passports'),
-            count: myAnimals.length,
-          },
-          {
-            id: 'devices',
-            label: t('আইওটি ভাইটালস ও সতর্কতা', 'IoT Vitals & Alerts'),
-            count: myAlerts.filter((a) => a.status !== 'resolved').length,
-          },
-          {
-            id: 'care',
-            label: t('পশুচিকিৎসক, জরুরি কল ও রিমাইন্ডার', 'Vet Care & Reminders'),
-            count: myAppointments.length,
-          },
-          { id: 'ai', label: t('স্ক্যান ও AI পরামর্শ', 'Scan & AI Advisor') },
-          {
-            id: 'wallet',
-            label: t('ওয়ালেট, ঋণ ও বীমা', 'Wallet, Loans & Insurance'),
-            count: myLoans.length + myPolicies.length,
-          },
-          {
-            id: 'market',
-            label: t('ওষুধ ও খাদ্য বাজার', 'Marketplace & Orders'),
-            count: myOrders.length,
-          },
-          {
-            id: 'education',
-            label: t('খামার শিক্ষা', 'Knowledge Hub'),
-            count: state.content.filter((c) => c.status === 'published').length,
-          },
-        ]}
-      />
 
       {/* SECTION 1: OVERVIEW */}
       {section === 'home' ? (
@@ -355,7 +342,7 @@ export function FarmerWebFeature({
                   variant="danger"
                   size="sm"
                   icon="phone"
-                  onClick={() => setSection('care')}
+                  onClick={() => router.push(webHref('farmer', 'care'))}
                 >
                   {t('জরুরি ভেট কল', 'Emergency Vet')}
                 </Button>
@@ -363,7 +350,7 @@ export function FarmerWebFeature({
                   variant="primary"
                   size="sm"
                   icon="scan"
-                  onClick={() => setSection('ai')}
+                  onClick={() => router.push(webHref('farmer', 'ai'))}
                 >
                   {t('AI লক্ষণ স্ক্যান', 'AI Symptom Scan')}
                 </Button>
@@ -379,7 +366,7 @@ export function FarmerWebFeature({
                   variant="secondary"
                   size="sm"
                   icon="plus"
-                  onClick={() => setSection('animals')}
+                  onClick={() => router.push(webHref('farmer', 'animals'))}
                 >
                   {t('প্রাণী যোগ / সম্পাদনা', 'Manage Animals')}
                 </Button>
@@ -399,8 +386,7 @@ export function FarmerWebFeature({
                       key={animal.id}
                       type="button"
                       onClick={() => {
-                        setSelectedAnimalId(animal.id);
-                        setSection('animals');
+                        router.push(webHref('farmer', 'animals', animal.id));
                       }}
                       className="rounded-[14px] border border-[#E2E8F0] bg-white p-3.5 text-left hover:border-[#15803D] transition-colors cursor-pointer flex flex-col gap-2"
                     >
@@ -449,7 +435,7 @@ export function FarmerWebFeature({
                 <h3 className="text-base font-bold text-[#1F2937]">
                   {t('যাচাইকৃত পশুচিকিৎসক প্যানেল', 'Verified Veterinarians')}
                 </h3>
-                <Button variant="ghost" size="sm" onClick={() => setSection('care')}>
+                <Button variant="ghost" size="sm" onClick={() => router.push(webHref('farmer', 'care'))}>
                   {t('সাক্ষাৎ বুক করুন', 'Book Visit')}
                 </Button>
               </div>
@@ -481,8 +467,7 @@ export function FarmerWebFeature({
                       variant="secondary"
                       size="sm"
                       onClick={() => {
-                        setSelectedVetId(v.id);
-                        setSection('care');
+                        router.push(webHref('farmer', 'care'));
                       }}
                     >
                       {money(v.fee ?? 500)}
@@ -511,7 +496,7 @@ export function FarmerWebFeature({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setSection('devices')}
+                    onClick={() => router.push(webHref('farmer', 'devices'))}
                   >
                     {t('দেখুন', 'Inspect')}
                   </Button>
@@ -1127,8 +1112,8 @@ export function FarmerWebFeature({
               {activeAnimal?.productionDrop ? (
                 <div className="rounded-[10px] border border-[#FECDD3] bg-[#FFF1F2] p-3 text-xs font-semibold text-[#BE123C]">
                   {t(
-                    'দুধ উৎপাদন হ্রাস শনাক্ত (productionDrop): ব্যাংক কিস্তি বিরতি (UC-003) ও জরুরি চিকিৎসার জন্য উপযুক্ত।',
-                    'Verified Milk Yield Drop Detected (productionDrop): Eligible for bank loan grace period (UC-003) and priority care.',
+                    'দুধ উৎপাদন হ্রাস শনাক্ত হয়েছে: ব্যাংক কিস্তি বিরতি ও জরুরি চিকিৎসার জন্য উপযুক্ত।',
+                    'Verified Milk Yield Drop Detected: Eligible for bank loan grace period and priority care.',
                   )}
                 </div>
               ) : null}
@@ -1156,10 +1141,13 @@ export function FarmerWebFeature({
               </h3>
               {myAlerts.map((al) => {
                 const an = myAnimals.find((a) => a.id === al.animalId);
+                const highlighted = id === al.id;
                 return (
                   <div
                     key={al.id}
-                    className="rounded-[12px] border border-[#E2E8F0] p-3.5 flex flex-wrap items-center justify-between gap-3"
+                    className={`rounded-[12px] border border-[#E2E8F0] p-3.5 flex flex-wrap items-center justify-between gap-3 ${
+                      highlighted ? 'ring-2 ring-[#15803D] bg-[#EBF4EE]/30' : ''
+                    }`}
                   >
                     <div>
                       <div className="flex items-center gap-2">
@@ -1174,7 +1162,7 @@ export function FarmerWebFeature({
                       </span>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      {al.status === 'open' ? (
+                      {['open', 'escalated'].includes(al.status) ? (
                         <Button
                           variant="secondary"
                           size="sm"
@@ -1190,7 +1178,7 @@ export function FarmerWebFeature({
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setSection('wallet')}
+                          onClick={() => router.push(webHref('farmer', 'wallet'))}
                         >
                           {t('জরুরি চিকিৎসা ঋণ', 'Emergency Medical Loan Options')}
                         </Button>
@@ -1199,9 +1187,7 @@ export function FarmerWebFeature({
                         variant="primary"
                         size="sm"
                         onClick={() => {
-                          setSelectedAnimalId(al.animalId);
-                          setSelectedAlertId(al.id);
-                          setSection('care');
+                          router.push(webHref('farmer', 'care', al.id));
                         }}
                       >
                         {t('ভেট বুক করুন', 'Book Vet')}
@@ -1328,19 +1314,27 @@ export function FarmerWebFeature({
                   variant="primary"
                   icon="calendar"
                   disabled={busy || !activeAnimal || !selectedVetId}
-                  onClick={() =>
-                    activeAnimal &&
+                  onClick={() => {
+                    if (!activeAnimal) return;
+                    const linkedAlertId =
+                      selectedAlertId ||
+                      myAlerts.find(
+                        (a) =>
+                          a.animalId === activeAnimal.id &&
+                          ['open', 'escalated', 'acknowledged'].includes(a.status) &&
+                          !a.appointmentId,
+                      )?.id;
                     void run({
                       type: 'appointment.book',
                       animalId: activeAnimal.id,
                       vetId: selectedVetId,
-                      alertId: selectedAlertId || undefined,
+                      alertId: linkedAlertId,
                       scheduledAt: new Date(Date.parse(state.now) + 3_600_000).toISOString(),
                       mode: apptMode,
                       priority: apptPriority,
                       reason: apptReason,
-                    })
-                  }
+                    });
+                  }}
                 >
                   {t('সাক্ষাৎ বুক করুন', 'Confirm Appointment')}
                 </Button>
@@ -1694,7 +1688,7 @@ export function FarmerWebFeature({
             <Card className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-base font-bold text-[#1F2937]">
-                  {t('৭০% জামানত কৃষি ঋণ আবেদন (UC-003)', '70% LTV Livestock Collateral Loan')}
+                  {t('৭০% জামানত কৃষি ঋণ আবেদন', '70% LTV Livestock Collateral Loan')}
                 </h3>
                 <Badge tone="brand">Max 70% Valuation</Badge>
               </div>
@@ -1859,7 +1853,7 @@ export function FarmerWebFeature({
             {/* Livestock Insurance & Claim Submission */}
             <Card className="flex flex-col gap-4">
               <h3 className="text-base font-bold text-[#1F2937]">
-                {t('প্রাণী বীমা ও দাবি দাখিল (UC-002)', 'Livestock Insurance & Claims')}
+                {t('প্রাণী বীমা ও দাবি দাখিল', 'Livestock Insurance & Claims')}
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
                 <SelectField

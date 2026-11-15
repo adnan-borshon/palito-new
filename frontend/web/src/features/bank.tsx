@@ -1,10 +1,12 @@
 'use client';
 
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 
 import { useMemo, useState } from 'react';
 import { hasIoTEvidence, maximumLoanAmount } from '@palito/shared';
 import { useWebApp } from '@/providers/web-provider.tsx';
+import { webHref } from '@/navigation.ts';
 import {
   Badge,
   Button,
@@ -14,7 +16,6 @@ import {
   HealthScoreBar,
   KpiCard,
   SplitWorkbench,
-  TabsBar,
   TextareaField,
   toneForStatus,
   WebIcon,
@@ -27,6 +28,7 @@ export function BankWebFeature({
   screen: string;
   id?: string;
 }) {
+  const router = useRouter();
   const { state, locale, t, money, date, dateTime, run, busy, openMobileHandoff, user } =
     useWebApp();
 
@@ -35,15 +37,9 @@ export function BankWebFeature({
     [state.loans, user],
   );
 
-  const [tab, setTab] = useState<'underwriting' | 'portfolio' | 'settlements' | 'passport'>(
-    screen === 'loans'
-      ? 'portfolio'
-      : screen === 'settlements'
-        ? 'settlements'
-        : screen === 'passport'
-          ? 'passport'
-          : 'underwriting',
-  );
+  const isLoansScreen = screen === 'loans' || screen === 'loan' || screen === 'settlements';
+  const isPassportScreen = screen === 'passport';
+  const isUnderwritingScreen = !isLoansScreen && !isPassportScreen;
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLoanId, setSelectedLoanId] = useState<string>(
@@ -148,7 +144,7 @@ export function BankWebFeature({
           icon="landmark"
         />
         <KpiCard
-          label={t('সর্বোচ্চ জামানত সীমা (UC-003)', 'Max Collateral LTV Policy')}
+          label={t('সর্বোচ্চ জামানত সীমা', 'Max Collateral LTV Policy')}
           value="70%"
           hint={t('যাচাইকৃত প্রাণী মূল্যের ৭০% পর্যন্ত', 'Strict cap on verified livestock value')}
           tone="info"
@@ -157,7 +153,7 @@ export function BankWebFeature({
         <KpiCard
           label={t('বীমা থেকে স্বয়ংক্রিয় সমন্বয়', 'Insurance Debt Settlements')}
           value={money(totalDebtSettled)}
-          hint={t('UC-002 ডেট-ফার্স্ট দাবি নিষ্পত্তি', 'Settled automatically from claims')}
+          hint={t('বীমা দাবি থেকে স্বয়ংক্রিয় ঋণ নিষ্পত্তি', 'Settled automatically from claims')}
           tone="success"
           icon="check"
         />
@@ -191,37 +187,7 @@ export function BankWebFeature({
         </Button>
       </div>
 
-      {/* Primary Workbench Mode Tabs */}
-      <TabsBar
-        ariaLabel={t('ব্যাংক ওয়ার্কবেঞ্চ ট্যাব', 'Bank workbench sections')}
-        active={tab}
-        onChange={setTab}
-        tabs={[
-          {
-            id: 'underwriting',
-            label: t('আন্ডাররাইটিং ও জামানত যাচাই কিউ', 'Underwriting & Collateral Queue'),
-            count: myLoans.length,
-          },
-          {
-            id: 'portfolio',
-            label: t('সক্রিয় ঋণ ও কিস্তি সূচি টেবিল', 'Loan Portfolio & Grace Schedule'),
-            count: myLoans.filter((l) => ['active', 'approved', 'paid'].includes(l.status))
-              .length,
-          },
-          {
-            id: 'settlements',
-            label: t('বীমা দাবি থেকে ঋণ সমন্বয় (UC-002)', 'Collateral Insurance Settlements'),
-            count: settledClaims.length,
-          },
-          {
-            id: 'passport',
-            label: t('ডিজিটাল স্বাস্থ্য পাসপোর্ট', 'Collateral Health Passport'),
-            count: state.animals.length,
-          },
-        ]}
-      />
-
-      {tab === 'underwriting' ? (
+      {isUnderwritingScreen ? (
         <SplitWorkbench
           masterTitle={t('ঋণ আবেদন ও ফাইল তালিকা', 'Loan Applications & Files')}
           masterCount={loans.length}
@@ -354,8 +320,8 @@ export function BankWebFeature({
                     <div className="flex items-center justify-between text-sm font-bold text-[#0A401E]">
                       <span>
                         {t(
-                          '৭০% জামানত সীমা যাচাই (UC-003 LTV Check)',
-                          '70% Collateral LTV Cap Verification (UC-003)',
+                          '৭০% জামানত সীমা যাচাই',
+                          '70% Collateral LTV Cap Verification',
                         )}
                       </span>
                       <span className="tabular-nums">
@@ -484,8 +450,7 @@ export function BankWebFeature({
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            setSelectedPassportAnimalId(collateralAnimal.id);
-                            setTab('passport');
+                            router.push(webHref('bank', 'passport', collateralAnimal.id));
                           }}
                         >
                           {t('সম্পূর্ণ পাসপোর্ট দেখুন', 'Open Full Passport')}
@@ -658,7 +623,7 @@ export function BankWebFeature({
                               })
                             }
                           >
-                            {t('গ্রেস পিরিয়ড মঞ্জুর করুন (UC-003)', 'Grant Grace Period (UC-003)')}
+                            {t('গ্রেস পিরিয়ড মঞ্জুর করুন', 'Grant Grace Period')}
                           </Button>
                         </div>
                       </div>
@@ -672,8 +637,8 @@ export function BankWebFeature({
                         ) : (
                           <span>
                             {t(
-                              'কিস্তি বিরতি (UC-003) শুধুমাত্র তখনই প্রযোজ্য যখন জামানত প্রাণীর যাচাইকৃত অসুস্থতা বা দুধ উৎপাদন হ্রাস (productionDrop) শনাক্ত হয়।',
-                              'Installment grace extension (UC-003) is unlocked only when verified illness or milk production drop (productionDrop) is active on the collateral animal.',
+                              'কিস্তি বিরতি শুধুমাত্র তখনই প্রযোজ্য যখন জামানত প্রাণীর যাচাইকৃত অসুস্থতা বা দুধ উৎপাদন হ্রাস শনাক্ত হয়।',
+                              'Installment grace extension is unlocked only when verified illness or milk production drop is active on the collateral animal.',
                             )}
                           </span>
                         )}
@@ -721,7 +686,7 @@ export function BankWebFeature({
         />
       ) : null}
 
-      {tab === 'portfolio' ? (
+      {isLoansScreen ? (
         <Card className="p-0 overflow-hidden">
           <div className="px-5 py-4 border-b border-[#E2E8F0] flex items-center justify-between">
             <h2 className="text-base font-bold text-[#1F2937]">
@@ -786,8 +751,7 @@ export function BankWebFeature({
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            setSelectedLoanId(loan.id);
-                            setTab('underwriting');
+                            router.push(webHref('bank', 'applications', loan.id));
                           }}
                         >
                           {t('বিস্তারিত', 'Inspect')}
@@ -802,14 +766,14 @@ export function BankWebFeature({
         </Card>
       ) : null}
 
-      {tab === 'settlements' ? (
+      {isLoansScreen ? (
         <Card className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-[#1F2937]">
                 {t(
-                  'জামানত বীমা দাবি থেকে স্বয়ংক্রিয় ঋণ সমন্বয় (UC-002)',
-                  'Collateral Insurance Debt-First Settlements (UC-002)',
+                  'জামানত বীমা দাবি থেকে স্বয়ংক্রিয় ঋণ সমন্বয়',
+                  'Collateral Insurance Debt-First Settlements',
                 )}
               </h2>
               <p className="text-xs text-[#64748B]">
@@ -878,10 +842,19 @@ export function BankWebFeature({
         </Card>
       ) : null}
 
-      {tab === 'passport' ? (
+      {isPassportScreen ? (
         <Card className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
+              <div className="mb-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => router.push(webHref('bank', 'applications'))}
+                >
+                  ← {t('আন্ডাররাইটিং কিউতে ফিরুন', 'Back to Underwriting')}
+                </Button>
+              </div>
               <h2 className="text-base font-bold text-[#1F2937]">
                 {t('জামানত প্রাণীর ডিজিটাল স্বাস্থ্য পাসপোর্ট', 'Collateral Animal Digital Health Passport')}
               </h2>
@@ -947,7 +920,7 @@ export function BankWebFeature({
                     </Badge>
                     {passportAnimal.productionDrop ? (
                       <Badge tone="danger">
-                        {t('দুধ উৎপাদন হ্রাস শনাক্ত (UC-003)', 'Milk Production Drop Verified (UC-003)')}
+                        {t('দুধ উৎপাদন হ্রাস শনাক্ত', 'Milk Production Drop Verified')}
                       </Badge>
                     ) : null}
                   </div>

@@ -31,7 +31,7 @@ export interface WebAppContextValue {
   money: (amount: number) => string;
   date: (iso: string) => string;
   dateTime: (iso: string) => string;
-  run: (command: DemoCommand) => Promise<CommandResult>;
+  run: (command: DemoCommand, options?: { silent?: boolean }) => Promise<CommandResult>;
   busy: boolean;
   ready: boolean;
   error: string | null;
@@ -146,14 +146,14 @@ export function WebAppProvider({
   const closeMobileHandoff = useCallback(() => setMobileHandoff(null), []);
 
   const run = useCallback(
-    async (command: DemoCommand): Promise<CommandResult> => {
+    async (command: DemoCommand, options?: { silent?: boolean }): Promise<CommandResult> => {
       setPending((v) => v + 1);
       setErrorResult(null);
       setSuccessResult(null);
       try {
         const result = await repo.execute(command);
         if (!result.ok) setErrorResult(result);
-        else if (result.message) setSuccessResult(result);
+        else if (result.message && !options?.silent) setSuccessResult(result);
         return result;
       } catch {
         setErrorResult(unexpectedError);

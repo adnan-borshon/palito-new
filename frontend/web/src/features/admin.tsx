@@ -12,7 +12,6 @@ import {
   KpiCard,
   SelectField,
   SplitWorkbench,
-  TabsBar,
   TextareaField,
   toneForStatus,
 } from '@/components/ui.tsx';
@@ -26,7 +25,7 @@ export function AdminWebFeature({
 }) {
   const { state, locale, t, money, dateTime, run, busy, user } = useWebApp();
 
-  const initialTab =
+  const tab: 'overview' | 'users' | 'cms' | 'reports' =
     screen === 'users' || screen === 'user'
       ? 'users'
       : screen === 'content' || screen === 'article'
@@ -34,7 +33,6 @@ export function AdminWebFeature({
         : screen === 'reports' || screen === 'audit'
           ? 'reports'
           : 'overview';
-  const [tab, setTab] = useState<'overview' | 'users' | 'cms' | 'reports'>(initialTab);
 
   // Users filter state
   const [roleFilter, setRoleFilter] = useState<string>('all');
@@ -151,38 +149,11 @@ export function AdminWebFeature({
         />
       </div>
 
-      <TabsBar
-        ariaLabel={t('অ্যাডমিন কনসোল ট্যাব', 'Admin console tabs')}
-        active={tab}
-        onChange={setTab}
-        tabs={[
-          {
-            id: 'overview',
-            label: t('সিস্টেম ওভারভিউ ও অপারেশনস নিয়ন্ত্রণ', 'System Overview & Clock Controls'),
-          },
-          {
-            id: 'users',
-            label: t('ব্যবহারকারী ও রোল অ্যাক্সেস ডিরেক্টরি', 'Users & Role Access Directory'),
-            count: state.users.length,
-          },
-          {
-            id: 'cms',
-            label: t('শিক্ষামূলক কন্টেন্ট সিএমএস (CMS)', 'Bilingual Educational CMS'),
-            count: state.content.length,
-          },
-          {
-            id: 'reports',
-            label: t('অডিট ট্রেইল ও অপারেশনস রিপোর্ট', 'Audit Logs & Reports'),
-            count: state.audit.length,
-          },
-        ]}
-      />
-
       {tab === 'overview' ? (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <Card className="lg:col-span-6 flex flex-col gap-4">
             <h2 className="text-base font-bold text-[#1F2937]">
-              {t('সিস্টেম সময়, এসএলএ ও পরিবেশ নিয়ন্ত্রণ', 'System Clock, SLA Escalation & Environment')}
+              {t('সিস্টেম সময় ও পরিবেশ নিয়ন্ত্রণ', 'System Clock & Environment Controls')}
             </h2>
             <p className="text-xs text-[#64748B]">
               {t(
@@ -199,7 +170,7 @@ export function AdminWebFeature({
                 disabled={busy}
                 onClick={() => void run({ type: 'demo.advanceTime', hours: 4 })}
               >
-                {t('+৪ ঘণ্টা (UC-001 সতর্কতা এসকেলেট)', '+4 Hours (Trigger UC-001 Escalation)')}
+                {t('+৪ ঘণ্টা (অমীমাংসিত সতর্কতা এসকেলেট)', '+4 Hours (Escalate Unresolved Alerts)')}
               </Button>
               <Button
                 variant="secondary"
@@ -217,7 +188,7 @@ export function AdminWebFeature({
                 disabled={busy}
                 onClick={() => void run({ type: 'demo.advanceTime', hours: 24 * 7 })}
               >
-                {t('+৭ দিন (দাবি ও পলিসি ফলোআপ)', '+7 Days (Claim SLA Check)')}
+                {t('+৭ দিন (দাবি ও পলিসি ফলোআপ)', '+7 Days (Claim & Policy Follow-up)')}
               </Button>
             </div>
 

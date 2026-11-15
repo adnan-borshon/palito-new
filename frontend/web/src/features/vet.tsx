@@ -1,10 +1,12 @@
 'use client';
 
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 
 import { useMemo, useState } from 'react';
 import { hasIoTEvidence, type HealthRecord, type Medicine } from '@palito/shared';
 import { useWebApp } from '@/providers/web-provider.tsx';
+import { webHref } from '@/navigation.ts';
 import {
   Badge,
   Button,
@@ -15,7 +17,6 @@ import {
   KpiCard,
   SelectField,
   SplitWorkbench,
-  TabsBar,
   TextareaField,
   toneForStatus,
   WebIcon,
@@ -28,6 +29,7 @@ export function VetWebFeature({
   screen: string;
   id?: string;
 }) {
+  const router = useRouter();
   const { state, user, locale, t, money, date, dateTime, run, busy, openMobileHandoff } =
     useWebApp();
 
@@ -64,7 +66,7 @@ export function VetWebFeature({
     );
   }, [state.animals, state.appointments, state.claims, user]);
 
-  const initialTab =
+  const tab: 'consultations' | 'patients' | 'claims' | 'emergency' | 'schedule' =
     screen === 'animals' || screen === 'animal' || screen === 'passport'
       ? 'patients'
       : screen === 'reviews' ||
@@ -77,13 +79,10 @@ export function VetWebFeature({
           : screen === 'schedule'
             ? 'schedule'
             : 'consultations';
-  const [tab, setTab] = useState<
-    'consultations' | 'patients' | 'claims' | 'emergency' | 'schedule'
-  >(initialTab);
 
   // Consultations state
   const [selectedApptId, setSelectedApptId] = useState<string>(
-    initialTab === 'consultations' && id
+    tab === 'consultations' && id
       ? id
       : (myAppointments[0]?.id ?? state.appointments[0]?.id ?? ''),
   );
@@ -100,7 +99,7 @@ export function VetWebFeature({
 
   // Patient record state
   const [selectedAnimalId, setSelectedAnimalId] = useState<string>(
-    initialTab === 'patients' && id
+    tab === 'patients' && id
       ? id
       : (linkedAnimals[0]?.id ?? state.animals[0]?.id ?? ''),
   );
@@ -114,7 +113,7 @@ export function VetWebFeature({
 
   // Claim review state
   const [selectedClaimId, setSelectedClaimId] = useState<string>(
-    initialTab === 'claims' && id
+    tab === 'claims' && id
       ? id
       : (myClaims.find((c) => c.status === 'vet_review')?.id ??
         myClaims[0]?.id ??
@@ -134,9 +133,24 @@ export function VetWebFeature({
   );
   const [scheduleAvailable, setScheduleAvailable] = useState(user?.available ?? true);
 
-  const escalatedAlerts = state.alerts.filter((a) =>
-    ['open', 'escalated'].includes(a.status),
+  const escalatedAlerts = state.alerts
+    .filter((a) => ['open', 'escalated'].includes(a.status))
+    .slice()
+    .sort((a, b) => (a.status === 'escalated' ? -1 : b.status === 'escalated' ? 1 : 0));
+  const activeAppointments = myAppointments.filter((a) =>
+    ['requested', 'accepted', 'in_progress'].includes(a.status),
   );
+  const myPrescriptions = state.prescriptions.filter(
+    (p) => !user?.id || user.role !== 'vet' || p.vetId === user.id,
+  );
+  const alertStatusText = (status: string) =>
+    status === 'escalated'
+      ? t('জরুরি', 'Escalated')
+      : status === 'acknowledged'
+        ? t('গৃহীত', 'Acknowledged')
+        : status === 'resolved'
+          ? t('সমাধানকৃত', 'Resolved')
+          : t('সক্রিয়', 'Open');
   const activeAppt =
     myAppointments.find((a) => a.id === selectedApptId) ?? myAppointments[0];
   const apptAnimal = activeAppt
@@ -206,32 +220,32 @@ export function VetWebFeature({
       {/* Clinical Command KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
-          label={t('সক্রিয় ও এসকেলেটেড সতর্কতা', 'Open & Escalated Alerts')}
+          label={t('সক্রিয় ও জরুরি সতর্কতা', 'Open & Escalated Alerts')}
           value={escalatedAlerts.length}
-          hint={t('UC-001 ৪ ঘণ্টা SLA পর্যবেক্ষণ', 'UC-001 4-hour SLA monitoring')}
+          hint={t('৪ ঘণ্টার মধ্যে জরুরি সাড়া পর্যবেক্ষণ', '4-hour priority response monitoring')}
           tone={escalatedAlerts.length > 0 ? 'danger' : 'brand'}
           icon="alert"
         />
         <KpiCard
-          label={t('সাক্ষাৎ ও টেলিমেডিসিন কিউ', 'Consultation Queue')}
-          value={myAppointments.length}
+          label={t('চলমান সাক্ষাৎ ও টেলিমেডিসিন কিউ', 'Active Consultation Queue')}
+          value={activeAppointments.length}
           hint={t(
-            `${myAppointments.filter((a) => a.priority === 'emergency').length}টি জরুরি কল`,
-            `${myAppointments.filter((a) => a.priority === 'emergency').length} emergency priority`,
+            `${activeAppointments.filter((a) => a.priority === 'emergency').length}টি জরুরি কল`,
+            `${activeAppointments.filter((a) => a.priority === 'emergency').length} emergency priority`,
           )}
           tone="brand"
           icon="calendar"
         />
         <KpiCard
           label={t('প্রদত্ত ডিজিটাল প্রেসক্রিপশন', 'Digital Prescriptions')}
-          value={state.prescriptions.length}
+          value={myPrescriptions.length}
           hint={t('ওষুধ রিমাইন্ডারের সাথে যুক্ত', 'Synced with farmer reminders')}
           tone="success"
           icon="stethoscope"
         />
         <KpiCard
           label={t('বীমা দাবি পর্যালোচনা', 'Insurance Claim Reviews')}
-          value={state.claims.filter((c) => c.status === 'vet_review').length}
+          value={myClaims.filter((c) => c.status === 'vet_review').length}
           hint={t('ক্লিনিক্যাল মতামতের অপেক্ষায়', 'Awaiting veterinary opinion')}
           tone="info"
           icon="shield-check"
@@ -256,60 +270,40 @@ export function VetWebFeature({
                 {escalatedAlerts
                   .map((al) => {
                     const an = state.animals.find((a) => a.id === al.animalId);
-                    return `${an?.name ?? al.animalId}: ${al.title[locale]} (${al.status})`;
+                    return `${an?.name ?? al.animalId}: ${al.title[locale]} (${alertStatusText(al.status)})`;
                   })
                   .join(' · ')}
               </div>
             </div>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            icon="smartphone"
-            onClick={() =>
-              openMobileHandoff({
-                role: 'vet',
-                screen: screen || 'home',
-                title: t('পশুচিকিৎসক ট্রায়াজ ডেস্ক', 'Veterinary Clinical Triage'),
-              })
-            }
-          >
-            {t('মোবাইল টেলিমেডিসিন লিংক', 'Mobile Telemedicine Link')}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {tab !== 'emergency' ? (
+              <Button
+                variant="danger"
+                size="sm"
+                icon="alert"
+                onClick={() => router.push(webHref('vet', 'emergency'))}
+              >
+                {t('জরুরি ট্রায়াজ কিউ', 'Emergency Triage Queue')}
+              </Button>
+            ) : null}
+            <Button
+              variant="outline"
+              size="sm"
+              icon="smartphone"
+              onClick={() =>
+                openMobileHandoff({
+                  role: 'vet',
+                  screen: screen || 'home',
+                  title: t('পশুচিকিৎসক ট্রায়াজ ডেস্ক', 'Veterinary Clinical Triage'),
+                })
+              }
+            >
+              {t('মোবাইল টেলিমেডিসিন লিংক', 'Mobile Telemedicine Link')}
+            </Button>
+          </div>
         </div>
       ) : null}
-
-      <TabsBar
-        ariaLabel={t('পশুচিকিৎসক ওয়ার্কবেঞ্চ ট্যাব', 'Veterinarian workbench tabs')}
-        active={tab}
-        onChange={setTab}
-        tabs={[
-          {
-            id: 'consultations',
-            label: t('সাক্ষাৎ, ৭-দিনের ভাইটালস ও প্রেসক্রিপশন', 'Consultations, 7-Day Vitals & Rx'),
-            count: myAppointments.length,
-          },
-          {
-            id: 'patients',
-            label: t('প্রাণী ডিরেক্টরি ও ক্লিনিক্যাল রেকর্ড', 'Patient Registry & Health Records'),
-            count: linkedAnimals.length,
-          },
-          {
-            id: 'claims',
-            label: t('বীমা দাবি ক্লিনিক্যাল যাচাই (UC-002)', 'Insurance Claim Clinical Reviews'),
-            count: myClaims.length,
-          },
-          {
-            id: 'emergency',
-            label: t('জরুরি ট্রায়াজ কিউ (UC-001)', 'Emergency Alert Triage (UC-001)'),
-            count: escalatedAlerts.length,
-          },
-          {
-            id: 'schedule',
-            label: t('চেম্বার সময়সূচি ও প্রাপ্যতা', 'Clinic Schedule & Availability'),
-          },
-        ]}
-      />
 
       {tab === 'consultations' ? (
         <SplitWorkbench
@@ -1058,11 +1052,11 @@ export function VetWebFeature({
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-[#1F2937]">
-                {t('জরুরি সতর্কতা ও ৪-ঘণ্টা SLA ট্রায়াজ কিউ (UC-001)', 'Emergency Alert & 4-Hour SLA Triage Queue (UC-001)')}
+                {t('জরুরি সতর্কতা ও দ্রুত ট্রায়াজ কিউ', 'Emergency Alert & Priority Triage Queue')}
               </h2>
               <p className="text-xs text-[#64748B]">
                 {t(
-                  '৪ ঘণ্টার মধ্যে সমাধান না হওয়া গুরুতর সতর্কতা স্বয়ংক্রিয়ভাবে এসকেলেট হয়।',
+                  '৪ ঘণ্টার মধ্যে সমাধান না হওয়া গুরুতর সতর্কতা স্বয়ংক্রিয়ভাবে অগ্রাধিকার তালিকায় যুক্ত হয়।',
                   'Critical collar alerts unresolved after 4 hours automatically escalate here for rapid clinical intervention.',
                 )}
               </p>
@@ -1085,10 +1079,13 @@ export function VetWebFeature({
               {escalatedAlerts.map((alert) => {
                 const animal = state.animals.find((a) => a.id === alert.animalId);
                 const linkedAppt = myAppointments.find((ap) => ap.alertId === alert.id);
+                const highlighted = id === alert.id;
                 return (
                   <div
                     key={alert.id}
-                    className="rounded-[14px] border border-[#FECDD3] bg-[#FFF1F2]/70 p-4 flex flex-col gap-3"
+                    className={`rounded-[14px] border border-[#FECDD3] bg-[#FFF1F2]/70 p-4 flex flex-col gap-3 ${
+                      highlighted ? 'ring-2 ring-[#BE123C]' : ''
+                    }`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>
@@ -1100,29 +1097,57 @@ export function VetWebFeature({
                           {dateTime(alert.createdAt)}
                         </div>
                       </div>
-                      <Badge tone="danger">{alert.status}</Badge>
+                      <Badge tone="danger">{alertStatusText(alert.status)}</Badge>
                     </div>
                     <p className="text-xs text-[#881337]">{alert.message[locale]}</p>
                     <div className="flex flex-wrap gap-2">
-                      {linkedAppt ? (
+                      {linkedAppt && linkedAppt.status === 'requested' ? (
                         <Button
                           variant="primary"
                           size="sm"
-                          onClick={() => {
-                            setSelectedApptId(linkedAppt.id);
-                            setTab('consultations');
-                          }}
+                          disabled={busy}
+                          onClick={() =>
+                            void run({
+                              type: 'appointment.decide',
+                              appointmentId: linkedAppt.id,
+                              accept: true,
+                              note: 'Accepted emergency triage dispatch',
+                            })
+                          }
                         >
-                          {t('জরুরি সাক্ষাৎ খুলুন', 'Open Linked Consultation')}
+                          {t('জরুরি সাক্ষাৎ গ্রহণ করুন', 'Accept Emergency Visit')}
                         </Button>
                       ) : null}
+                      {linkedAppt ? (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            router.push(webHref('vet', 'appointments', linkedAppt.id));
+                          }}
+                        >
+                          {t('সাক্ষাৎ ও পরামর্শ খুলুন', 'Open Linked Consultation')}
+                        </Button>
+                      ) : null}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={busy}
+                        onClick={() =>
+                          void run({
+                            type: 'alert.acknowledge',
+                            alertId: alert.id,
+                          })
+                        }
+                      >
+                        {t('ট্রায়াজ গ্রহণ করুন', 'Acknowledge Triage')}
+                      </Button>
                       {animal ? (
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            setSelectedAnimalId(animal.id);
-                            setTab('patients');
+                            router.push(webHref('vet', 'animals', animal.id));
                           }}
                         >
                           {t('প্রাণীর পাসপোর্ট দেখুন', 'Inspect Patient Passport')}

@@ -328,7 +328,7 @@ export function LoginView() {
               <div className="text-xs text-[#D8E9DE]">
                 {t('ক্লিনিক্যাল ট্রায়াজ', 'Clinical Triage')}
               </div>
-              <div className="text-lg font-bold mt-1 tabular-nums">4h SLA Alert</div>
+              <div className="text-lg font-bold mt-1 tabular-nums">4h Priority Alert</div>
               <div className="text-xs text-white/75 mt-1">
                 {t('জরুরি কল ও ডিজিটাল প্রেসক্রিপশন', 'Emergency dispatch & digital Rx')}
               </div>
