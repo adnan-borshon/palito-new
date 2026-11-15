@@ -2,11 +2,11 @@ This is an Expo/React Native mobile application. Prioritize mobile-first pattern
 
 ## Mandatory delivery order and durable context
 
-Complete all five mobile roles, test and fix them, deliver mobile for user review, address feedback, then wait for explicit user approval before implementing any web application. No Next.js screens or web-specific designs during the mobile phase. Expo React Native Web output is a mobile preview only. All integrations remain frontend simulations; no production API, database, real payment or paid infrastructure.
+Complete all five mobile roles, test and fix them, deliver mobile for user review, address feedback, then wait for explicit user approval before implementing any web application. No Next.js screens or web-specific designs during the mobile phase. Expo React Native Web output is a mobile preview only. Existing frontend integrations are demonstrations until replaced and verified. Backend, database and authentication work is authorized in the development repository. Do not deploy, change production data, activate paid services, send real OTP campaigns or transfer real money without explicit authorization.
 
 At every continuation read this file, `docs/implementation-plan.md`, current requirements/design/progress/test documents and the latest user feedback; inspect the real repository state. Retrieve relevant Claude-Mem history when available. Files remain authoritative. Record meaningful decisions and verification results without secrets. Never infer approval from silence or a finished milestone.
 
-The Expo app is in `frontend/mobile`; run Expo commands there. Shared portable code is in `frontend/shared`. Root npm scripts forward to workspaces. Read the Expo major version from `frontend/mobile/package.json`. Routes are in `frontend/mobile/src/app`. `frontend/web` is reserved and `backend` is intentionally empty. Use native dependencies only in the mobile package and one version of React. Follow the shared command contract in `docs/shared-contract.md`.
+The Expo app is in `frontend/mobile`; run Expo commands there. Shared portable code is in `frontend/shared`. Root npm scripts forward to workspaces. Read the Expo major version from `frontend/mobile/package.json`. Routes are in `frontend/mobile/src/app`. `frontend/web` contains the completed Next.js app; `backend` is currently an empty placeholder. Use native dependencies only in the mobile package and one version of React. Follow the shared command contract in `docs/shared-contract.md`. For backend, Firebase Auth, PostgreSQL, security and testing work, follow `.agents/skills/backend/SKILL.md`.
 
 ## Expo has changed — do not trust your training data
 
