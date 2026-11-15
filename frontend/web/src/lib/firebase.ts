@@ -10,7 +10,7 @@ export function firebaseAuth() {
   if (emulator && (process.env.NODE_ENV === 'production' || !projectId.startsWith('demo-') || !['localhost', '127.0.0.1'].includes(window.location.hostname))) throw new Error('Invalid authentication configuration');
   const app = getApps().find(a => a.name === 'palito-identity') ?? initializeApp({ projectId, apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY, authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }, 'palito-identity');
   auth = initializeAuth(app, { persistence: inMemoryPersistence });
-  if (emulator) connectAuthEmulator(auth, 'http://127.0.0.1:9099');
+  if (emulator) { connectAuthEmulator(auth, 'http://127.0.0.1:9099'); auth.settings.appVerificationDisabledForTesting=true; }
   return auth;
 }
 export async function api(path: string, init: RequestInit = {}) {

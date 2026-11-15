@@ -45,6 +45,12 @@ export function configureApplication(app: INestApplication, config: AppConfig, l
     skip: (request: Request) => ['GET', 'HEAD'].includes(request.method) && ['/api/v1/health/live', '/api/v1/health/ready'].includes(request.path),
     handler: (request: Request, response: Response) => sendError(response, 429, (request as CorrelatedRequest).requestId),
   }));
+  app.use(rateLimit({
+    windowMs: 60000, limit: config.NODE_ENV==='test' ? 1000 : 20,
+    standardHeaders:'draft-8',legacyHeaders:false,
+    skip:(request:Request)=>!['/api/v1/recovery-requests','/api/v1/onboarding','/api/v1/sessions','/api/v1/staff/invitations/accept'].includes(request.path),
+    handler:(request:Request,response:Response)=>sendError(response,429,(request as CorrelatedRequest).requestId),
+  }));
   app.use(express.json({ limit: config.BODY_LIMIT_BYTES, strict: true }));
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true, forbidNonWhitelisted: true, forbidUnknownValues: true,

@@ -81,6 +81,7 @@ enum ValuationStatus {
 
 model User {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tokensRevokedAfter DateTime? @map("tokens_revoked_after") @db.Timestamptz(3)
   firebaseUid String @unique @map("firebase_uid") @db.VarChar(128)
   displayName String @map("display_name") @db.VarChar(120)
   phoneE164 String? @unique @map("phone_e164") @db.VarChar(16)
@@ -89,6 +90,11 @@ model User {
   status AccountStatus @default(PENDING)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  sentInvitations StaffInvitation[] @relation("InvitationActor")
+  auditsActed IdentityAudit[] @relation("AuditActor")
+  auditsReceived IdentityAudit[] @relation("AuditSubject")
+  recoveryRequests RecoveryRequest[] @relation("RecoveryUser")
+  recoveryReviews RecoveryRequest[] @relation("RecoveryReviewer")
   webSessions WebSession[]
   memberships Membership[]
   vetCredential VetCredential? @relation("VetUser")
@@ -107,6 +113,8 @@ model User {
 }
 
 model Organization {
+  invitations StaffInvitation[]
+  identityAudits IdentityAudit[]
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   kind OrganizationKind
   name String @db.VarChar(160)
@@ -335,5 +343,53 @@ model WebSession {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   @@index([firebaseUid, expiresAt])
   @@map("web_sessions")
+  @@schema("palito")
+}
+
+model StaffInvitation {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tokenHash String @unique @map("token_hash") @db.Char(64)
+  email String @db.VarChar(254)
+  organizationId String @map("organization_id") @db.Uuid
+  role StaffRole
+  organization Organization @relation(fields:[organizationId], references:[id], onDelete:Restrict, onUpdate:NoAction)
+  creator User @relation("InvitationActor", fields:[createdById], references:[id], onDelete:Restrict, onUpdate:NoAction)
+  createdById String @map("created_by_id") @db.Uuid
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  acceptedAt DateTime? @map("accepted_at") @db.Timestamptz(3)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@index([organizationId, createdAt])
+  @@map("staff_invitations")
+  @@schema("palito")
+}
+
+model IdentityAudit {
+  actor User? @relation("AuditActor", fields:[actorId], references:[id], onDelete:Restrict, onUpdate:NoAction)
+  subject User? @relation("AuditSubject", fields:[subjectId], references:[id], onDelete:Restrict, onUpdate:NoAction)
+  organization Organization? @relation(fields:[organizationId], references:[id], onDelete:Restrict, onUpdate:NoAction)
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId String? @map("actor_id") @db.Uuid
+  subjectId String? @map("subject_id") @db.Uuid
+  action String @db.VarChar(80)
+  organizationId String? @map("organization_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@index([subjectId, createdAt])
+  @@map("identity_audit")
+  @@schema("palito")
+}
+
+model RecoveryRequest {
+  user User @relation("RecoveryUser", fields:[userId], references:[id], onDelete:Restrict, onUpdate:NoAction)
+  reviewer User? @relation("RecoveryReviewer", fields:[reviewedById], references:[id], onDelete:Restrict, onUpdate:NoAction)
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  kind String @db.VarChar(20)
+  status String @default("PENDING") @db.VarChar(20)
+  reviewedById String? @map("reviewed_by_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  reviewedAt DateTime? @map("reviewed_at") @db.Timestamptz(3)
+  @@index([userId, status])
+  @@map("recovery_requests")
   @@schema("palito")
 }

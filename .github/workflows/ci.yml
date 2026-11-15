@@ -28,6 +28,8 @@ jobs:
       CI: 'true'
       NEXT_TELEMETRY_DISABLED: '1'
       EXPO_NO_TELEMETRY: '1'
+      BROWSER_E2E: 'true'
+      PLAYWRIGHT_BROWSER_CHANNEL: chrome
       TEST_DATABASE_URL: postgresql://palito_ci:ephemeral-ci-only@127.0.0.1:5432/palito_ci
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -43,7 +45,28 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build:backend
+      - run: google-chrome --version
       - run: npm exec --yes --ignore-scripts --package firebase-tools@15.36.0 -- firebase emulators:exec --config backend/firebase.json --project demo-palito --only auth "npm run test:backend:integration"
       - run: npm run build:web
       - run: npm run export:web
       - run: npm audit --omit=dev --audit-level=high
+  native-android-compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      CI: 'true'
+      EXPO_NO_TELEMETRY: '1'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: node frontend/mobile/scripts/native-test-config.mjs
+      - run: npx expo prebuild --platform android --no-install
+        working-directory: frontend/mobile
+      - run: ./gradlew :app:assembleDebug --no-daemon --max-workers=2 -Porg.gradle.jvmargs=-Xmx4g
+        working-directory: frontend/mobile/android

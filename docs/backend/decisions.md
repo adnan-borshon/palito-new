@@ -61,3 +61,9 @@ B28: User authorized M3 on 2026-11-15. Implement official Firebase Admin verific
 B29: Use an eight-hour HttpOnly Secure SameSite Strict Firebase cookie plus a database hash registry for immediate current-session revocation, exact origin and random double-submit CSRF. Firebase browser persistence is memory-only and SDK sign-out follows exchange. Native bearer calls refresh through the native SDK; no refresh token is copied to demo storage.
 
 B30: Staff contexts require current approved organization/membership, verified email/password primary and recent SMS MFA; vet credentials must also be verified. No staff mutation capability is exposed. Invitation/approval audit, initial admin, MFA enrollment/recovery UI, phone recovery and native provider/device verification remain incomplete M3 gates. B03/B05 have not been represented as user-approved production policy. No live project or paid Identity Platform activation occurred.
+
+## M3 completion update
+
+The user explicitly requested completion of M3. B03/B05 are implemented as conservative engineering defaults: verified email/password plus recent SMS MFA, reviewed organization memberships, 48-hour single-use email-bound invitations, eight-hour secure web sessions, and assisted recovery with no automatic factor deletion. The one-time first administrator is an audited offline operator command; concurrent execution is locked. Physical-device and live-provider evidence remains a release gate, not a reason to omit independent software implementation.
+
+B31: PostgreSQL stores an immediate auth-time revocation cutoff alongside nonce-bound web session hashes. All-device logout, verified phone changes and status changes invalidate older ID tokens, even if Firebase valid-since falls in the same second or provider revocation later fails. New sign-in must occur after the cutoff. No durable credential is copied into demo/browser persistence.

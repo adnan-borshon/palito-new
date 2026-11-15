@@ -1,9 +1,10 @@
-import { Body, Controller, Delete, Get, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Post, Req, Res, ForbiddenException } from '@nestjs/common';
 import { IsIn, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 import type { Request, Response } from 'express';
 import { Public, type AuthRequest } from '../platform/auth.js';
 import { FirebaseIdentity, recent } from './firebase.js';
 import { Accounts } from './accounts.js';
+import { DatabaseService } from '../platform/database.js';
 import { Sessions } from './sessions.js';
 class TokenDto { @IsString() @MinLength(1) @MaxLength(12000) idToken!: string; }
 class OnboardDto extends TokenDto {
@@ -12,7 +13,7 @@ class OnboardDto extends TokenDto {
 }
 @Controller()
 export class IdentityController {
-  constructor(private readonly firebase: FirebaseIdentity, private readonly accounts: Accounts, private readonly sessions: Sessions) {}
+  constructor(private readonly firebase: FirebaseIdentity, private readonly accounts: Accounts, private readonly sessions: Sessions, private readonly db: DatabaseService) {}
   @Public() @Get('sessions/csrf') csrf(@Req() request: Request, @Res({ passthrough: true }) response: Response) { return this.sessions.csrf(request, response); }
   @Public() @Post('sessions') async exchange(@Body() body: TokenDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
     this.sessions.checkCsrf(request);
@@ -26,10 +27,15 @@ export class IdentityController {
   @Public() @Delete('sessions/current') async logout(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
     this.sessions.checkCsrf(request); await this.sessions.clear(request, response); return { signedOut: true };
   }
-  @Post('sessions/revoke-all') async revoke(@Req() request: AuthRequest) {
-    const match = /^Bearer ([^\s]+)$/.exec(request.headers.authorization ?? '');
-    // Explicit bearer reauthentication required, including for cookie users.
-    const identity = await this.firebase.verify(match?.[1] ?? ''); recent(identity);
+  @Post('sessions/revoke-all') async revoke(@Req() request: AuthRequest, @Body() body: TokenDto) {
+    const identity = await this.firebase.verify(body.idToken); recent(identity);
+    if(identity.uid!==request.principal.firebaseUid) throw new ForbiddenException();
+    await this.accounts.stepUp(identity);
+    await this.db.prisma.$transaction(async tx=>{
+      await tx.user.update({where:{id:request.principal.userId},data:{tokensRevokedAfter:new Date()}});
+      await tx.webSession.updateMany({where:{firebaseUid:identity.uid,revokedAt:null},data:{revokedAt:new Date()}});
+      await tx.identityAudit.create({data:{actorId:request.principal.userId,subjectId:request.principal.userId,action:'ALL_SESSIONS_REVOKED'}});
+    });
     await this.firebase.revoke(identity.uid); return { signedOut: true };
   }
   @Public() @Post('onboarding') async onboard(@Body() body: OnboardDto) {

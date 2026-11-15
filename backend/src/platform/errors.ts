@@ -25,7 +25,8 @@ export class SafeExceptionFilter implements ExceptionFilter {
     // Body-parser errors expose a numeric status but their message/body must never be echoed.
     const rawStatus = exception instanceof HttpException ? exception.getStatus()
       : (exception as { status?: unknown } | null)?.status;
-    let status = 500;
+    const prismaCode=(exception as {code?:string}|null)?.code;
+    let status = prismaCode==='P2002'||prismaCode==='P2003' ? 409 : prismaCode==='P2025' ? 404 : 500;
     if (typeof rawStatus === 'number' && Number.isInteger(rawStatus)) {
       if ([400, 413, 415].includes(rawStatus) || (exception instanceof HttpException && rawStatus >= 400 && rawStatus <= 599)) status = rawStatus;
     }

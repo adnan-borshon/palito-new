@@ -24,7 +24,9 @@ export class IdentityGuard implements CanActivate {
     if (this.reflector.getAllAndOverride<boolean>(PUBLIC_ROUTE, [context.getHandler(), context.getClass()])) return true;
     const request = context.switchToHttp().getRequest<AuthRequest>();
     const cookie = cookieValue(request, SESSION_COOKIE);
-    if (cookie && request.headers.authorization) throw new UnauthorizedException();
+    const hasCookie=(request.headers.cookie??'').split(';').some(item=>item.trim().startsWith(`${SESSION_COOKIE}=`));
+    if (hasCookie && !cookie) throw new UnauthorizedException();
+    if (hasCookie && request.headers.authorization) throw new UnauthorizedException();
     if (cookie) {
       if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method)) this.sessions.checkCsrf(request);
       const parts = cookie.split('~');

@@ -27,7 +27,7 @@ Release A: identity + healthcare + reliable jobs; finance disabled or explicit s
 **Skills:** Palito backend; relevant PostgreSQL skills.
 
 ### M3 — Firebase identity and authorization
-**Status:** in progress; backend/emulator/session paths and opt-in client screens implemented. [Identity checkpoint](identity.md) records unfinished provider, native lifecycle, staff invitation/MFA/recovery gates. Do not mark the complete M3 exit as passed.
+**Status:** software implementation delivered for review, including staff/MFA/invitations/recovery/native configuration. [Identity implementation](identity.md) and [operator runbook](m3-operator-runbook.md) distinguish automated evidence from outstanding live-provider/physical-device acceptance.
 **Depends on:** M2; SDK/MFA decisions from M0.
 **Submilestones:** M3a emulator/token verification and /me; M3b mobile/web session lifecycle; M3c privileged invitation/MFA and permission matrix.
 **Work:** signup/onboarding, verified identity mapping, account suspension, role/membership approval, phone change/recovery, logout/revocation, CSRF and abuse controls.

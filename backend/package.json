@@ -26,7 +26,8 @@
     "migrate:deploy": "node --env-file-if-exists=.env --run migrate:run",
     "db:seed": "npm run build && node --env-file=.env dist/seed.js",
     "migrate:run": "prisma migrate deploy",
-    "test:auth:emulator": "npm run build:test && npm exec --yes --ignore-scripts --package firebase-tools@15.36.0 -- firebase emulators:exec --project demo-palito --only auth \"node --test dist-test/test/integration/*.test.js\""
+    "test:auth:emulator": "npm run build:test && npm exec --yes --ignore-scripts --package firebase-tools@15.36.0 -- firebase emulators:exec --project demo-palito --only auth \"node --test dist-test/test/integration/*.test.js\"",
+    "admin:bootstrap": "npm run build && node --env-file-if-exists=.env scripts/bootstrap-admin.mjs"
   },
   "dependencies": {
     "@nestjs/common": "12.5.0",
@@ -54,6 +55,7 @@
     "@types/pg": "8.23.1",
     "@types/supertest": "7.2.1",
     "eslint": "9.39.5",
+    "playwright": "1.65.1",
     "prisma": "7.10.1",
     "supertest": "7.3.2",
     "typescript": "6.0.3",

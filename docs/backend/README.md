@@ -1,4 +1,4 @@
-M3 is authorized and in progress. Start with [current checkpoint](progress.md) and [identity setup and remaining gates](identity.md). Backend identity/session paths are implemented; staff invitation/MFA/recovery and native/provider/browser E2E gates remain incomplete. M4 has not started.
+M3 software implementation is delivered for review. Start with [progress](progress.md), [identity implementation](identity.md) and [operator runbook](m3-operator-runbook.md). Staff/MFA/invitation/recovery and native configuration code are implemented. Live project and physical-device acceptance still require owner configuration and hardware. M4 has not started.
 
 # Backend foundation review
 

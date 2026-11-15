@@ -71,7 +71,7 @@ after(async () => {
 
 test('clean official migrations and idempotent synthetic seed expose typed Prisma data with exact money/date values', async () => {
   const rows=await migrator.query('SELECT migration_name FROM palito._prisma_migrations ORDER BY migration_name');
-  assert.equal(rows.rowCount,3); assert.equal(await prisma.user.count(),4);
+  assert.equal(rows.rowCount,4); assert.equal(await prisma.user.count(),4);
   const animal=await prisma.animal.findUniqueOrThrow({where:{id:ids.animalA}});
   assert.equal(animal.estimateMinor,14000000n); assert.equal(animal.birthDate.toISOString(),'2020-01-01T00:00:00.000Z');
   assert.equal(animal.weightKg.toFixed(3),'450.000');
@@ -287,8 +287,84 @@ if (process.env.FIREBASE_AUTH_EMULATOR_HOST) test('official Firebase emulator + 
     await request(server).get('/api/v1/me').set('Authorization', `Bearer ${bob.idToken}`).expect(401);
     const fresh = await phoneIdentity('+8801700000003');
     await request(server).post('/api/v1/onboarding').send({ idToken: fresh.idToken, displayName: 'Revocation fixture', locale: 'bn' }).expect(201);
+    await request(server).post('/api/v1/sessions/revoke-all').set('Authorization', `Bearer ${fresh.idToken}`).send({idToken:alice.idToken}).expect(403);
+    await request(server).post('/api/v1/sessions/revoke-all').set('Authorization', `Bearer ${fresh.idToken}`).send({idToken:fresh.idToken}).expect(201);
+    await request(server).get('/api/v1/me').set('Authorization', `Bearer ${fresh.idToken}`).expect(401);
     // Move valid-since beyond the token auth_time using the official emulator admin API.
     await rest('/identitytoolkit.googleapis.com/v1/accounts:update?key=synthetic-emulator-key', { localId: fresh.localId, validSince: String(Math.floor(Date.now()/1000) + 1) });
     await request(server).get('/api/v1/me').set('Authorization', `Bearer ${fresh.idToken}`).expect(401);
   } finally { await app.close(); }
+});
+
+if(process.env.FIREBASE_AUTH_EMULATOR_HOST) test('staff invitation, official emulator SMS MFA, first-admin bootstrap, approval, recovery and permission matrix',async()=>{
+ const {createApplication}=await import('../../src/application.js');const {loadConfig}=await import('../../src/platform/config.js');const {createLogger}=await import('../../src/platform/logger.js');
+ const {bootstrapFirstAdministrator}=await import('../../src/identity/bootstrap-admin.js');const {getAuth}=await import('firebase-admin/auth');const {getApps}=await import('firebase-admin/app');
+ const request=(await import('supertest')).default;
+ const config=loadConfig({...urls(databaseName),AUTH_MODE:'emulator',FIREBASE_PROJECT_ID:'demo-palito',FIREBASE_AUTH_EMULATOR_HOST:process.env.FIREBASE_AUTH_EMULATOR_HOST,LOG_LEVEL:'silent',CORS_ORIGINS:'http://localhost:3000',RATE_LIMIT_MAX:'1000'});
+ const app=await createApplication(config,createLogger(config));await app.init();const server=app.getHttpServer();
+ const base=`http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}`;
+ async function rest(path:string,body?:unknown){const r=await fetch(`${base}${path}`,body?{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer owner'},body:JSON.stringify(body)}:{});const data=await r.json();assert.ok(r.ok,`Emulator status ${r.status}: ${data.error?.message}`);return data;}
+ const endpoint=(method:string,v='v1')=>`/identitytoolkit.googleapis.com/${v}/accounts:${method}?key=synthetic-emulator-key`;
+ const mfa=(method:string)=>`/identitytoolkit.googleapis.com/v2/accounts/${method}?key=synthetic-emulator-key`;
+ async function code(sessionInfo:string){const values=await rest('/emulator/v1/projects/demo-palito/verificationCodes');return values.verificationCodes.find((v:{sessionInfo:string})=>v.sessionInfo===sessionInfo).code;}
+ async function identity(email:string,phone:string){
+  const password='Synthetic-emulator-password-only-123!';const firebase=getAuth(getApps().find(a=>a.name==='palito-demo-palito'));
+  const user=await firebase.createUser({email,password,emailVerified:true});
+  const primary=await rest(endpoint('signInWithPassword'),{email,password,returnSecureToken:true});
+  const start=await rest(mfa('mfaEnrollment:start'),{idToken:primary.idToken,phoneEnrollmentInfo:{phoneNumber:phone}});
+  const info=start.phoneSessionInfo.sessionInfo;
+  await rest(mfa('mfaEnrollment:finalize'),{idToken:primary.idToken,displayName:'Synthetic factor',phoneVerificationInfo:{sessionInfo:info,code:await code(info)}});
+  const pending=await rest(endpoint('signInWithPassword'),{email,password,returnSecureToken:true});assert.ok(pending.mfaPendingCredential);
+  const challenge=await rest(mfa('mfaSignIn:start'),{mfaPendingCredential:pending.mfaPendingCredential,mfaEnrollmentId:pending.mfaInfo[0].mfaEnrollmentId,phoneSignInInfo:{}});
+  const session=challenge.phoneResponseInfo.sessionInfo;
+  const signed=await rest(mfa('mfaSignIn:finalize'),{mfaPendingCredential:pending.mfaPendingCredential,phoneVerificationInfo:{sessionInfo:session,code:await code(session)}});
+  return {token:signed.idToken,primary:primary.idToken,user:await firebase.getUser(user.uid)};
+ }
+ try{
+  const adminIdentity=await identity('synthetic-admin@example.test','+8801700000011');
+  assert.deepEqual(await bootstrapFirstAdministrator(prisma,adminIdentity.user,false),{ready:true,changed:false});
+  const bootstraps=await Promise.allSettled([bootstrapFirstAdministrator(prisma,adminIdentity.user,true),bootstrapFirstAdministrator(prisma,adminIdentity.user,true)]);
+  assert.equal(bootstraps.filter(result=>result.status==='fulfilled').length,1);
+  await assert.rejects(bootstrapFirstAdministrator(prisma,adminIdentity.user,true));
+  const auth=(path:string)=>request(server).post(path).set('Authorization',`Bearer ${adminIdentity.token}`);
+  const org=await auth('/api/v1/staff/organizations').send({name:'Synthetic clinic',kind:'CLINIC'}).expect(201);
+  await request(server).post('/api/v1/staff/invitations').set('Authorization',`Bearer ${adminIdentity.primary}`).send({organizationId:org.body.id,email:'vet@example.test',role:'VET'}).expect(403);
+  const vet=await identity('synthetic-vet@example.test','+8801700000012');
+  const invitation=await auth('/api/v1/staff/invitations').send({organizationId:org.body.id,email:vet.user.email,role:'VET'}).expect(201);
+  assert.ok(invitation.body.invitationToken);assert.equal((await prisma.staffInvitation.findUniqueOrThrow({where:{id:invitation.body.id}})).tokenHash, (await import('../../src/identity/sessions.js')).fingerprint(invitation.body.invitationToken));
+  await request(server).post('/api/v1/staff/invitations/accept').send({idToken:vet.primary,invitationToken:invitation.body.invitationToken,displayName:'Vet',registrationNumber:'SYNTHETIC-M3-VET'}).expect(403);
+  const accepted=await request(server).post('/api/v1/staff/invitations/accept').send({idToken:vet.token,invitationToken:invitation.body.invitationToken,displayName:'Vet',registrationNumber:'SYNTHETIC-M3-VET'}).expect(201);
+  await request(server).post('/api/v1/staff/invitations/accept').send({idToken:vet.token,invitationToken:invitation.body.invitationToken,displayName:'Vet'}).expect(403);
+  const before=await request(server).get('/api/v1/me').set('Authorization',`Bearer ${vet.token}`).expect(200);assert.deepEqual(before.body.memberships,[]);
+  await auth(`/api/v1/staff/vets/${accepted.body.userId}/credential`).send({status:'VERIFIED'}).expect(201);
+  const verified=await request(server).get('/api/v1/me').set('Authorization',`Bearer ${vet.token}`).expect(200);assert.equal(verified.body.memberships[0].role,'VET');
+  await request(server).post('/api/v1/staff/invitations').set('Authorization',`Bearer ${vet.token}`).send({organizationId:org.body.id,email:'other@example.test',role:'VET'}).expect(403);
+  await auth('/api/v1/staff/invitations').send({organizationId:org.body.id,email:'wrong@example.test',role:'ADMIN'}).expect(403);
+  const expired=await auth('/api/v1/staff/invitations').send({organizationId:org.body.id,email:vet.user.email,role:'VET'}).expect(201);
+  await prisma.staffInvitation.update({where:{id:expired.body.id},data:{createdAt:new Date(Date.now()-7200000),expiresAt:new Date(Date.now()-3600000)}});
+  await request(server).post('/api/v1/staff/invitations/accept').send({idToken:vet.token,invitationToken:expired.body.invitationToken,displayName:'Expired'}).expect(403);
+  const foreign=await auth('/api/v1/staff/invitations').send({organizationId:org.body.id,email:'another@example.test',role:'VET'}).expect(201);
+  await request(server).post('/api/v1/staff/invitations/accept').send({idToken:vet.token,invitationToken:foreign.body.invitationToken,displayName:'Wrong target'}).expect(403);
+  await auth(`/api/v1/staff/invitations/${foreign.body.id}/revoke`).send({}).expect(201);
+  const recovery=await request(server).post('/api/v1/me/recovery-requests').set('Authorization',`Bearer ${vet.token}`).send({kind:'LOST_FACTOR'}).expect(201);
+  await request(server).post(`/api/v1/staff/recovery-requests/${recovery.body.id}/decision`).set('Authorization',`Bearer ${vet.token}`).send({decision:'APPROVED'}).expect(403);
+  await auth(`/api/v1/staff/recovery-requests/${recovery.body.id}/decision`).send({decision:'APPROVED'}).expect(201);
+  await auth(`/api/v1/staff/recovery-requests/${recovery.body.id}/decision`).send({decision:'APPROVED'}).expect(409);
+  const known=await request(server).post('/api/v1/recovery-requests').send({email:vet.user.email}).expect(201);
+  const unknown=await request(server).post('/api/v1/recovery-requests').send({email:'unknown@example.test'}).expect(201);assert.deepEqual(known.body,unknown.body);
+  await auth(`/api/v1/staff/memberships/${verified.body.memberships[0].id}/status`).send({status:'REVOKED'}).expect(201);
+  const stale=await request(server).get('/api/v1/me').set('Authorization',`Bearer ${vet.token}`).expect(200);assert.deepEqual(stale.body.memberships,[]);
+  await auth(`/api/v1/staff/users/${accepted.body.userId}/status`).send({status:'SUSPENDED'}).expect(201);
+  await request(server).get('/api/v1/me').set('Authorization',`Bearer ${vet.token}`).expect(403);
+  await rejected('UPDATE palito.identity_audit SET action=$1',['FORGED'],'42501');
+  await rejected('DELETE FROM palito.identity_audit',[],'23514',migrator);
+  const events=await prisma.identityAudit.findMany();assert.ok(events.some(e=>e.action==='INITIAL_ADMIN_PROVISIONED'));assert.ok(events.some(e=>e.action==='INVITATION_ACCEPTED'));
+ }finally{await app.close();}
+});
+
+if(process.env.BROWSER_E2E==='true') test('Chromium phone sign-in, cookie restore, CSRF, isolated browser and logout via Next proxy',async()=>{
+ const {createApplication}=await import('../../src/application.js');const {loadConfig}=await import('../../src/platform/config.js');const {createLogger}=await import('../../src/platform/logger.js');
+ const config=loadConfig({...urls(databaseName),AUTH_MODE:'emulator',FIREBASE_PROJECT_ID:'demo-palito',FIREBASE_AUTH_EMULATOR_HOST:process.env.FIREBASE_AUTH_EMULATOR_HOST,LOG_LEVEL:'silent',CORS_ORIGINS:'http://localhost:3000',RATE_LIMIT_MAX:'1000'});
+ const app=await createApplication(config,createLogger(config));await app.listen(4000,'127.0.0.1');
+ try{const {browserJourney}=await import('./browser.scenario.js');await browserJourney();}finally{await app.close();}
 });

@@ -10,6 +10,8 @@ import { DisabledIdentityVerifier, FirebaseVerifier, IDENTITY_VERIFIER, Identity
 import { FirebaseIdentity } from './identity/firebase.js';
 import { Accounts } from './identity/accounts.js';
 import { Sessions } from './identity/sessions.js';
+import { Staff } from './identity/staff.js';
+import { StaffController } from './identity/staff.controller.js';
 import { IdentityController } from './identity/identity.controller.js';
 
 @Module({})
@@ -17,10 +19,10 @@ export class AppModule {
   static register(config: AppConfig, logger: Logger): DynamicModule {
     return {
       module: AppModule,
-      controllers: [HealthController, IdentityController],
+      controllers: [HealthController, IdentityController, StaffController],
       providers: [
         { provide: APP_CONFIG, useValue: config }, { provide: APP_LOGGER, useValue: logger },
-        DatabaseService, FirebaseIdentity, Accounts, Sessions, { provide: IDENTITY_VERIFIER, useClass: config.AUTH_MODE === 'disabled' ? DisabledIdentityVerifier : FirebaseVerifier },
+        DatabaseService, FirebaseIdentity, Accounts, Sessions, Staff, { provide: IDENTITY_VERIFIER, useClass: config.AUTH_MODE === 'disabled' ? DisabledIdentityVerifier : FirebaseVerifier },
         { provide: APP_GUARD, useClass: IdentityGuard },
       ],
       exports: [DatabaseService],

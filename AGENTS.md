@@ -2,7 +2,7 @@ This is an Expo/React Native mobile application. Prioritize mobile-first pattern
 
 ## Mandatory delivery order and durable context
 
-Mobile approval is recorded on 2026-11-15 and both clients exist. The user reviewed M0–M2 and explicitly authorized **milestone 3**. Implement Firebase identity, account/membership authorization and client session lifecycle; retain M3 provider/device/staff approval gates honestly. Stop for review before M4. M3 is in progress and cannot be marked complete while native lifecycle, staff invitation/MFA/recovery and provider configuration remain unverified.
+Mobile approval is recorded on 2026-11-15 and both clients exist. The user reviewed M0–M2 and explicitly authorized **milestone 3**. Implement Firebase identity, account/membership authorization and client session lifecycle; retain M3 provider/device/staff approval gates honestly. Stop for review before M4. The user explicitly requested finishing M3 and fixing errors. All independent staff/MFA/recovery/session/client/config code must be implemented and tested. Record live provider and physical-device acceptance separately; never claim these passed without actual configuration/devices. Stop for review before M4.
 
 No production deployment, paid activation, real OTP campaign, production data change or real-money transfer is authorized. Firebase/login/session integration is the current M3 and care workflows are M4. Existing clients remain on their local demo repository. Temporary local/CI database creation and tests are authorized development work; never migrate or seed production by implication.
 
