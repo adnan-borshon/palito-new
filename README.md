@@ -4,8 +4,12 @@ Bangla-first livestock care, veterinary, insurance, lending, and administration 
 
 - `frontend/mobile`: Complete Expo SDK 58 + React Native 0.88 + Expo Router + TypeScript mobile application across all five roles.
 - `frontend/shared`: Portable TypeScript domain engine, validation, Bangla/English localization, deterministic fixtures, and versioned local storage repository.
-- `frontend/web`: Reserved for the Next.js App Router web application (gated until mobile review approval).
-- `backend`: Intentionally empty placeholder. All authentication, AI, IoT, calls, payments, insurance, loans, and deliveries are clearly labeled local demonstrations.
+- `frontend/web`: Existing Next.js App Router web application across all five roles.
+- `backend`: Empty placeholder. Backend milestone 0 is prepared for review; [start here](docs/backend/README.md). Existing authentication, AI, IoT, calls and finance use the local demo repository, regardless of UI copy. No production integration is implemented.
+
+## Current backend review
+
+Only M0 is in scope. See [backend progress](docs/backend/progress.md) for checks actually rerun and [milestone backlog](docs/backend/implementation-plan.md) for later work. M1 requires the user's next instruction. The historical frontend walkthroughs below operate on local records.
 
 ## Run locally
 
@@ -23,12 +27,12 @@ npm start
 | `npm run web` | Open the Expo mobile preview in the browser |
 | `npm run android` | Launch on a connected Android device or configured emulator |
 | `npm run ios` | Launch on an iOS simulator (requires macOS) |
-| `npm run typecheck` | Run TypeScript `--noEmit` across `@palito/mobile` and `@palito/shared` |
+| `npm run typecheck` | Run TypeScript `--noEmit` across all three frontend workspaces |
 | `npm run lint` | Run `expo lint` on the mobile workspace |
-| `npm run test` | Run all shared and mobile automated test suites |
+| `npm run test` | Run shared, mobile and web domain/component test suites |
 | `npm run test:shared` | Run the 18 shared domain & journey tests (`node --test`) |
 | `npm run test:mobile` | Run the 11 Jest + React Native Testing Library mobile tests |
-| `npm run doctor` | Run `npx expo-doctor` diagnostics (`20/20` checks) |
+| `npm run doctor` | Run `npx expo-doctor` diagnostics (record actual current results) |
 | `npm run export:web` | Build the static mobile preview bundle in `frontend/mobile/dist/` |
 
 ## Seeded demo accounts & OTP

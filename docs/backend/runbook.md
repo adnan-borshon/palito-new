@@ -1,0 +1,47 @@
+# Baseline and future operations
+
+M0 only. No backend, PostgreSQL service, migrations, provider credentials or deployment exists in this change. The following baseline commands are real existing project commands; future operations below are requirements to implement, not commands to run now.
+
+## Reproduce current checks
+
+Use repository-pinned Node 24.22.3 where available (M0 environment used compatible 24.22.1), then from repo root:
+
+```bash
+npm ci --ignore-scripts --no-audit --no-fund
+npm run typecheck
+npm run lint
+npm run lint:web
+npm test
+npm run build:web
+npm run export:web
+```
+
+`lint:web` currently runs `tsc --noEmit` and is not ESLint; fixing it is M1. Tests are demo/domain and component tests. Static Expo export and Next.js build do not verify native hardware, real SMS, calls, payments, API authorization or database constraints. Builds can modify tracked `.next` output; do not include generated changes in feature PRs. M1 must untrack these outputs without removing source.
+
+The original SRS can be extracted with `pdftotext -layout docs/srs.pdf <scratch-path>` and rendered with Poppler. Use physical PDF pages, since contents numbering differs. Do not commit extracted personal/title-page data or page images as application assets.
+
+## Baseline check plan
+
+| Stage | Commands/evidence | Interpretation |
+|---|---|---|
+| M0 source | Clean git status, source SHA, original SRS + PAL/command set equality, diff/links | Documentary baseline, not API implementation |
+| M0 automated | Commands above; Node/web/shared/component counts; actual exit status | Record in progress; never replace failure with historical report |
+| M1 clean setup | Backend config invalid/missing checks, real lint/types/unit/build, health/readiness/shutdown; fresh CI install | New API foundation only after approval |
+| M2 database | Clean and upgrade migrations on real PostgreSQL; FK/check/unique/runtime-role tests | No SQLite/memory substitute for concurrency/constraints |
+| M3 identity | Emulator tokens plus live operator/native SDK checks separately | Emulator pass never proves SMS/cost/delivery or secure device persistence |
+| M4–8 features | Scoped API/database tests, separate-process races, web journeys and physical devices | Include policy versions, fault injection and pending provider states |
+| M9–10 operations | Approved workload/load shape, secret/scanner triage, restore/rollout rehearsal | Report exact environment and residual risks; no production activation by implication |
+
+## Future operational controls
+
+Configuration: separate dev/staging/production projects, database roles, buckets, callback keys and secrets. Production rejects emulators, fixture users/OTP, demo flags and test providers. Secrets stay outside Git and frontend bundles. Document exact required variables when M1/M3 introduces them.
+
+Migrations: reviewed Prisma history plus explicit SQL for unsupported constraints; expand/backfill/contract; test old app compatibility and upgrade path. Database runtime cannot migrate. Review irreversible changes and use forward repair instead of promising destructive rollback.
+
+Outages: return explicit dependency failure/pending state, preserve financial intent ID, show actual stale reads, avoid silent demo fallback. Worker jobs have owner, attempt bounds/backoff, deduplication and failed-job triage. Ambiguous external success goes to reconciliation before retrying transfer.
+
+Backups/restore: owner and hosting budget unresolved. Candidate RPO <=1h/RTO <=4h requires encrypted backups, access controls, retention policy and timed restore into an isolated database with ledger/outbox reconciliation before release. No backup has been created or restored in M0.
+
+Incident handling: identify on-call owner, freeze affected capability where needed, preserve redacted audit/evidence, rotate relevant secrets, reconcile provider states, repair through audited amendments/reversals and document recovery. Define escalation contacts before pilot.
+
+Deployment: M10 prepares staging rollout/rollback and feature gates for user review. Enabling paid services, production migrations, SMS campaigns, real finance or live deployment needs explicit authorization. Current M0 review does not authorize M1.

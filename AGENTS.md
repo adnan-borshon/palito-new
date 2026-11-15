@@ -2,11 +2,13 @@ This is an Expo/React Native mobile application. Prioritize mobile-first pattern
 
 ## Mandatory delivery order and durable context
 
-Complete all five mobile roles, test and fix them, deliver mobile for user review, address feedback, then wait for explicit user approval before implementing any web application. No Next.js screens or web-specific designs during the mobile phase. Expo React Native Web output is a mobile preview only. All integrations remain frontend simulations; no production API, database, real payment or paid infrastructure.
+The existing implementation plan records mobile approval on 2026-11-15 and the Next.js web app now exists. Preserve both clients. The current user instruction authorizes **backend milestone 0 only** from `docs/backend/source-plan.md`: requirements/source review, design contracts, tool review, baseline checks, documentation and review delivery. Stop for the user's review before M1. Do not treat a completed milestone or silence as authorization to continue.
 
-At every continuation read this file, `docs/implementation-plan.md`, current requirements/design/progress/test documents and the latest user feedback; inspect the real repository state. Retrieve relevant Claude-Mem history when available. Files remain authoritative. Record meaningful decisions and verification results without secrets. Never infer approval from silence or a finished milestone.
+Existing integrations remain local demonstrations until replaced and verified. No production deployment, paid service activation, real OTP campaign, production data changes or real-money transfer is authorized. No API runtime, database schema or frontend behavior changes belong in M0.
 
-The Expo app is in `frontend/mobile`; run Expo commands there. Shared portable code is in `frontend/shared`. Root npm scripts forward to workspaces. Read the Expo major version from `frontend/mobile/package.json`. Routes are in `frontend/mobile/src/app`. `frontend/web` is reserved and `backend` is intentionally empty. Use native dependencies only in the mobile package and one version of React. Follow the shared command contract in `docs/shared-contract.md`.
+On continuation read this file, `docs/backend/README.md`, `docs/backend/progress.md`, the implementation plan, traceability, decisions and latest user feedback; inspect the actual branch/diff. Historical frontend reports are not current runtime evidence. Retrieve relevant Claude-Mem history if available; files remain authoritative. Record real check results and blockers without secrets.
+
+The Expo app is in `frontend/mobile`; run Expo commands there. Shared portable demo code is in `frontend/shared`; Next.js is in `frontend/web`; `backend` remains an empty placeholder until M1 is authorized. Read the installed Expo major from its package.json before changing native APIs. Use native dependencies only in mobile and preserve one React version. Follow `docs/shared-contract.md` for existing demo behavior and `docs/backend/api-contracts.md` for proposed API boundaries. For backend/auth/database/security work, follow [repository backend guidance](.agents/skills/backend/SKILL.md), with the current milestone boundary above taking priority.
 
 ## Expo has changed — do not trust your training data
 

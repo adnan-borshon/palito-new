@@ -35,3 +35,7 @@ Missing external data: expose deterministic loading/empty/error/offline/retry st
 
 - 2026-11-14: Re-read live project structure, refreshed key Figma contexts, confirmed migration to `frontend/mobile`, and recorded original source mappings. Implementation and verification status are tracked separately.
 
+
+## Backend M0 supersession — 2026-11-15
+
+D01/D02's historical mobile-first gate is satisfied as recorded in the implementation plan; web source exists. D04/D08/D09/D19 continue to describe the approved local demo environment and UI, which this M0 does not change. They do not authorize seeded OTPs, role switching, local financial authority or undisclosed simulations in a future production API. B01–B20 in [backend decisions](backend/decisions.md) define the proposed server design and unresolved policies. D20's isolated adapter is a useful seam, but scoped data/session/cache/intent changes are still required for backend integration. User authorization in this turn ends at M0; M1 must wait for review.

@@ -10,5 +10,9 @@
 - `frontend/mobile`: Expo SDK 58, React 19.3.0, React Native 0.88.1, Expo Router, TypeScript.
 - `frontend/web`: Next.js 16 App Router, React 19.3.0, TypeScript, Tailwind CSS v4, Lucide icons, native accessible `<dialog>` / `tablist` / responsive container-query tables, local `Anek Bangla` + `Plus Jakarta Sans` fonts, and local Palito brand assets.
 - `frontend/shared`: platform-independent domain types, fixtures, command repository, validation, localization, 70% LTV quote calculation (`demoLoanQuote`, `maximumLoanAmount`), and `hasIoTEvidence`.
-- `backend`: intentionally empty (`.gitkeep`) until backend/database/auth stack is selected; `@palito/web` isolates transport in `frontend/web/src/lib/client.ts` with automatic `requestId` idempotency for zero-UI-rewrite backend integration.
+- `backend`: still empty (`.gitkeep`); NestJS/PostgreSQL/Prisma/Firebase design selected in backend M0. Web transport is isolated, but automatic fresh request IDs do not by themselves make retries safe; API integration needs scoped queries, sessions and durable intent handling.
 - Node 24 LTS (`v24.22.3`); single root npm workspace and lockfile.
+
+## Backend milestone 0 — 2026-11-15
+
+Current authorization is M0 only. [Backend review index](backend/README.md), [checkpoint](backend/progress.md) and [ordered milestones](backend/implementation-plan.md) supersede outdated frontend-only restrictions for this review. No application/runtime/schema changes or M1 work are included. Stop for user review.

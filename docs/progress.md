@@ -2,6 +2,10 @@
 
 Updated 2026-11-15. **Both `@palito/mobile` (Expo SDK 58) and `@palito/web` (Next.js 16 App Router) are implemented and connected to `@palito/shared`.**
 
+## Backend M0 review checkpoint — 2026-11-15
+
+M0 documentation and baseline assessment are in [backend progress](backend/progress.md). It records current executed checks separately from the historical frontend results below. All 65 PAL requirements and all 53 commands are mapped. Backend runtime remains empty; stop for user review before M1.
+
 ## Current phase
 
 - **Mobile (`frontend/mobile`):** Complete across all five roles (`farmer`, `vet`, `bank`, `insurer`, `admin`) and verified with TypeScript, ESLint, Expo Doctor (`20/20`), shared domain tests (`18/18`), mobile component/journey tests (`11/11`), and static web preview bundle export (`export:web`).
