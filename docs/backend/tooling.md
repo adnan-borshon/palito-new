@@ -40,6 +40,12 @@ The external plugin's connection workflow depends on postgres-mcp, which is not 
 
 ## M3 SDK/dependency review
 
-Firebase Admin 14.5.1 supports Node >=22; Firebase web 13.3.0 and matching React Native Firebase app/auth 27.1.1 are pinned. Native peer metadata supports the installed React Native/Expo range; this is not a native build/device result. Official Auth emulator CLI 15.36.0 is invoked explicitly in development/CI and is not a backend production dependency.
+Firebase Admin 14.5.1 supports Node >=22; Firebase web 13.3.0 and matching React Native Firebase app/auth 26.4.2 are pinned. Native peer metadata supports the installed React Native/Expo range; this is not a native build/device result. Official Auth emulator CLI 15.36.0 is invoked explicitly in development/CI and is not a backend production dependency.
 
 Client SDK Firestore dependencies (unused by the auth implementation) resolved an older gRPC 1.9.x with GHSA-m9gg-hp2v-232j/GHSA-f596-whhp-79r4. Root override selects patched same-major @grpc/grpc-js 1.14.7; the original Firebase and Expo versions are retained rather than accepting automatic major downgrades. [Upstream advisory](https://github.com/advisories/GHSA-m9gg-hp2v-232j) identifies patched 1.13.6/1.14.5. Verify the final lockfile, audit and build evidence before accepting this override.
+
+## Native compilation correction
+
+Hosted compilation found Firebase Auth 25 (the v27 default Android BoM 35) uses Kotlin 2.4 metadata, while Expo 58 supplies Kotlin 2.2. The v27 guide also requires dynamic frameworks/SPM for Apple SDK 13, incompatible with the previous static-framework configuration. Native app/auth are therefore pinned together at stable **26.4.2**, whose default Android BoM is **34.18.0** and Apple SDK **12.19.3**, with the supported CocoaPods/static-framework path and explicit Expo ios.disableSPM. The modular authentication API is retained, as are Expo/RN and their supported toolchain. No Kotlin metadata-check bypass or unsupported v27 BoM override is used. Web Firebase 13.3.0 and backend Admin 14.5.1 remain unchanged.
+
+Primary compatibility references: [v27 requirements](https://rnfirebase.io/migrating-to-v27), [maintainer clarification on Expo 58](https://github.com/invertase/react-native-firebase/issues/9418), [v26 architecture/API guide](https://rnfirebase.io/migrating-to-v26). Package SDK pins were inspected from published metadata. Final Android compilation evidence is recorded in the PR.

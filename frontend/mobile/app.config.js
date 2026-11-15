@@ -10,6 +10,6 @@ module.exports = ({ config }) => {
   return { ...config,
     android: { ...config.android, package: androidPackage, googleServicesFile: androidFile },
     ios: { ...config.ios, bundleIdentifier: iosBundle, googleServicesFile: iosFile },
-    plugins: [...(config.plugins || []).filter(p => !['@react-native-firebase/app','@react-native-firebase/auth','expo-build-properties'].includes(Array.isArray(p)?p[0]:p)), '@react-native-firebase/app', '@react-native-firebase/auth', ['expo-build-properties', { ios: { useFrameworks: 'static' } }]],
+    plugins: [...(config.plugins || []).filter(p => !['@react-native-firebase/app','@react-native-firebase/auth','expo-build-properties'].includes(Array.isArray(p)?p[0]:p)), ['@react-native-firebase/app', { ios: { disableSPM: true } }], '@react-native-firebase/auth', ['expo-build-properties', { ios: { useFrameworks: 'static' } }]],
   };
 };

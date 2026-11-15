@@ -52,6 +52,21 @@ export async function browserJourney(){
   await page.getByLabel('Organization name',{exact:true}).fill('Browser clinic');
   await page.getByRole('button',{name:'Approve organization',exact:true}).click();
   await page.getByRole('option',{name:'Browser clinic',exact:true}).waitFor({state:'attached'});
+  // Reauthenticate through the actual staff UI, then exercise cookie + fresh-proof logout-all.
+  await page.goto('http://localhost:3000/identity/staff');
+  await page.getByLabel('Email',{exact:true}).fill('synthetic-admin@example.test');
+  await page.getByLabel('Password',{exact:true}).fill('Synthetic-emulator-password-only-123!');
+  const secondChallenge=page.waitForResponse(r=>r.url().includes('mfaSignIn:start')&&r.status()===200);
+  await page.getByRole('button',{name:'Sign in',exact:true}).click();
+  const secondInfo=await (await secondChallenge).json();
+  const secondCodes=await (await fetch(`http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/emulator/v1/projects/demo-palito/verificationCodes`)).json();
+  const secondCode=secondCodes.verificationCodes.find((v:{sessionInfo:string})=>v.sessionInfo===secondInfo.phoneResponseInfo.sessionInfo).code;
+  await page.getByLabel('SMS code',{exact:true}).fill(secondCode);
+  await page.getByRole('button',{name:'Verify MFA code',exact:true}).click();
+  await page.getByText('MFA verified. Accept your invitation or open your staff session.',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Sign out all devices after MFA',exact:true}).click();
+  await page.getByText('All sessions revoked.',{exact:true}).waitFor();
+  assert.equal(await page.evaluate(async()=>{const response=await fetch('/api/v1/me');return response.status;}),401);
   await context.close();
  }finally{
   await browser?.close();

@@ -68,5 +68,5 @@ jobs:
       - run: node frontend/mobile/scripts/native-test-config.mjs
       - run: npx expo prebuild --platform android --no-install
         working-directory: frontend/mobile
-      - run: ./gradlew :app:assembleDebug --no-daemon --max-workers=2 -Porg.gradle.jvmargs=-Xmx4g
+      - run: ./gradlew :app:assembleDebug --no-daemon --max-workers=2 -Porg.gradle.jvmargs=-Xmx4g -PreactNativeArchitectures=arm64-v8a
         working-directory: frontend/mobile/android
