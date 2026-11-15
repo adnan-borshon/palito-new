@@ -1,3 +1,5 @@
+> Current M3 update (2026-11-15): Firebase identity/session paths and opt-in `/identity` client screens are implemented. M3 is **in progress**, not complete. Read [identity checkpoint](docs/backend/identity.md) for exact endpoints, setup, actual tests and unfinished staff/native/provider gates. Earlier milestone descriptions below remain historical or proposed unless superseded there.
+
 # Palito
 
 Bangla-first livestock care, veterinary, insurance, lending, and administration frontend for **Farmer**, **Veterinarian**, **Bank**, **Insurer**, and **Administrator** roles.

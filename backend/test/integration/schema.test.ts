@@ -71,7 +71,7 @@ after(async () => {
 
 test('clean official migrations and idempotent synthetic seed expose typed Prisma data with exact money/date values', async () => {
   const rows=await migrator.query('SELECT migration_name FROM palito._prisma_migrations ORDER BY migration_name');
-  assert.equal(rows.rowCount,2); assert.equal(await prisma.user.count(),4);
+  assert.equal(rows.rowCount,3); assert.equal(await prisma.user.count(),4);
   const animal=await prisma.animal.findUniqueOrThrow({where:{id:ids.animalA}});
   assert.equal(animal.estimateMinor,14000000n); assert.equal(animal.birthDate.toISOString(),'2020-01-01T00:00:00.000Z');
   assert.equal(animal.weightKg.toFixed(3),'450.000');
@@ -216,4 +216,79 @@ test('upgrade from first migration preserves existing rows; deploy is repeatable
     } finally {await upgraded.end();}
     runPrisma(['migrate','diff','--from-config-datasource','--to-schema','prisma/schema.prisma','--exit-code'],env);
   } finally {rmSync(temporary,{recursive:true,force:true});}
+});
+
+// Explicit emulator command registers this real provider test; ordinary database CI
+// does not silently report it as a passed or skipped provider check.
+if (process.env.FIREBASE_AUTH_EMULATOR_HOST) test('official Firebase emulator + PostgreSQL API: onboarding, isolation, CSRF, cookies, suspension and revocation', async () => {
+  const { createApplication } = await import('../../src/application.js');
+  const { loadConfig } = await import('../../src/platform/config.js');
+  const { createLogger } = await import('../../src/platform/logger.js');
+  const { getAuth } = await import('firebase-admin/auth');
+  const { getApps } = await import('firebase-admin/app');
+  const request = (await import('supertest')).default;
+  const env = urls(databaseName);
+  const config = loadConfig({ ...env, AUTH_MODE: 'emulator', FIREBASE_PROJECT_ID: 'demo-palito', FIREBASE_AUTH_EMULATOR_HOST: process.env.FIREBASE_AUTH_EMULATOR_HOST, LOG_LEVEL: 'silent', CORS_ORIGINS: 'http://localhost:3000', RATE_LIMIT_MAX: '1000' });
+  const app = await createApplication(config, createLogger(config)); await app.init();
+  const base = `http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}`;
+  async function rest(path: string, body?: unknown) {
+    const result = await fetch(`${base}${path}`, body ? { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer owner' }, body: JSON.stringify(body) } : {});
+    assert.ok(result.ok, `Emulator REST status ${result.status}`); return result.json();
+  }
+  async function phoneIdentity(phoneNumber: string) {
+    const sent = await rest('/identitytoolkit.googleapis.com/v1/accounts:sendVerificationCode?key=synthetic-emulator-key', { phoneNumber });
+    const codes = await rest('/emulator/v1/projects/demo-palito/verificationCodes');
+    const code = codes.verificationCodes.find((item: { sessionInfo: string }) => item.sessionInfo === sent.sessionInfo).code;
+    return rest('/identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=synthetic-emulator-key', { sessionInfo: sent.sessionInfo, code });
+  }
+  try {
+    const alice = await phoneIdentity('+8801700000001'); const bob = await phoneIdentity('+8801700000002');
+    const server = app.getHttpServer();
+    await request(server).get('/api/v1/me').expect(401);
+    await request(server).get('/api/v1/me').set('Authorization', 'Bearer malformed-token').expect(401);
+    // Emulator tokens are intentionally unsigned; verify claim denials through the real Admin adapter.
+    for (const change of [{ aud: 'demo-other-project' }, { exp: 1 }]) {
+      const parts = alice.idToken.split('.');
+      parts[1] = Buffer.from(JSON.stringify({ ...JSON.parse(Buffer.from(parts[1], 'base64url').toString()), ...change })).toString('base64url');
+      await request(server).get('/api/v1/me').set('Authorization', `Bearer ${parts.join('.')}`).expect(401);
+    }
+    for (const identity of [alice, bob]) await request(server).post('/api/v1/onboarding').send({ idToken: identity.idToken, displayName: 'Synthetic emulator farmer', locale: 'bn' }).expect(201);
+    await request(server).post('/api/v1/onboarding').send({ idToken: alice.idToken, displayName: 'Escalate', locale: 'bn', role: 'ADMIN' }).expect(400);
+    const a = await request(server).get('/api/v1/me').set('Authorization', `Bearer ${alice.idToken}`).expect(200);
+    const b = await request(server).get('/api/v1/me').set('Authorization', `Bearer ${bob.idToken}`).expect(200);
+    assert.notEqual(a.body.userId, b.body.userId); assert.deepEqual(a.body.memberships, []);
+    assert.ok(!JSON.stringify(a.body).includes(b.body.userId)); assert.ok(!JSON.stringify(a.body).includes(alice.localId));
+    const csrf = await request(server).get('/api/v1/sessions/csrf').expect(200);
+    const csrfCookie = (csrf.headers['set-cookie'] as unknown as string[])[0]!.split(';')[0]!;
+    await request(server).post('/api/v1/sessions').send({ idToken: alice.idToken }).expect(403);
+    const exchanged = await request(server).post('/api/v1/sessions').set('Origin', 'http://localhost:3000').set('Cookie', csrfCookie).set('X-CSRF-Token', csrf.body.csrfToken).send({ idToken: alice.idToken }).expect(201);
+    const cookie = (exchanged.headers['set-cookie'] as unknown as string[]).find((value: string) => value.startsWith('__Host-palito-session=') && !value.startsWith('__Host-palito-session=;'));
+    assert.ok(cookie); assert.ok(cookie.includes('HttpOnly') && cookie.includes('Secure') && cookie.includes('SameSite=Strict'));
+    let session = cookie.split(';')[0]!;
+    const firstSession = session;
+    const rotateCsrf = await request(server).get('/api/v1/sessions/csrf').expect(200);
+    const rotateCookie = (rotateCsrf.headers['set-cookie'] as unknown as string[])[0]!.split(';')[0]!;
+    const rotated = await request(server).post('/api/v1/sessions').set('Origin', 'http://localhost:3000').set('Cookie', `${session}; ${rotateCookie}`).set('X-CSRF-Token', rotateCsrf.body.csrfToken).send({idToken: alice.idToken}).expect(201);
+    const nextCookie = (rotated.headers['set-cookie'] as unknown as string[]).find(value => value.startsWith('__Host-palito-session=') && !value.startsWith('__Host-palito-session=;'));
+    assert.ok(nextCookie); session = nextCookie.split(';')[0]!; assert.notEqual(session, firstSession);
+    await request(server).get('/api/v1/me').set('Cookie', firstSession).expect(401);
+    await request(server).get('/api/v1/me').set('Cookie', session).expect(200);
+    await request(server).get('/api/v1/me').set('Cookie', session).set('Authorization', `Bearer ${bob.idToken}`).expect(401);
+    await prisma.user.update({ where: { id: a.body.userId }, data: { status: 'SUSPENDED' } });
+    await request(server).get('/api/v1/me').set('Cookie', session).expect(403);
+    await prisma.user.update({ where: { id: a.body.userId }, data: { status: 'ACTIVE' } });
+    const logoutCsrf = await request(server).get('/api/v1/sessions/csrf').expect(200);
+    const logoutCookie = (logoutCsrf.headers['set-cookie'] as unknown as string[])[0]!.split(';')[0]!;
+    await request(server).delete('/api/v1/sessions/current').set('Origin', 'https://evil.example').set('Cookie', `${session}; ${logoutCookie}`).set('X-CSRF-Token', logoutCsrf.body.csrfToken).expect(403);
+    await request(server).delete('/api/v1/sessions/current').set('Origin', 'http://localhost:3000').set('Cookie', `${session}; ${logoutCookie}`).set('X-CSRF-Token', logoutCsrf.body.csrfToken).expect(200);
+    await request(server).get('/api/v1/me').set('Cookie', session).expect(401);
+    const firebase = getAuth(getApps().find(app => app.name === 'palito-demo-palito'));
+    await firebase.updateUser(bob.localId, { disabled: true });
+    await request(server).get('/api/v1/me').set('Authorization', `Bearer ${bob.idToken}`).expect(401);
+    const fresh = await phoneIdentity('+8801700000003');
+    await request(server).post('/api/v1/onboarding').send({ idToken: fresh.idToken, displayName: 'Revocation fixture', locale: 'bn' }).expect(201);
+    // Move valid-since beyond the token auth_time using the official emulator admin API.
+    await rest('/identitytoolkit.googleapis.com/v1/accounts:update?key=synthetic-emulator-key', { localId: fresh.localId, validSince: String(Math.floor(Date.now()/1000) + 1) });
+    await request(server).get('/api/v1/me').set('Authorization', `Bearer ${fresh.idToken}`).expect(401);
+  } finally { await app.close(); }
 });

@@ -49,7 +49,7 @@ test('real listener handles SIGTERM and releases its TCP listener and database c
   const port = (reservation.address() as { port: number }).port;
   await new Promise<void>((resolve, reject) => reservation.close(error => error ? reject(error) : resolve()));
   const child = spawn(process.execPath, [fileURLToPath(new URL('../../src/main.js', import.meta.url))], {
-    env: { ...process.env, NODE_ENV: 'test', DATABASE_URL: databaseUrl, LOG_LEVEL: 'info', PORT: String(port), HOST: '127.0.0.1', SWAGGER_ENABLED: 'false', AUTH_MODE: 'disabled', DEMO_MODE: 'false' },
+    env: { ...process.env, FIREBASE_AUTH_EMULATOR_HOST: undefined, NODE_ENV: 'test', DATABASE_URL: databaseUrl, LOG_LEVEL: 'info', PORT: String(port), HOST: '127.0.0.1', SWAGGER_ENABLED: 'false', AUTH_MODE: 'disabled', DEMO_MODE: 'false' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let output = ''; child.stdout.on('data', value => { output += value.toString(); });

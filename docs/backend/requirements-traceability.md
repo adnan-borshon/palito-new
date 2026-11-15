@@ -1,3 +1,5 @@
+> Current M3 update (2026-11-15): Firebase identity/session paths and opt-in `/identity` client screens are implemented. M3 is **in progress**, not complete. Read [identity checkpoint](identity.md) for exact endpoints, setup, actual tests and unfinished staff/native/provider gates. Earlier milestone descriptions below remain historical or proposed unless superseded there.
+
 # Backend requirements traceability
 
 M0 mapping against main `b31b165bc92f2734776b608aeba241a6b9dd291e`, original `docs/srs.pdf` (49 physical pages), and the existing PAL matrix. All 65 current PAL IDs are preserved. Old matrix pass labels describe earlier demo acceptance, not backend tests. Proposed routes use `/api/v1`; all table names are design only. F/V/B/I/A scopes are defined in [security](security.md). Each row's engineering owner is the implementer of its delivery milestone; unresolved policy owners are in [decisions](decisions.md).

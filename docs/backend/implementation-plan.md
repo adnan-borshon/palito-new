@@ -1,6 +1,6 @@
 # Backend implementation backlog
 
-Derived from the uploaded [source plan](source-plan.md), reconciled to source `b31b165bc92f2734776b608aeba241a6b9dd291e` on 2026-11-15. Engineering owns implementation/test evidence; product, clinical and partner policy owners are assigned in decisions. Read traceability for individual PAL IDs and planned acceptance tests. M1 was reviewed and M2 database foundation is delivered for review; M3 and later remain unimplemented.
+Derived from the uploaded [source plan](source-plan.md), reconciled to source `b31b165bc92f2734776b608aeba241a6b9dd291e` on 2026-11-15. Engineering owns implementation/test evidence; product, clinical and partner policy owners are assigned in decisions. Read traceability for individual PAL IDs and planned acceptance tests. M0–M2 were reviewed; M3 is authorized and in progress. See identity.md for implemented paths and remaining exit gates. M4+ remain unimplemented.
 
 Release A: identity + healthcare + reliable jobs; finance disabled or explicit sandbox. Release B: finance sandbox after approved terms/ledger/contracts. Release C: independently gated telemetry/AI/calls/commerce/reporting/provider pilot. These groups sequence all requirements; they do not remove any SRS/PAL scope. Initial API and conceptual tables are in architecture/API contracts; schema migrations are M2, not M0.
 
@@ -19,7 +19,7 @@ Release A: identity + healthcare + reliable jobs; finance disabled or explicit s
 **Skills:** Palito backend; GitHub CI tooling.
 
 ### M2 — Database foundation
-**Status:** implemented for review; see [database design](database.md) and [checkpoint](progress.md). Stop before M3.
+**Status:** reviewed; user authorized M3. See [database design](database.md) and [M2 checkpoint](milestone-2-checkpoint.md).
 **Depends on:** M1.
 **Work:** identity, membership, farm, animal and clinical prerequisites; migrations; constraints; database roles; synthetic seeds; monetary/date contracts. Document later financial schema without building unused modules.
 **Tests planned:** clean migration, upgrade from prior version, foreign keys, duplicate identity/membership and invalid ownership.
@@ -27,6 +27,7 @@ Release A: identity + healthcare + reliable jobs; finance disabled or explicit s
 **Skills:** Palito backend; relevant PostgreSQL skills.
 
 ### M3 — Firebase identity and authorization
+**Status:** in progress; backend/emulator/session paths and opt-in client screens implemented. [Identity checkpoint](identity.md) records unfinished provider, native lifecycle, staff invitation/MFA/recovery gates. Do not mark the complete M3 exit as passed.
 **Depends on:** M2; SDK/MFA decisions from M0.
 **Submilestones:** M3a emulator/token verification and /me; M3b mobile/web session lifecycle; M3c privileged invitation/MFA and permission matrix.
 **Work:** signup/onboarding, verified identity mapping, account suspension, role/membership approval, phone change/recovery, logout/revocation, CSRF and abuse controls.

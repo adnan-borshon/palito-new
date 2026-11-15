@@ -19,7 +19,9 @@ const schema = z.object({
   RATE_LIMIT_WINDOW_MS: integer(60000, 1000, 3600000),
   DATABASE_TIMEOUT_MS: integer(2000, 100, 10000),
   SWAGGER_ENABLED: z.enum(['true', 'false']).default('false').transform(value => value === 'true'),
-  AUTH_MODE: z.literal('disabled').default('disabled'),
+  AUTH_MODE: z.enum(['disabled', 'firebase', 'emulator']).default('disabled'),
+  FIREBASE_PROJECT_ID: z.string().regex(/^[a-z][a-z0-9-]{4,62}$/).default('demo-palito'),
+  WEB_ORIGIN: origin.default('http://localhost:3000'),
   DEMO_MODE: z.literal('false').default('false'),
 });
 
@@ -34,6 +36,11 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     throw new ConfigurationError(`Invalid configuration fields: ${fields}`);
   }
   const config = result.data;
+  const emulator = env.FIREBASE_AUTH_EMULATOR_HOST;
+  if (config.AUTH_MODE === 'emulator' && (config.NODE_ENV === 'production' || !config.FIREBASE_PROJECT_ID.startsWith('demo-') || !emulator || !/^(127\.0\.0\.1|localhost):[0-9]{2,5}$/.test(emulator))) throw new ConfigurationError('Emulator requires a local demo project');
+  if (config.AUTH_MODE !== 'emulator' && emulator) throw new ConfigurationError('Unexpected Firebase emulator configuration');
+  if (config.AUTH_MODE === 'firebase' && config.FIREBASE_PROJECT_ID.startsWith('demo-')) throw new ConfigurationError('Live Firebase requires a real project ID');
+  if (config.NODE_ENV === 'production' && !config.WEB_ORIGIN.startsWith('https://')) throw new ConfigurationError('Production requires HTTPS web origin');
   if (config.NODE_ENV !== 'test' && new URL(config.DATABASE_URL).username !== 'palito_runtime') {
     throw new ConfigurationError('DATABASE_URL must use the dedicated palito_runtime role');
   }

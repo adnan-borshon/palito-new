@@ -12,7 +12,7 @@ try {
   server.headersTimeout = 10000;
   server.keepAliveTimeout = 5000;
   await app.listen(config.PORT, config.HOST);
-  logger.info({ event: 'application_started', port: config.PORT, authMode: 'disabled' });
+  logger.info({ event: 'application_started', port: config.PORT, authMode: config.AUTH_MODE });
 } catch (error) {
   // Environment/parser/provider errors may contain secrets; never echo raw exceptions.
   process.stderr.write(error instanceof ConfigurationError ? `${error.message}\n` : 'Palito API startup failed. Check configuration and service availability.\n');

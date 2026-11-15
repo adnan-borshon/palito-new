@@ -1,3 +1,5 @@
+> Current M3 update (2026-11-15): Firebase identity/session paths and opt-in `/identity` client screens are implemented. M3 is **in progress**, not complete. Read [identity checkpoint](identity.md) for exact endpoints, setup, actual tests and unfinished staff/native/provider gates. Earlier milestone descriptions below remain historical or proposed unless superseded there.
+
 # Security design and permissions
 
 M0 threat model plus M1 foundation controls. M1 implements tested default-deny authentication boundary, configuration guards, safe errors/logging, body/DTO limits, exact CORS, security headers and per-instance rate limiting. The disabled verifier authenticates nobody. M2 additionally enforces database role separation, core FK/check/exclusion constraints and signed/approved history protections; application database credentials cannot migrate. Resource permissions below remain planned for later milestones; no security audit or production identity/authorization implementation is complete.

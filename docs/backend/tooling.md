@@ -1,3 +1,5 @@
+> Current M3 update (2026-11-15): Firebase identity/session paths and opt-in `/identity` client screens are implemented. M3 is **in progress**, not complete. Read [identity checkpoint](identity.md) for exact endpoints, setup, actual tests and unfinished staff/native/provider gates. Earlier milestone descriptions below remain historical or proposed unless superseded there.
+
 # Tooling review and adoption
 
 Updated for M2, 2026-11-15. A guidance file, connected tool and executable dependency are different. M0 status is retained where relevant; M1 installed only the explicit backend/web-lint dependencies and configured development/CI checks. No provider/cloud services were activated.
@@ -35,3 +37,9 @@ Verified action refs on 2026-11-15: checkout v6 `d23441a48e516b6c34aea4fa41551a3
 Reviewed Microsoft postgres-skills at commit `b7908c0b53b2a292fb8286d4d4bdba7ea4690291`: MIT license, plugin packaging supports Codex/Claude/Copilot, and generic advanced-indexing/connection-management references. Adopted portable guidance on scoped multicolumn B-tree ordering, unique/exclusion constraints, pool fan-out and distinct connection/query/idle-transaction limits. Source: [pinned repository](https://github.com/microsoft/postgres-skills/tree/b7908c0b53b2a292fb8286d4d4bdba7ea4690291).
 
 The external plugin's connection workflow depends on postgres-mcp, which is not exposed/installed here. It was reviewed, not installed or claimed operational; no Azure control plane, PostgreSQL MCP connection, telemetry or new personal skill was activated. This task uses the explicitly authorized local/CI PostgreSQL development workflow and official PostgreSQL/Prisma documentation. Primary references: [constraints](https://www.postgresql.org/docs/18/ddl-constraints.html), [Prisma v7 migration customization](https://docs.prisma.io/docs/orm/v7/prisma-migrate/workflows/customizing-migrations), [Prisma generation](https://docs.prisma.io/docs/orm/v7/prisma-client/setup-and-configuration/generating-prisma-client).
+
+## M3 SDK/dependency review
+
+Firebase Admin 14.5.1 supports Node >=22; Firebase web 13.3.0 and matching React Native Firebase app/auth 27.1.1 are pinned. Native peer metadata supports the installed React Native/Expo range; this is not a native build/device result. Official Auth emulator CLI 15.36.0 is invoked explicitly in development/CI and is not a backend production dependency.
+
+Client SDK Firestore dependencies (unused by the auth implementation) resolved an older gRPC 1.9.x with GHSA-m9gg-hp2v-232j/GHSA-f596-whhp-79r4. Root override selects patched same-major @grpc/grpc-js 1.14.7; the original Firebase and Expo versions are retained rather than accepting automatic major downgrades. [Upstream advisory](https://github.com/advisories/GHSA-m9gg-hp2v-232j) identifies patched 1.13.6/1.14.5. Verify the final lockfile, audit and build evidence before accepting this override.

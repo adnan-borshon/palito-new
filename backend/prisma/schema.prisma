@@ -89,6 +89,7 @@ model User {
   status AccountStatus @default(PENDING)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  webSessions WebSession[]
   memberships Membership[]
   vetCredential VetCredential? @relation("VetUser")
   credentialReviews VetCredential[] @relation("CredentialReviewer")
@@ -321,5 +322,18 @@ model PrescriptionItem {
   prescription Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Restrict)
   @@index([prescriptionId])
   @@map("prescription_items")
+  @@schema("palito")
+}
+
+// Hash only; raw Firebase cookies are never persisted. Current-session revocation is local.
+model WebSession {
+  tokenHash String @id @map("token_hash") @db.Char(64)
+  firebaseUid String @map("firebase_uid") @db.VarChar(128)
+  user User @relation(fields: [firebaseUid], references: [firebaseUid], onDelete: Restrict, onUpdate: NoAction)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@index([firebaseUid, expiresAt])
+  @@map("web_sessions")
   @@schema("palito")
 }

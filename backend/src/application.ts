@@ -56,7 +56,7 @@ export function configureApplication(app: INestApplication, config: AppConfig, l
 
 export function createOpenApi(app: INestApplication) {
   const options = new DocumentBuilder().setTitle('Palito API').setVersion('0.1.0')
-    .setDescription('M1 operational foundation only. Firebase, domain endpoints and Prisma schema are not implemented.')
+    .setDescription('Identity and session API plus operational health. Healthcare and financial workflows remain gated.')
     .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'Firebase ID token' }, 'firebase').build();
   return SwaggerModule.createDocument(app, options);
 }

@@ -1,6 +1,8 @@
+M3 is authorized and in progress. Start with [current checkpoint](progress.md) and [identity setup and remaining gates](identity.md). Backend identity/session paths are implemented; staff invitation/MFA/recovery and native/provider/browser E2E gates remain incomplete. M4 has not started.
+
 # Backend foundation review
 
-Updated 2026-11-15. The user reviewed M0/M1 and authorized M2. Review [current progress](progress.md), [database foundation](database.md) and [runnable setup](../../backend/README.md). Core Prisma schema/migrations/roles are implemented; Firebase and domain API workflows are later milestones. Stop for review before M3; no deployment is included.
+Updated 2026-11-15. The user reviewed M0/M1 and authorized M2. Review [current progress](progress.md), [database foundation](database.md) and [runnable setup](../../backend/README.md). Core Prisma schema/migrations/roles are implemented; Firebase and domain API workflows are later milestones. Historical M2 boundary: stop for review before M3; no deployment is included.
 
 Start with [progress](progress.md) for executed checks and remaining limitations. M0 architectural direction remains the baseline; dependent provider/policy gates remain:
 

@@ -1,3 +1,5 @@
+> Current M3 update (2026-11-15): Firebase identity/session paths and opt-in `/identity` client screens are implemented. M3 is **in progress**, not complete. Read [identity checkpoint](backend/identity.md) for exact endpoints, setup, actual tests and unfinished staff/native/provider gates. Earlier milestone descriptions below remain historical or proposed unless superseded there.
+
 # Palito mobile & web progress
 
 Updated 2026-11-15. **Both `@palito/mobile` (Expo SDK 58) and `@palito/web` (Next.js 16 App Router) are implemented and connected to `@palito/shared`.**

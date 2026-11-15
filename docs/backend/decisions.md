@@ -53,3 +53,11 @@ B25: Keep appointment/valuation owner fields as historical snapshots validated a
 B26: Preserve acres as the farm area unit because the existing mobile form explicitly labels acres. Store exact acres/weight decimals and date-only births; BDT money uses BIGINT minor units with canonical string JSON and explicit whole-BDT x100 conversion. No production financial terms or vaccination thresholds are inferred.
 
 B27: Local bootstrap only, with separate distinct random administrator/migrator/runtime secrets; application development/production startup requires runtime username, while CLI migration URL requires migrator username. Synthetic seed is explicit, local-only, transaction/idempotency guarded and never runs on startup/install/migrate. It creates no administrator membership, working Firebase credential, verified vet or approved valuation.
+
+## M3 engineering checkpoint
+
+B28: User authorized M3 on 2026-11-15. Implement official Firebase Admin verification and database-owned identity mapping; default auth disabled, emulator loopback/demo-only, live project/ADC explicitly configured. UID is the only link key. Public phone onboarding creates a farmer account without privileged membership.
+
+B29: Use an eight-hour HttpOnly Secure SameSite Strict Firebase cookie plus a database hash registry for immediate current-session revocation, exact origin and random double-submit CSRF. Firebase browser persistence is memory-only and SDK sign-out follows exchange. Native bearer calls refresh through the native SDK; no refresh token is copied to demo storage.
+
+B30: Staff contexts require current approved organization/membership, verified email/password primary and recent SMS MFA; vet credentials must also be verified. No staff mutation capability is exposed. Invitation/approval audit, initial admin, MFA enrollment/recovery UI, phone recovery and native provider/device verification remain incomplete M3 gates. B03/B05 have not been represented as user-approved production policy. No live project or paid Identity Platform activation occurred.

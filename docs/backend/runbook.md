@@ -1,3 +1,5 @@
+> Current M3 update (2026-11-15): Firebase identity/session paths and opt-in `/identity` client screens are implemented. M3 is **in progress**, not complete. Read [identity checkpoint](identity.md) for exact endpoints, setup, actual tests and unfinished staff/native/provider gates. Earlier milestone descriptions below remain historical or proposed unless superseded there.
+
 # Baseline and future operations
 
 M2 is implemented for review. Follow [backend setup](../../backend/README.md) for the executable local workflow and [current progress](progress.md) for actual results. Core Prisma migrations and database roles now exist. No provider credentials or deployment exist. Historical M0 results are in [M0 report](milestone-0-report.md).

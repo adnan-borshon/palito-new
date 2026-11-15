@@ -1,3 +1,5 @@
+> Current M3 update (2026-11-15): Firebase identity/session paths and opt-in `/identity` client screens are implemented. M3 is **in progress**, not complete. Read [identity checkpoint](identity.md) for exact endpoints, setup, actual tests and unfinished staff/native/provider gates. Earlier milestone descriptions below remain historical or proposed unless superseded there.
+
 # Proposed API contract
 
 Domain contracts remain M0 design. M1 implements only GET `/api/v1/health/live`, GET `/api/v1/health/ready` and development-only GET `/api/openapi.json`, with the common validation/error/request-safeguard boundary; no domain routes/DTOs are implemented. M2 adds the database layer, not additional HTTP endpoints. Prefix `/api/v1`. Methods below complement all command mappings in [command inventory](command-inventory.md) and requirement reads in [traceability](requirements-traceability.md). Exact provider DTOs and financial product fields remain gated by [decisions](decisions.md) before their implementation milestone.

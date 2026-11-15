@@ -1,3 +1,5 @@
+> Current M3 update (2026-11-15): Firebase identity/session paths and opt-in `/identity` client screens are implemented. M3 is **in progress**, not complete. Read [identity checkpoint](identity.md) for exact endpoints, setup, actual tests and unfinished staff/native/provider gates. Earlier milestone descriptions below remain historical or proposed unless superseded there.
+
 # Architecture and migration design
 
 Status: M0 target design plus M1/M2 foundations, 2026-11-15. Source snapshot: `b31b165bc92f2734776b608aeba241a6b9dd291e`.

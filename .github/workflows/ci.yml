@@ -43,7 +43,7 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build:backend
-      - run: npm run test:backend:integration
+      - run: npm exec --yes --ignore-scripts --package firebase-tools@15.36.0 -- firebase emulators:exec --config backend/firebase.json --project demo-palito --only auth "npm run test:backend:integration"
       - run: npm run build:web
       - run: npm run export:web
       - run: npm audit --omit=dev --audit-level=high
