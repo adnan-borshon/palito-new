@@ -296,29 +296,23 @@ export class OpsService {
       throw new BadRequestException();
     }
     const cutoff = dto.readBefore ? instant(dto.readBefore) : undefined;
-    return this.command(
-      p,
-      key,
-      "notifications.read",
-      dto,
-      async (tx) => {
-        const now = new Date();
-        const where: Prisma.NotificationWhereInput = {
-          recipientId: p.userId,
-          readAt: null,
-          ...(dto.ids ? { id: { in: dto.ids } } : {}),
-          ...(cutoff ? { createdAt: { lte: cutoff } } : {}),
-        };
-        const updated = await tx.notification.updateMany({
-          where,
-          data: { readAt: now },
-        });
-        const unreadCount = await tx.notification.count({
-          where: { recipientId: p.userId, readAt: null },
-        });
-        return { markedCount: updated.count, unreadCount };
-      },
-    );
+    return this.command(p, key, "notifications.read", dto, async (tx) => {
+      const now = new Date();
+      const where: Prisma.NotificationWhereInput = {
+        recipientId: p.userId,
+        readAt: null,
+        ...(dto.ids ? { id: { in: dto.ids } } : {}),
+        ...(cutoff ? { createdAt: { lte: cutoff } } : {}),
+      };
+      const updated = await tx.notification.updateMany({
+        where,
+        data: { readAt: now },
+      });
+      const unreadCount = await tx.notification.count({
+        where: { recipientId: p.userId, readAt: null },
+      });
+      return { markedCount: updated.count, unreadCount };
+    });
   }
 
   recordAdherence(
@@ -427,7 +421,7 @@ export class OpsService {
     });
   }
 
-  retryDeadLetter(
+  async retryDeadLetter(
     p: AccountPrincipal,
     id: string,
     key: string | undefined,
@@ -440,6 +434,7 @@ export class OpsService {
       {},
       async (tx) => {
         await this.verifyAdmin(tx, p);
+        await tx.$queryRaw`SELECT id FROM palito.outbox_events WHERE id = ${id}::uuid FOR UPDATE`;
         const event = await tx.outboxEvent.findUnique({ where: { id } });
         if (!event) throw new NotFoundException();
         if (event.status !== "DEAD_LETTER") throw new ConflictException();

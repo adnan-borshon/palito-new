@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import sharp from "sharp";
 import type { PrismaClient } from "../../src/generated/prisma/client.js";
 import type { AccountPrincipal } from "../../src/identity/accounts.js";
@@ -110,7 +110,7 @@ export async function opsScenario(
     });
 
     // 1. Outbox enqueue deduplication & Care consultation pipeline enqueues minimal notifications
-    const futureSlotTime = new Date(Date.now() + 2 * 3_600_000);
+    const futureSlotTime = new Date(Date.now() + 2 * 60_000);
     futureSlotTime.setUTCSeconds(0, 0);
     await care.availability(vet, key(), 0, [futureSlotTime.toISOString()]);
     const vetSlots = await care.slots(vet.userId);
@@ -165,10 +165,7 @@ export async function opsScenario(
         },
       });
     });
-    assert.equal(
-      await prisma.outboxEvent.count({ where: { dedupeKey } }),
-      1,
-    );
+    assert.equal(await prisma.outboxEvent.count({ where: { dedupeKey } }), 1);
 
     const initialBatch = await worker.processBatch("m5-worker-1");
     assert.ok(initialBatch.succeeded >= 1);
@@ -223,7 +220,11 @@ export async function opsScenario(
         dedupeKey: crashKey,
         aggregateKind: "appointment",
         aggregateId: appt.id,
-        payload: { recipientId: farmer.userId, linkKind: "appointment", linkId: appt.id },
+        payload: {
+          recipientId: farmer.userId,
+          linkKind: "appointment",
+          linkId: appt.id,
+        },
       }),
     );
 
@@ -282,7 +283,7 @@ export async function opsScenario(
         aggregateKind: "consultation",
         aggregateId: appt.id,
         status: "PROCESSING",
-        lockedBy: "crashed-worker",
+        lockOwner: "crashed-worker",
         lockedUntil: new Date(Date.now() - 60_000),
         payload: {
           recipientId: farmer.userId,
@@ -293,6 +294,9 @@ export async function opsScenario(
     });
     const reclaimedBatch = await worker.processBatch("m5-worker-reclaim");
     assert.ok(reclaimedBatch.reclaimed >= 1);
+    await worker.processBatch("m5-worker-after-reclaim-backoff", {
+      now: new Date(Date.now() + 60_000),
+    });
     assert.equal(
       (
         await prisma.outboxEvent.findUniqueOrThrow({
@@ -326,8 +330,11 @@ export async function opsScenario(
       },
     });
     assert.equal(
-      (await prisma.outboxEvent.findUniqueOrThrow({ where: { id: dlqEvent.id } }))
-        .status,
+      (
+        await prisma.outboxEvent.findUniqueOrThrow({
+          where: { id: dlqEvent.id },
+        })
+      ).status,
       "DEAD_LETTER",
     );
     await denied(ops.deadLetters(farmer, { limit: 25 }), 403);
@@ -342,8 +349,11 @@ export async function opsScenario(
       now: new Date(Date.now() + 5_000),
     });
     assert.equal(
-      (await prisma.outboxEvent.findUniqueOrThrow({ where: { id: dlqEvent.id } }))
-        .status,
+      (
+        await prisma.outboxEvent.findUniqueOrThrow({
+          where: { id: dlqEvent.id },
+        })
+      ).status,
       "COMPLETED",
     );
 
@@ -352,22 +362,20 @@ export async function opsScenario(
       where: { animalId: animal.id, source: "VET" },
     });
     const dueAtNow = new Date();
-    const takenReminder = await prisma.careReminder.create({
-      data: {
-        animalId: animal.id,
-        ownerId: farmer.userId,
-        recordId: completedVetRecord.id,
-        dueAt: dueAtNow,
-        enabled: true,
-      },
+    const takenReminder = await prisma.careReminder.update({
+      where: { recordId: completedVetRecord.id },
+      data: { dueAt: dueAtNow },
+    });
+    const amendment = await care.amend(vet, completedVetRecord.id, key(), {
+      note: "Synthetic follow-up fixture",
+      reason: "Exercise separate reminder adherence",
     });
     const missedReminder = await prisma.careReminder.create({
       data: {
         animalId: animal.id,
         ownerId: farmer.userId,
-        recordId: completedVetRecord.id,
+        recordId: amendment.id,
         dueAt: dueAtNow,
-        enabled: true,
       },
     });
 
@@ -402,27 +410,17 @@ export async function opsScenario(
     );
 
     // 7. Expired non-READY file cleanup leaves READY files intact
-    const pendingUpload = await care.upload(farmer, key(), {
+    const expiredUpload = {
       animalId: animal.id,
+      uploaderId: farmer.userId,
+      ownerAtUploadId: farmer.userId,
       purpose: "animal-photo",
       contentType: "image/png",
-      sizeBytes: 128,
-    });
-    await prisma.privateFile.update({
-      where: { id: pendingUpload.id },
-      data: { expiresAt: new Date(Date.now() - 60_000) },
-    });
-    const quarantinedFile = await prisma.privateFile.create({
-      data: {
-        animalId: animal.id,
-        uploaderId: farmer.userId,
-        ownerAtUploadId: farmer.userId,
-        purpose: "animal-photo",
-        contentType: "image/png",
-        declaredBytes: 128,
-        status: "QUARANTINED",
-        expiresAt: new Date(Date.now() - 60_000),
-      },
+      declaredBytes: 128,
+      expiresAt: new Date(Date.now() - 60_000),
+    };
+    const pendingUpload = await prisma.privateFile.create({
+      data: expiredUpload,
     });
     const pngBytes = await sharp({
       create: {
@@ -434,6 +432,14 @@ export async function opsScenario(
     })
       .png()
       .toBuffer();
+    const quarantinedFile = await prisma.privateFile.create({
+      data: {
+        ...expiredUpload,
+        status: "QUARANTINED",
+        bytes: new Uint8Array(pngBytes),
+        sha256: createHash("sha256").update(pngBytes).digest("hex"),
+      },
+    });
     const readyUpload = await care.upload(farmer, key(), {
       animalId: animal.id,
       purpose: "animal-photo",
@@ -455,7 +461,9 @@ export async function opsScenario(
       null,
     );
     assert.equal(
-      await prisma.privateFile.findUnique({ where: { id: quarantinedFile.id } }),
+      await prisma.privateFile.findUnique({
+        where: { id: quarantinedFile.id },
+      }),
       null,
     );
     assert.ok(

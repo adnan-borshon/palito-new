@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "../../src/generated/prisma/client.js";
 import type { AccountPrincipal } from "../../src/identity/accounts.js";
 import { CareService } from "../../src/care/care.service.js";
+import { OutboxWorkerService } from "../../src/ops/outbox.worker.js";
 import { FinanceService } from "../../src/finance/finance.service.js";
 import { signWebhookPayload } from "../../src/finance/lending-math.js";
 import { SYNTHETIC_IDS } from "../../src/database/synthetic.js";
@@ -107,7 +108,11 @@ export async function financeScenario(
     // 1. Disabled sandbox fails closed with 503
     const disabledFinance = new FinanceService(
       db,
-      loadConfig({ ...env, FINANCE_SANDBOX_ENABLED: "false", LOG_LEVEL: "silent" }),
+      loadConfig({
+        ...env,
+        FINANCE_SANDBOX_ENABLED: "false",
+        LOG_LEVEL: "silent",
+      }),
     );
     await denied(disabledFinance.wallet(farmer), 503);
 
@@ -128,7 +133,7 @@ export async function financeScenario(
       weightKg: "310.0",
       estimateMinor: "12000000",
     });
-    const slotTime = new Date(Date.now() + 2 * 3_600_000);
+    const slotTime = new Date(Date.now() + 2 * 60_000);
     slotTime.setUTCSeconds(0, 0);
     await care.availability(vet, key(), 0, [slotTime.toISOString()]);
     const vetSlots = await care.slots(vet.userId);
@@ -150,9 +155,7 @@ export async function financeScenario(
       kind: "vaccination",
       diagnosis: confidentialNote,
       advice: "Boosters up to date",
-      medicines: [
-        { name: "FMD-Vax", dose: "2ml", frequency: "Once", days: 1 },
-      ],
+      medicines: [{ name: "FMD-Vax", dose: "2ml", frequency: "Once", days: 1 }],
     });
 
     // 3. Maker/checker collateral valuations
@@ -177,7 +180,10 @@ export async function financeScenario(
     assert.equal(draftVal.status, "DRAFT");
 
     // Maker cannot approve own valuation; unrelated bank org cannot approve
-    await denied(finance.approveValuation(assessor, draftVal.id, key(), 1), 403);
+    await denied(
+      finance.approveValuation(assessor, draftVal.id, key(), 1),
+      403,
+    );
     await denied(
       finance.approveValuation(otherBankStaff, draftVal.id, key(), 1),
       403,
@@ -195,7 +201,10 @@ export async function financeScenario(
     // 4. Collateral eligibility & redacted bank risk summary (zero clinical diagnosis leakage)
     const eligibility = await finance.collateralEligibility(farmer, animal.id);
     assert.equal(eligibility.eligible, true);
-    assert.equal(eligibility.latestApprovedValuation?.maxLoanCap70Minor, "7000000");
+    assert.equal(
+      eligibility.latestApprovedValuation?.maxLoanCap70Minor,
+      "7000000",
+    );
 
     const risk = await finance.collateralRiskSummary(approver, animal.id);
     assert.equal(risk.verifiedVetVaccinationCount, 1);
@@ -223,7 +232,10 @@ export async function financeScenario(
     });
     await prisma.loanQuote.update({
       where: { id: expiredQuote.id },
-      data: { expiresAt: new Date(Date.now() - 60_000) },
+      data: {
+        createdAt: new Date(Date.now() - 31 * 60_000),
+        expiresAt: new Date(Date.now() - 60_000),
+      },
     });
     await denied(
       finance.createLoan(farmer, key(), {
@@ -256,12 +268,11 @@ export async function financeScenario(
         purpose: "Race loan 2",
       }),
     ]);
-    assert.equal(
-      raceResults.filter((r) => r.status === "fulfilled").length,
-      1,
-    );
+    assert.equal(raceResults.filter((r) => r.status === "fulfilled").length, 1);
     const rejectedLoan = (
-      raceResults.find((r) => r.status === "fulfilled") as PromiseFulfilledResult<{
+      raceResults.find(
+        (r) => r.status === "fulfilled",
+      ) as PromiseFulfilledResult<{
         id: string;
         version: number;
       }>
@@ -287,6 +298,43 @@ export async function financeScenario(
       "RELEASED",
     );
 
+    const expiringQuote = await finance.createQuote(farmer, key(), {
+      animalId: animal.id,
+      valuationId: approvedVal.id,
+      requestedPrincipalMinor: "1000",
+      termMonths: 1,
+    });
+    const expiringLoan = await finance.createLoan(farmer, key(), {
+      quoteId: expiringQuote.id,
+      purpose: "Exercise reservation expiry",
+    });
+    await prisma.collateralReservation.update({
+      where: { loanId: expiringLoan.id },
+      data: { expiresAt: new Date(Date.now() - 60_000) },
+    });
+    await denied(
+      finance.decideLoan(approver, expiringLoan.id, key(), 1, {
+        decision: "approve",
+        note: "Expired collateral must block approval",
+      }),
+      409,
+    );
+    const worker = new OutboxWorkerService(db, config, logger);
+    assert.equal(await worker.expireCollateral(new Date()), 1);
+    assert.equal(await worker.expireCollateral(new Date()), 0);
+    assert.equal(
+      (await finance.loanDetail(farmer, expiringLoan.id)).status,
+      "CANCELLED",
+    );
+    assert.equal(
+      (
+        await prisma.collateralReservation.findUniqueOrThrow({
+          where: { loanId: expiringLoan.id },
+        })
+      ).status,
+      "EXPIRED",
+    );
+
     // 7. Full loan lifecycle: quote -> apply -> approve -> disburse -> HMAC webhook -> schedule -> grace -> repay -> paid
     const qLive = await finance.createQuote(farmer, key(), {
       animalId: animal.id,
@@ -308,6 +356,27 @@ export async function financeScenario(
       key(),
       2,
       { provider: "SANDBOX_SIMULATOR" },
+    );
+
+    await denied(finance.loanDetail(assessor, liveLoan.id), 404);
+    assert.ok(
+      !(await finance.listLoans(assessor)).items.some(
+        (loan) => loan.id === liveLoan.id,
+      ),
+    );
+    await denied(
+      finance.paymentDetail(assessor, disburseRes.paymentIntent.id),
+      404,
+    );
+    assert.equal(
+      (await finance.paymentDetail(farmer, disburseRes.paymentIntent.id))
+        .status,
+      "PROVIDER_ACCEPTED",
+    );
+    assert.ok(
+      (await finance.reconcileLedger(admin)).oldestPendingPayments.some(
+        (payment) => payment.id === disburseRes.paymentIntent.id,
+      ),
     );
 
     const disburseWebhookPayload = {
@@ -347,6 +416,18 @@ export async function financeScenario(
       409,
     );
 
+    const lateFailure = {
+      ...disburseWebhookPayload,
+      externalEventId: `late-failure-${key()}`,
+      status: "FAILED" as const,
+    };
+    const lateResult = await finance.handleWebhook(
+      signWebhookPayload(WEBHOOK_SECRET, lateFailure),
+      lateFailure,
+    );
+    assert.ok("status" in lateResult);
+    assert.equal(lateResult.status, "IGNORED");
+
     // Sandbox wallet reflects credited disbursement (non-withdrawable)
     const walletAfterDisburse = await finance.wallet(farmer);
     assert.equal(walletAfterDisburse.balanceMinor, "3000001");
@@ -358,17 +439,11 @@ export async function financeScenario(
     assert.equal(schedule.items[2]!.principalMinor, "1000001");
 
     // Reviewed grace extension on installment #1
-    const graced = await finance.grantGrace(
-      approver,
-      liveLoan.id,
-      key(),
-      3,
-      {
-        installmentId: schedule.items[0]!.id,
-        graceDays: 14,
-        reason: "Temporary flood disruption",
-      },
-    );
+    const graced = await finance.grantGrace(approver, liveLoan.id, key(), 4, {
+      installmentId: schedule.items[0]!.id,
+      graceDays: 14,
+      reason: "Temporary flood disruption",
+    });
     assert.equal(graced.installment.status, "GRACE");
 
     // Partial repayment from sandbox wallet (allocates across #1 -> PAID and #2 -> PARTIAL)
@@ -443,6 +518,24 @@ export async function financeScenario(
             currency: "BDT",
           },
         });
+      }),
+    );
+
+    await assert.rejects(
+      db.prisma.ledgerTransaction.create({
+        data: {
+          idempotencyKey: `empty-${key()}`,
+          referenceKind: "REVERSAL",
+          referenceId: randomUUID(),
+          currency: "BDT",
+          description: "Incomplete posting",
+        },
+      }),
+    );
+    const existingLeg = await db.prisma.ledgerEntry.findFirstOrThrow();
+    await assert.rejects(
+      db.prisma.ledgerEntry.create({
+        data: { ...existingLeg, id: randomUUID() },
       }),
     );
 

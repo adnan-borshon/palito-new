@@ -17,7 +17,7 @@ const adminUrl = process.env.TEST_DATABASE_URL;
 assert.ok(adminUrl, 'TEST_DATABASE_URL must reference a disposable local PostgreSQL test administrator');
 assert.ok(['127.0.0.1','localhost','[::1]'].includes(new URL(adminUrl).hostname),'Schema tests refuse nonlocal PostgreSQL targets');
 const suffix = randomUUID().replaceAll('-','');
-const databaseName = `palito_m2_${suffix}`;
+const databaseName = `palito_test_m2_${suffix}`;
 const upgradeName = `palito_m2_upgrade_${suffix}`;
 const names = [databaseName, upgradeName];
 const admin = new pg.Client({ connectionString: adminUrl });
@@ -71,7 +71,7 @@ after(async () => {
 
 test('clean official migrations and idempotent synthetic seed expose typed Prisma data with exact money/date values', async () => {
   const rows=await migrator.query('SELECT migration_name FROM palito._prisma_migrations ORDER BY migration_name');
-  assert.equal(rows.rowCount,7); assert.equal(await prisma.user.count(),4);
+  assert.equal(rows.rowCount,8); assert.equal(await prisma.user.count(),4);
   const animal=await prisma.animal.findUniqueOrThrow({where:{id:ids.animalA}});
   assert.equal(animal.estimateMinor,14000000n); assert.equal(animal.birthDate.toISOString(),'2020-01-01T00:00:00.000Z');
   assert.equal(animal.weightKg.toFixed(3),'450.000');
@@ -383,4 +383,17 @@ test('M6 lending & ledger sandbox: maker/checker valuations, redacted risk, 70% 
 
 if(process.env.FIREBASE_AUTH_EMULATOR_HOST)test('M4 official Firebase phone/MFA HTTP workflow and raw private upload boundaries',async()=>{
  const {careApiScenario}=await import('./care-api.scenario.js');await careApiScenario(prisma,urls(databaseName));
+});
+
+if (process.env.BACKUP_REHEARSAL === 'true') test('PostgreSQL dump and restore preserves the populated outbox and balanced ledger', async () => {
+ const result = spawnSync(process.execPath, ['scripts/rehearse-backup-restore.mjs'], {
+  cwd: backendDir, env: { ...process.env, ...urls(databaseName) }, encoding: 'utf8', timeout: 60000,
+ });
+ assert.equal(result.status, 0, result.stderr);
+ const report = JSON.parse(result.stdout);
+ assert.equal(report.rehearsal, 'ok');
+ assert.equal(report.migrationCount, 8);
+ assert.ok(report.outboxEventCount > 0);
+ assert.ok(report.ledgerTransactionCount > 0);
+ assert.equal(report.unbalancedTransactions, 0);
 });

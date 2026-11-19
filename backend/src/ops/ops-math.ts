@@ -96,7 +96,7 @@ export function minimalNotificationCopy(
     case "CONSULTATION_COMPLETED":
       return {
         category: "CARE_EVENT",
-        title: "পরামর্শ ও প্রেসক্রিপশন প্রস্তুত · Consultation & prescription ready",
+        title: "চিকিৎসার আপডেট প্রস্তুত · Care update ready",
         body: "পশুচিকিৎসক পরামর্শ সম্পন্ন করেছেন। অ্যাপে নিরাপদে প্রেসক্রিপশন দেখুন। · The veterinarian completed the consultation. Sign in to view the record.",
         urgent: false,
       };

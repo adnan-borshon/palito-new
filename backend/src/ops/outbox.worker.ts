@@ -210,7 +210,9 @@ export class OutboxWorkerService implements OnApplicationShutdown {
       `;
       let count = 0;
       for (const r of overdue) {
-        const dueLocalDate = new Date(`${dhakaDateString(r.due_at)}T00:00:00.000Z`);
+        const dueLocalDate = new Date(
+          `${dhakaDateString(r.due_at)}T00:00:00.000Z`,
+        );
         const takenOrSkipped = await tx.reminderAdherenceEvent.findFirst({
           where: {
             reminderId: r.id,
@@ -320,15 +322,21 @@ export class OutboxWorkerService implements OnApplicationShutdown {
         dedupeKey: string;
         payload: Record<string, unknown>;
         attemptNumber: number;
+        attemptBudgetUsed: number;
         maxAttempts: number;
       }[] = [];
       for (const row of rows) {
-        const attemptNumber = row.attempts + 1;
+        const attemptBudgetUsed = row.attempts + 1;
+        const history = await tx.jobAttempt.aggregate({
+          where: { outboxEventId: row.id },
+          _max: { attemptNumber: true },
+        });
+        const attemptNumber = (history._max.attemptNumber ?? 0) + 1;
         await tx.outboxEvent.update({
           where: { id: row.id },
           data: {
             status: "PROCESSING",
-            attempts: attemptNumber,
+            attempts: attemptBudgetUsed,
             lockedUntil: leaseUntil,
             lockOwner: workerId,
           },
@@ -348,6 +356,7 @@ export class OutboxWorkerService implements OnApplicationShutdown {
           dedupeKey: row.dedupe_key,
           payload: row.payload ?? {},
           attemptNumber,
+          attemptBudgetUsed,
           maxAttempts: row.max_attempts,
         });
       }
@@ -377,12 +386,12 @@ export class OutboxWorkerService implements OnApplicationShutdown {
           });
         }
         await this.db.prisma.$transaction(async (tx) => {
-          await tx.jobAttempt.update({
+          await tx.$queryRaw`SELECT id FROM palito.outbox_events WHERE id = ${item.id}::uuid FOR UPDATE`;
+          const attempt = await tx.jobAttempt.updateMany({
             where: {
-              outboxEventId_attemptNumber: {
-                outboxEventId: item.id,
-                attemptNumber: item.attemptNumber,
-              },
+              outboxEventId: item.id,
+              attemptNumber: item.attemptNumber,
+              outcome: "STARTED",
             },
             data: {
               outcome: "SUCCEEDED",
@@ -390,6 +399,7 @@ export class OutboxWorkerService implements OnApplicationShutdown {
               finishedAt: new Date(),
             },
           });
+          if (!attempt.count) return;
           await tx.outboxEvent.update({
             where: { id: item.id },
             data: {
@@ -408,9 +418,10 @@ export class OutboxWorkerService implements OnApplicationShutdown {
           err instanceof Error && /^[A-Z0-9_]{3,64}$/.test(err.message)
             ? err.message
             : "DELIVERY_FAILURE";
-        const dead = item.attemptNumber >= item.maxAttempts;
+        const dead = item.attemptBudgetUsed >= item.maxAttempts;
         await this.db.prisma.$transaction(async (tx) => {
-          await tx.jobAttempt.updateMany({
+          await tx.$queryRaw`SELECT id FROM palito.outbox_events WHERE id = ${item.id}::uuid FOR UPDATE`;
+          const attempt = await tx.jobAttempt.updateMany({
             where: {
               outboxEventId: item.id,
               attemptNumber: item.attemptNumber,
@@ -422,6 +433,7 @@ export class OutboxWorkerService implements OnApplicationShutdown {
               finishedAt: new Date(),
             },
           });
+          if (!attempt.count) return;
           await tx.outboxEvent.update({
             where: { id: item.id },
             data: {
@@ -431,7 +443,9 @@ export class OutboxWorkerService implements OnApplicationShutdown {
               lastErrorCode: code,
               nextAttemptAt: dead
                 ? now
-                : new Date(now.getTime() + computeBackoffMs(item.attemptNumber)),
+                : new Date(
+                    now.getTime() + computeBackoffMs(item.attemptBudgetUsed),
+                  ),
             },
           });
           if (dead) {
@@ -520,6 +534,23 @@ export class OutboxWorkerService implements OnApplicationShutdown {
     return `${this.config.NOTIFICATION_CHANNEL_MODE}:${item.dedupeKey}`;
   }
 
+  /** Expire only unfunded, unsubmitted-to-provider loans. Keep ambiguous payments reserved. */
+  async expireCollateral(now: Date) {
+    if (!this.config.FINANCE_SANDBOX_ENABLED) return 0;
+    return this.db.prisma.$executeRaw`
+      WITH expired AS (
+        SELECT l.id AS loan_id, r.id AS reservation_id
+        FROM palito.loans l JOIN palito.collateral_reservations r ON r.loan_id = l.id
+        WHERE l.status IN ('SUBMITTED', 'APPROVED') AND r.status = 'HELD' AND r.expires_at <= ${now}
+        ORDER BY r.expires_at, r.id LIMIT 50 FOR UPDATE OF l SKIP LOCKED
+      ), cancelled AS (
+        UPDATE palito.loans l SET status = 'CANCELLED', version = version + 1
+        FROM expired e WHERE l.id = e.loan_id RETURNING e.reservation_id
+      )
+      UPDATE palito.collateral_reservations r SET status = 'EXPIRED', released_at = ${now}
+      FROM cancelled c WHERE r.id = c.reservation_id`;
+  }
+
   async runCycle(
     workerId = "palito-worker",
     now: Date = new Date(),
@@ -527,6 +558,7 @@ export class OutboxWorkerService implements OnApplicationShutdown {
     dueDispatched: number;
     escalated: number;
     expiredFilesRemoved: number;
+    expiredCollateral: number;
     batch: {
       reclaimed: number;
       processed: number;
@@ -536,10 +568,12 @@ export class OutboxWorkerService implements OnApplicationShutdown {
   }> {
     const reminders = await this.sweepReminders(workerId, now);
     const expiredFilesRemoved = await this.cleanupExpiredFiles(workerId, now);
+    const expiredCollateral = await this.expireCollateral(now);
     const batch = await this.processBatch(workerId, { now });
     return {
       ...reminders,
       expiredFilesRemoved,
+      expiredCollateral,
       batch,
     };
   }
