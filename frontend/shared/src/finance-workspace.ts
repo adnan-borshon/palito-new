@@ -1,4 +1,4 @@
-/** Real API projections for M6 Lending & Ledger Sandbox. Never imports or serializes DemoState. */
+/** API projections for the livestock lending sandbox. */
 import {
   CareFailure,
   careTime,
@@ -229,10 +229,7 @@ export class FinanceWorkspace {
     const epoch = this.generation;
     const expected = this.identity;
     const before = await this.transport<CareProfile>("/me");
-    if (
-      epoch !== this.generation ||
-      (expected && before.userId !== expected)
-    ) {
+    if (epoch !== this.generation || (expected && before.userId !== expected)) {
       this.clear();
       throw new CareFailure(401);
     }
@@ -367,9 +364,8 @@ export class FinanceWorkspace {
           : []),
         ...(isAdmin
           ? [
-              this.action(
-                "লেজার সমন্বয় যাচাই · Reconcile ledger",
-                async () => this.reconcileView(),
+              this.action("লেজার সমন্বয় যাচাই · Reconcile ledger", async () =>
+                this.reconcileView(),
               ),
             ]
           : []),
@@ -479,17 +475,18 @@ export class FinanceWorkspace {
             ? `Bank approved valuation: ${formatMinorBdt(eligibility.latestApprovedValuation.approvedValueMinor)} · 70% Max Loan Cap: ${formatMinorBdt(eligibility.latestApprovedValuation.maxLoanCap70Minor)}`
             : "No current approved bank valuation on file.",
         ],
-        actions: eligibility.eligible && eligibility.latestApprovedValuation
-          ? [
-              this.action("Request loan quote", async () =>
-                this.quoteForm(
-                  animal,
-                  eligibility.latestApprovedValuation!.id,
-                  eligibility.latestApprovedValuation!.maxLoanCap70Minor,
+        actions:
+          eligibility.eligible && eligibility.latestApprovedValuation
+            ? [
+                this.action("Request loan quote", async () =>
+                  this.quoteForm(
+                    animal,
+                    eligibility.latestApprovedValuation!.id,
+                    eligibility.latestApprovedValuation!.maxLoanCap70Minor,
+                  ),
                 ),
-              ),
-            ]
-          : [],
+              ]
+            : [],
       })),
     });
   }
@@ -620,17 +617,14 @@ export class FinanceWorkspace {
           actions:
             val.status === "DRAFT"
               ? [
-                  this.action(
-                    "Approve valuation (maker/checker)",
-                    async () => {
-                      await this.write(
-                        `/valuations/${val.id}/approve`,
-                        {},
-                        val.version,
-                      );
-                      await this.animalValuationsView(animalId);
-                    },
-                  ),
+                  this.action("Approve valuation (maker/checker)", async () => {
+                    await this.write(
+                      `/valuations/${val.id}/approve`,
+                      {},
+                      val.version,
+                    );
+                    await this.animalValuationsView(animalId);
+                  }),
                 ]
               : [],
         })),
@@ -742,6 +736,13 @@ export class FinanceWorkspace {
       totalDebitMinor: string;
       totalCreditMinor: string;
       unbalancedTransactionIds: string[];
+      pendingPaymentCount: number;
+      oldestPendingPayments: {
+        id: string;
+        kind: string;
+        status: string;
+        amountMinor: string;
+      }[];
     }>("/admin/ledger/reconciliation");
     this.emit({
       title: "লেজার সমন্বয় · Admin ledger reconciliation",
@@ -756,6 +757,11 @@ export class FinanceWorkspace {
           lines: [
             `Transactions: ${report.transactionCount} · Entries: ${report.entryCount}`,
             `Total debits: ${formatMinorBdt(report.totalDebitMinor)} · Total credits: ${formatMinorBdt(report.totalCreditMinor)}`,
+            `Awaiting sandbox provider: ${report.pendingPaymentCount}`,
+            ...report.oldestPendingPayments.map(
+              (payment) =>
+                `${payment.kind} · ${payment.status} · ${formatMinorBdt(payment.amountMinor)} · ${payment.id}`,
+            ),
           ],
           actions: [],
         },

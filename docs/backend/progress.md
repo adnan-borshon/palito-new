@@ -1,4 +1,15 @@
-# M4 healthcare implementation and review checkpoint
+# M5 and M6 review checkpoint
+
+The M5 and M6 implementation was already present on `main` at `9d1d1fe`. The follow-up review branch verifies that implementation and fixes problems found by the local suites and code review. M7 is outside this checkpoint.
+
+- **M5:** Durable notification processing, reminders and adherence, stale lease recovery, dead-letter retry, inbox preferences, operational triage, abandoned-upload cleanup and a backup/restore rehearsal. Admin retries reset the retry budget while preserving attempt history. A reclaimed worker cannot overwrite a newer attempt's outcome.
+- **M6:** Opt-in lending sandbox with independent valuation and approval, versioned quotes and a 70% cap, collateral reservations, simulated disbursement and repayment, installment schedules and manual grace, and an immutable ledger. After a bank officer decides a case, bank access follows that assignment. Expiry releases collateral on unfunded applications without dropping loans already awaiting a provider result. Reconciliation shows outstanding sandbox payment intents. Terminal payment events cannot reopen a closed intent.
+- **Verification:** 81 default tests and 23 PostgreSQL integration tests passed locally with the official Firebase Auth emulator. The integration suite includes a PostgreSQL 18 dump/restore of populated outbox and ledger records, migration upgrade/drift, two-instance collateral booking, and signed sandbox payment reconciliation. Workspace lint and type checks, backend and Next builds, and Expo web export passed. The local Chromium probe failed before page load because the environment denies its IPC socket. Hosted verification is tracked in the review PR.
+- **Configured modes:** In-app notifications are the default. External notification adapters and payments in these milestones are simulations. The sandbox uses the documented `sandbox-v1` zero-interest, zero-fee terms. Production provider operation and partner loan terms require separate approval.
+
+See [M5 operations](ops-m5.md), [M6 lending](lending-m6.md) and the [runbook](runbook.md).
+
+# Historical M4 healthcare checkpoint
 
 Updated 2026-11-15. The user authorized the next milestone after M3. Work is on the existing review branch/PR #2, based on verified M3 `5abab0fc619c778c7ff7de62b47d284188bac44d`. **Stop for review before M5.** No merge, production migration/deployment, paid activation or live OTP campaign is included.
 

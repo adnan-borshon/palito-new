@@ -13,7 +13,7 @@ Real workspaces on web and Expo mobile are separate from preserved local demo ro
 | [Lending M6](lending-m6.md) | Opt-in sandbox gate, maker/checker valuations, 70% LTV cap, collateral locks, ledger triggers, HMAC webhooks |
 | [Healthcare](healthcare.md) | Actual M4 routes, consent, state/time rules and private file protocol |
 | [Identity](identity.md) / [M3 operator runbook](m3-operator-runbook.md) | Firebase, current memberships, staff MFA, sessions and live setup gates |
-| [Database](database.md) | Relational foundation and restricted roles; 7 migrations through M6 |
+| [Database](database.md) | Relational foundation and restricted roles; 8 migrations through M6 |
 | [Architecture](architecture.md) / [API contracts](api-contracts.md) | Baseline contracts superseded per milestone by `identity.md`, `healthcare.md`, `ops-m5.md`, `lending-m6.md` |
 | [Traceability](requirements-traceability.md) / [Command inventory](command-inventory.md) | Preserved 65 PAL requirements and 53 demo command mappings |
 | [Decisions](decisions.md) / [Security](security.md) | Policy ownership, sandbox gates, and trust boundaries |

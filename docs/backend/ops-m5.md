@@ -41,3 +41,5 @@ M5 adds reliable PostgreSQL-backed background processing (`OutboxWorkerService` 
 ## Backup and restore rehearsal
 
 `backend/scripts/rehearse-backup-restore.mjs` (`npm run rehearse:backup-restore --workspace @palito/backend`) validates local-only loopback `pg_dump` / `pg_restore` round trips into a disposable database (`palito_restore_rehearsal_*`), checking `_prisma_migrations`, `outbox_events`, and zero unbalanced `ledger_transactions`, then drops the temporary restore database. It refuses non-development/test environments and non-loopback PostgreSQL hosts.
+
+Dead-letter retries reset the retry budget while continuing the original attempt history. Processing finalization checks that its attempt is still active after locking the outbox entry. Run the populated backup/restore scenario by setting `BACKUP_REHEARSAL=true` for `test:backend:integration` with PostgreSQL 18 client tools in `PATH` and the usual local test database configuration.

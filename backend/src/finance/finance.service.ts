@@ -63,9 +63,7 @@ function instant(value: string): Date {
   return date;
 }
 
-function decorateValuation<
-  T extends { amountMinor: bigint },
->(row: T) {
+function decorateValuation<T extends { amountMinor: bigint }>(row: T) {
   return {
     ...row,
     assessedValueMinor: row.amountMinor.toString(),
@@ -176,6 +174,16 @@ export class FinanceService {
             ? body.bankOrganizationId
             : undefined;
       await this.requireBankStaff(tx, p, orgId);
+      if (operation.startsWith("loan.")) {
+        const loan = await tx.loan.findUnique({
+          where: { id: operation.split(":")[1] },
+        });
+        if (
+          !loan ||
+          (loan.assignedOfficerId && loan.assignedOfficerId !== p.userId)
+        )
+          throw new NotFoundException();
+      }
       return;
     }
     if (operation === "quote.create" || operation === "loan.create") {
@@ -213,7 +221,10 @@ export class FinanceService {
         where: { actorId_key: { actorId: p.userId, key } },
       });
       if (saved) {
-        if (saved.operation !== operation || saved.payloadHash !== payloadHash) {
+        if (
+          saved.operation !== operation ||
+          saved.payloadHash !== payloadHash
+        ) {
           throw new ConflictException("Idempotency key payload mismatch");
         }
         await this.verifyReplayAuthority(tx, p, operation, saved.result);
@@ -243,23 +254,16 @@ export class FinanceService {
       | "PROVIDER_CLEARING",
     opts: { ownerUserId?: string; organizationId?: string } = {},
   ) {
-    const existing = await tx.ledgerAccount.findFirst({
-      where: {
-        accountKind,
-        ownerUserId: opts.ownerUserId ?? null,
-        organizationId: opts.organizationId ?? null,
-        currency: "BDT",
-      },
-    });
+    const scope = {
+      accountKind,
+      ownerUserId: opts.ownerUserId ?? null,
+      organizationId: opts.organizationId ?? null,
+      currency: "BDT",
+    };
+    const existing = await tx.ledgerAccount.findFirst({ where: scope });
     if (existing) return existing;
-    return tx.ledgerAccount.create({
-      data: {
-        accountKind,
-        ownerUserId: opts.ownerUserId ?? null,
-        organizationId: opts.organizationId ?? null,
-        currency: "BDT",
-      },
-    });
+    await tx.ledgerAccount.createMany({ data: [scope], skipDuplicates: true });
+    return tx.ledgerAccount.findFirstOrThrow({ where: scope });
   }
 
   private async postBalancedTransaction(
@@ -748,7 +752,10 @@ export class FinanceService {
       if (animal.status !== "ACTIVE") {
         throw new ConflictException("Animal is no longer ACTIVE");
       }
-      if (quote.status !== "ACTIVE" || quote.expiresAt.getTime() <= Date.now()) {
+      if (
+        quote.status !== "ACTIVE" ||
+        quote.expiresAt.getTime() <= Date.now()
+      ) {
         throw new ConflictException("Loan quote is expired or already used");
       }
       const valuation = await tx.valuation.findFirst({
@@ -879,7 +886,15 @@ export class FinanceService {
         OR: [
           { farmerId: p.userId },
           ...(bankOrgIds.length > 0
-            ? [{ bankOrganizationId: { in: bankOrgIds } }]
+            ? [
+                {
+                  bankOrganizationId: { in: bankOrgIds },
+                  OR: [
+                    { assignedOfficerId: null },
+                    { assignedOfficerId: p.userId },
+                  ],
+                },
+              ]
             : []),
         ],
         ...(q.status ? { status: q.status } : {}),
@@ -934,7 +949,11 @@ export class FinanceService {
       (m) =>
         m.role === "BANK_STAFF" && m.organizationId === loan.bankOrganizationId,
     );
-    if (!isFarmer && !isBankStaff) {
+    if (
+      !isFarmer &&
+      (!isBankStaff ||
+        (loan.assignedOfficerId && loan.assignedOfficerId !== p.userId))
+    ) {
       throw new NotFoundException();
     }
     if (isBankStaff && !isFarmer) {
@@ -988,6 +1007,8 @@ export class FinanceService {
         if (!before) throw new NotFoundException();
         await this.lockAnimal(tx, before.animalId);
         await this.requireBankStaff(tx, p, before.bankOrganizationId);
+        if (before.assignedOfficerId && before.assignedOfficerId !== p.userId)
+          throw new NotFoundException();
         if (before.farmerId === p.userId) {
           throw new ForbiddenException(
             "Bank officer cannot decide their own loan",
@@ -1010,9 +1031,18 @@ export class FinanceService {
             );
           }
           const updated = await tx.loan.updateMany({
-            where: { id, version, status: "SUBMITTED" },
+            where: {
+              id,
+              version,
+              status: "SUBMITTED",
+              collateralReservation: {
+                status: "HELD",
+                expiresAt: { gt: new Date() },
+              },
+            },
             data: {
               status: "APPROVED",
+              assignedOfficerId: p.userId,
               decidedById: p.userId,
               decidedAt: new Date(),
               decisionNote: d.note.trim(),
@@ -1025,6 +1055,7 @@ export class FinanceService {
             where: { id, version, status: "SUBMITTED" },
             data: {
               status: "REJECTED",
+              assignedOfficerId: p.userId,
               decidedById: p.userId,
               decidedAt: new Date(),
               decisionNote: d.note.trim(),
@@ -1085,6 +1116,8 @@ export class FinanceService {
         if (!before) throw new NotFoundException();
         await this.lockAnimal(tx, before.animalId);
         await this.requireBankStaff(tx, p, before.bankOrganizationId);
+        if (before.assignedOfficerId && before.assignedOfficerId !== p.userId)
+          throw new NotFoundException();
         if (before.status !== "APPROVED") {
           throw new ConflictException("Only APPROVED loans can be disbursed");
         }
@@ -1101,7 +1134,15 @@ export class FinanceService {
           );
         }
         const updated = await tx.loan.updateMany({
-          where: { id, version, status: "APPROVED" },
+          where: {
+            id,
+            version,
+            status: "APPROVED",
+            collateralReservation: {
+              status: "HELD",
+              expiresAt: { gt: new Date() },
+            },
+          },
           data: {
             status: "DISBURSING",
             version: { increment: 1 },
@@ -1239,7 +1280,7 @@ export class FinanceService {
         const walletAccount = await this.ensureAccount(tx, "USER_WALLET", {
           ownerUserId: p.userId,
         });
-        await tx.$queryRaw`SELECT id FROM palito.ledger_accounts WHERE id = ${walletAccount.id}::uuid FOR UPDATE`;
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('wallet-spend'), hashtext(${walletAccount.id}))`;
         const balance = await this.computeAccountBalanceMinor(
           tx,
           walletAccount.id,
@@ -1363,6 +1404,8 @@ export class FinanceService {
         const loan = await tx.loan.findUnique({ where: { id: loanId } });
         if (!loan) throw new NotFoundException();
         await this.requireBankStaff(tx, p, loan.bankOrganizationId);
+        if (loan.assignedOfficerId && loan.assignedOfficerId !== p.userId)
+          throw new NotFoundException();
         if (loan.status !== "ACTIVE") {
           throw new ConflictException(
             "Grace can only be granted on ACTIVE loans",
@@ -1485,7 +1528,7 @@ export class FinanceService {
         );
       }
 
-      if (intent.status === "CONFIRMED") {
+      if (["CONFIRMED", "FAILED", "CANCELLED"].includes(intent.status)) {
         const ignored = await tx.providerEvent.create({
           data: {
             provider: d.provider,
@@ -1745,20 +1788,23 @@ export class FinanceService {
       if (!intent) throw new NotFoundException();
       const isActor = intent.actorId === p.userId;
       const isAdmin = p.memberships.some((m) => m.role === "ADMIN");
-      let isLoanBankStaff = false;
+      let hasLoanAccess = false;
       if (intent.targetKind === "loan") {
         const loan = await tx.loan.findUnique({
           where: { id: intent.targetId },
         });
         if (loan) {
-          isLoanBankStaff = p.memberships.some(
-            (m) =>
-              m.role === "BANK_STAFF" &&
-              m.organizationId === loan.bankOrganizationId,
-          );
+          hasLoanAccess =
+            loan.farmerId === p.userId ||
+            ((!loan.assignedOfficerId || loan.assignedOfficerId === p.userId) &&
+              p.memberships.some(
+                (m) =>
+                  m.role === "BANK_STAFF" &&
+                  m.organizationId === loan.bankOrganizationId,
+              ));
         }
       }
-      if (!isActor && !isAdmin && !isLoanBankStaff) {
+      if (!isActor && !isAdmin && !hasLoanAccess) {
         throw new NotFoundException();
       }
       return json(intent);
@@ -1798,6 +1844,25 @@ export class FinanceService {
             OR COUNT(e.id) < 2
       `;
       const transactionCount = await tx.ledgerTransaction.count();
+      const awaitingProvider = {
+        provider: "SANDBOX_SIMULATOR",
+        status: { in: ["PENDING", "PROVIDER_ACCEPTED"] },
+      };
+      const [pendingPaymentCount, oldestPendingPayments] = await Promise.all([
+        tx.paymentIntent.count({ where: awaitingProvider }),
+        tx.paymentIntent.findMany({
+          where: awaitingProvider,
+          take: 25,
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          select: {
+            id: true,
+            kind: true,
+            status: true,
+            amountMinor: true,
+            createdAt: true,
+          },
+        }),
+      ]);
       return json({
         balanced:
           totalDebitMinor === totalCreditMinor && unbalancedRows.length === 0,
@@ -1806,6 +1871,8 @@ export class FinanceService {
         totalDebitMinor: totalDebitMinor.toString(),
         totalCreditMinor: totalCreditMinor.toString(),
         unbalancedTransactionIds: unbalancedRows.map((r) => r.transaction_id),
+        pendingPaymentCount,
+        oldestPendingPayments,
       });
     });
   }
