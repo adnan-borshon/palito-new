@@ -63,12 +63,12 @@ Keep admin, migration and runtime URLs separate. Existing M1 environments must r
 
 Before applying a future migration, review its SQL and locking/data effect, run clean and prior-version upgrade tests on disposable PostgreSQL, verify runtime denial and model drift, and retain the immutable published history. If a migration fails, inspect status and affected state with the migration/administrator owner; do not automatically reset or delete real data. Production migration rollout/restore rehearsal remains M10.
 
-## M4–M9 review, worker and sandbox setup
+## M4–M10 review, worker, sandbox and deployment preflight setup
 
-See [healthcare](healthcare.md), [ops M5](ops-m5.md), [lending M6](lending-m6.md), [insurance M7](insurance-m7.md), [extensions M8](extensions-m8.md), and [QA & security M9](qa-security-m9.md) for implemented DTOs, worker operations, ledger & extension invariants, security matrix verification, and client lifecycles; [progress](progress.md) records actual checks.
+See [healthcare](healthcare.md), [ops M5](ops-m5.md), [lending M6](lending-m6.md), [insurance M7](insurance-m7.md), [extensions M8](extensions-m8.md), [QA & security M9](qa-security-m9.md), and [deployment & pilot M10](deployment-pilot-m10.md) for implemented DTOs, worker operations, ledger & extension invariants, security matrix verification, deployment preflight checks, and client lifecycles; [progress](progress.md) records actual checks.
 - Enable `HEALTHCARE_NO_CHARGE_PILOT=true` only for an explicit no-charge development/staging pilot.
 - Configure `NOTIFICATION_CHANNEL_MODE=in-app-only` (default) or `sandbox`; run the M5/M8 worker with `npm run worker --workspace @palito/backend` or `WORKER_ENABLED=true`.
-- Enable `FINANCE_SANDBOX_ENABLED=true`, `PAYMENT_PROVIDER=sandbox`, and a >=16-char `SANDBOX_WEBHOOK_SECRET` **only** in development/staging to exercise `/finance` lending and insurance sandbox workflows.
-- Enable `EXTENSIONS_SANDBOX_ENABLED=true` **only** in development/staging to exercise M8 telemetry, AI, call tokens, commerce, and admin content/export routes; production fails closed if any sandbox or emulator option is set.
+- Enable `FINANCE_SANDBOX_ENABLED=true`, `PAYMENT_PROVIDER=sandbox`, and a >=16-char `SANDBOX_WEBHOOK_SECRET` **only** in `development` or `DEPLOYMENT_TIER=staging` to exercise `/finance` lending and insurance sandbox workflows.
+- Enable `EXTENSIONS_SANDBOX_ENABLED=true` **only** in `development` or `DEPLOYMENT_TIER=staging` to exercise M8 telemetry, AI, call tokens, commerce, and admin content/export routes; `DEPLOYMENT_TIER=production` fails closed if any sandbox, emulator, or Swagger option is set.
+- Run `npm run preflight:deploy --workspace @palito/backend` (optionally with `-- --require-migration-url`) before staging/production release to validate `DEPLOYMENT_TIER`, `palito_runtime`/`palito_migrator` credential separation, `sslmode=verify-full`, and the immutable `SHA-256` manifest across all 9 migrations.
 - Local backup/restore rehearsal (`npm run rehearse:backup-restore --workspace @palito/backend`) requires loopback PostgreSQL with `pg_dump`/`pg_restore`, `DATABASE_ADMIN_URL`, and `DATABASE_URL` in development/test.
-- Stop for review before M10 deployment preparation.

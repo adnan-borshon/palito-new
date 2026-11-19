@@ -1,6 +1,6 @@
 # Backend implementation backlog
 
-Derived from the uploaded [source plan](source-plan.md), reconciled to source `b31b165bc92f2734776b608aeba241a6b9dd291e` on 2026-11-15. Engineering owns implementation/test evidence; product, clinical and partner policy owners are assigned in decisions. Read traceability for individual PAL IDs and planned acceptance tests. M0–M9 (through extensions M8a–M8e and security QA M9) are implemented for review; M10 (deployment preparation & controlled pilot) remains stopped awaiting review and live-provider/partner gates. See `progress.md`, `extensions-m8.md`, and `qa-security-m9.md` for actual evidence/limits.
+Derived from the uploaded [source plan](source-plan.md), reconciled to source `b31b165bc92f2734776b608aeba241a6b9dd291e` on 2026-11-15. Engineering owns implementation/test evidence; product, clinical and partner policy owners are assigned in decisions. Read traceability for individual PAL IDs and planned acceptance tests. M0–M10 (through extensions M8a–M8e, security QA M9, and deployment preparation & pilot readiness M10) are implemented for review; live production activation remains gated on external provider credentials, partner policies (`B03`–`B13`), and physical-device verification. See `progress.md`, `extensions-m8.md`, `qa-security-m9.md`, and `deployment-pilot-m10.md` for actual evidence/limits.
 
 Release A: identity + healthcare + reliable jobs; finance disabled or explicit sandbox. Release B: finance sandbox after approved terms/ledger/contracts. Release C: independently gated telemetry/AI/calls/commerce/reporting/provider pilot. These groups sequence all requirements; they do not remove any SRS/PAL scope. Initial API and conceptual tables are in architecture/API contracts; schema migrations are M2, not M0.
 
@@ -81,14 +81,15 @@ Release A: identity + healthcare + reliable jobs; finance disabled or explicit s
 **Work:** automated security matrix (`SEC-DEMO`, `SEC-AUTH`, `SEC-INPUT`, `SEC-SCOPE`, `SEC-IOT`, `SEC-AI`, `SEC-LOG`), cross-tenant denial verification, strict mass-assignment refusal, and secret redaction checks. Unsupported physical-device and live-provider checks remain explicitly documented before M10.
 
 ### M10 — Deployment preparation and controlled pilot
+**Current status:** implemented for review in [deployment & pilot M10](deployment-pilot-m10.md), `backend/src/platform/deployment-preflight.ts`, `backend/scripts/verify-deployment-preflight.mjs`, `backend/.env.staging.example`, `backend/.env.production.example`, and `backend/test/deployment-preflight.test.ts`.
 **Depends on:** M9 release evidence and business/provider readiness.
-**Work:** environment separation, least-privilege credentials, repeatable build, migration expansion/backfill/contraction strategy, health checks, monitoring, alert ownership, restore drill and incident runbook. Rehearse staging rollout/rollback; irreversible schema changes need forward-repair strategy.
-**Exit:** concrete release checklist, support owner, verified backups, budget and provider configuration, staged feature enablement and documented rollback triggers.
-**Boundary:** preparing a deployment is not permission to activate production or transfer real funds.
+**Work:** environment tier separation (`DEPLOYMENT_TIER`: `development | test | staging | production`), least-privilege credential validation (`palito_runtime` vs `palito_migrator`, no `DATABASE_ADMIN_URL` in runtime), repeatable build & preflight CLI (`npm run preflight:deploy --workspace @palito/backend`), immutable 9-migration `SHA-256` manifest & expand/backfill/contract forward-repair strategy (`verifyMigrationHistory`), health/monitoring & rollback trigger evaluation (`evaluatePilotOperationalHealth` integrated into `GET /api/v1/admin/system-health`), backup/restore drill (`rehearse-backup-restore.mjs`), and concrete pilot readiness report separating implemented/verified capabilities from external provider, partner policy, and physical-device gates.
+**Exit:** concrete release checklist, support owners, verified immutable migration manifest, staged feature enablement, and documented rollback triggers (`UNBALANCED_LEDGER_DETECTED`, `OUTBOX_DEAD_LETTER_NONZERO`, `READINESS_PROBE_503_SUSTAINED`, `MIGRATION_PREFLIGHT_MISMATCH`, `UNAUTHORIZED_CROSS_SCOPE_ALERT`).
+**Boundary:** preparing a deployment is not permission to activate production, run live SMS campaigns, or transfer real funds.
 
 
 ## Immediate next step after M2 review
 
 Historical M3 boundary: M3 integrates Firebase verification and server-owned account/membership permissions, then real client session lifecycle and approved staff MFA. Review current provider prerequisites, emulator/project configuration, native SDK/device compatibility and the original B03–B06 gates. Do not treat synthetic UIDs, pending vet fixtures or database access as real identity verification. M3 must not silently implement all M4 care or M6 finance workflows.
 
-Current stop: user review after M8 and M9. Do not implement M10 deployment preparation until authorized.
+Current checkpoint: M0–M10 software implementation and automated verification are complete for review. Live production deployment, paid infrastructure, real telecom OTP/SMS campaigns, and real-money transactions remain gated on explicit user/partner authorization and external credentials.

@@ -9,6 +9,7 @@ const origin = z.string().url().refine(value => {
 });
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  DEPLOYMENT_TIER: z.enum(['development', 'test', 'staging', 'production']).optional(),
   HOST: z.enum(['127.0.0.1', '0.0.0.0', '::1']).default('127.0.0.1'),
   PORT: integer(4000, 1, 65535),
   DATABASE_URL: z.string().url().refine(value => URL.canParse(value) && ['postgres:', 'postgresql:'].includes(new URL(value).protocol)),
@@ -34,7 +35,13 @@ const schema = z.object({
   DEMO_MODE: z.literal('false').default('false'),
 });
 
-export type AppConfig = Readonly<Omit<z.infer<typeof schema>, 'CORS_ORIGINS'> & { CORS_ORIGINS: readonly string[] }>;
+export type DeploymentTier = 'development' | 'test' | 'staging' | 'production';
+export type AppConfig = Readonly<
+  Omit<z.infer<typeof schema>, 'CORS_ORIGINS' | 'DEPLOYMENT_TIER'> & {
+    CORS_ORIGINS: readonly string[];
+    DEPLOYMENT_TIER: DeploymentTier;
+  }
+>;
 export const APP_CONFIG = Symbol('APP_CONFIG');
 export class ConfigurationError extends Error {}
 
@@ -45,6 +52,13 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     throw new ConfigurationError(`Invalid configuration fields: ${fields}`);
   }
   const config = result.data;
+  const deploymentTier: DeploymentTier = config.DEPLOYMENT_TIER ?? config.NODE_ENV;
+  if (config.NODE_ENV === 'production' && !['staging', 'production'].includes(deploymentTier)) {
+    throw new ConfigurationError('Production NODE_ENV allows only staging or production DEPLOYMENT_TIER');
+  }
+  if (config.NODE_ENV !== 'production' && deploymentTier !== config.NODE_ENV) {
+    throw new ConfigurationError('DEPLOYMENT_TIER must match NODE_ENV outside production builds');
+  }
   const emulator = env.FIREBASE_AUTH_EMULATOR_HOST;
   if (config.AUTH_MODE === 'emulator' && (config.NODE_ENV === 'production' || !config.FIREBASE_PROJECT_ID.startsWith('demo-') || !emulator || !/^(127\.0\.0\.1|localhost):[0-9]{2,5}$/.test(emulator))) throw new ConfigurationError('Emulator requires a local demo project');
   if (config.AUTH_MODE !== 'emulator' && emulator) throw new ConfigurationError('Unexpected Firebase emulator configuration');
@@ -55,20 +69,26 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
   }
   if (config.NODE_ENV === 'production') {
     if (
-      config.SWAGGER_ENABLED ||
-      env.FIREBASE_AUTH_EMULATOR_HOST ||
-      config.PAYMENT_PROVIDER === 'sandbox' ||
-      config.FINANCE_SANDBOX_ENABLED ||
-      config.NOTIFICATION_CHANNEL_MODE === 'sandbox' ||
-      config.SANDBOX_WEBHOOK_SECRET ||
-      config.EXTENSIONS_SANDBOX_ENABLED
+      deploymentTier === 'production' &&
+      (
+        config.SWAGGER_ENABLED ||
+        env.FIREBASE_AUTH_EMULATOR_HOST ||
+        config.PAYMENT_PROVIDER === 'sandbox' ||
+        config.FINANCE_SANDBOX_ENABLED ||
+        config.NOTIFICATION_CHANNEL_MODE === 'sandbox' ||
+        config.SANDBOX_WEBHOOK_SECRET ||
+        config.EXTENSIONS_SANDBOX_ENABLED
+      )
     ) {
       throw new ConfigurationError('Production forbids development documentation, emulators and sandbox providers');
+    }
+    if (deploymentTier === 'staging' && (config.SWAGGER_ENABLED || env.FIREBASE_AUTH_EMULATOR_HOST)) {
+      throw new ConfigurationError('Staging forbids development documentation and emulators');
     }
     if (config.CORS_ORIGINS.some(value => !value.startsWith('https://'))) throw new ConfigurationError('Production requires HTTPS CORS origins');
     if (new URL(config.DATABASE_URL).searchParams.get('sslmode') !== 'verify-full') {
       throw new ConfigurationError('Production database requires sslmode=verify-full');
     }
   }
-  return Object.freeze({ ...config, CORS_ORIGINS: Object.freeze(config.CORS_ORIGINS) });
+  return Object.freeze({ ...config, DEPLOYMENT_TIER: deploymentTier, CORS_ORIGINS: Object.freeze(config.CORS_ORIGINS) });
 }

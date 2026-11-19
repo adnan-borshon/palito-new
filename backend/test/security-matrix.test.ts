@@ -167,4 +167,5 @@ test("M9 SEC-LOG: logger redacts tokens, headers, secrets, and cookies cleanly",
   assert.doesNotMatch(combined, /secret-session-cookie/);
   assert.doesNotMatch(combined, /firebase-id-token-value/);
   assert.doesNotMatch(combined, /invite-secret-hex/);
+  assert.doesNotMatch(combined, /device-secret-hex/);
 });

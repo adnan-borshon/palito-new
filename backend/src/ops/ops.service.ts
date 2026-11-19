@@ -11,6 +11,7 @@ import { Prisma } from "../generated/prisma/client.js";
 import type { AccountPrincipal } from "../identity/accounts.js";
 import { administrator } from "../identity/staff.js";
 import { APP_CONFIG, type AppConfig } from "../platform/config.js";
+import { evaluatePilotOperationalHealth } from "../platform/deployment-preflight.js";
 import { DatabaseService } from "../platform/database.js";
 import type { PageDto } from "../care/dto.js";
 import type {
@@ -391,19 +392,28 @@ export class OpsService {
             where: { status: "PROCESSING", lockedUntil: { lt: now } },
           }),
         ]);
+      const outbox = {
+        pending,
+        processing,
+        completed,
+        deadLetter,
+        staleLeases,
+      };
       return {
         status: "ok",
         measuredAt: now.toISOString(),
+        deploymentTier: this.config.DEPLOYMENT_TIER,
+        healthcareNoChargePilot: this.config.HEALTHCARE_NO_CHARGE_PILOT,
         workerEnabled: this.config.WORKER_ENABLED,
         notificationChannelMode: this.config.NOTIFICATION_CHANNEL_MODE,
         financeSandboxEnabled: this.config.FINANCE_SANDBOX_ENABLED,
-        outbox: {
-          pending,
-          processing,
-          completed,
-          deadLetter,
-          staleLeases,
-        },
+        extensionsSandboxEnabled: this.config.EXTENSIONS_SANDBOX_ENABLED,
+        outbox,
+        pilotEvaluation: evaluatePilotOperationalHealth({
+          tier: this.config.DEPLOYMENT_TIER,
+          workerEnabled: this.config.WORKER_ENABLED,
+          outbox,
+        }),
       };
     });
   }

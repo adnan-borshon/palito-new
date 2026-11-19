@@ -2,13 +2,44 @@ import { pino, type DestinationStream, type Logger } from 'pino';
 import type { LoggerService } from '@nestjs/common';
 import type { AppConfig } from './config.js';
 
+const REDACTED_FIELDS = [
+  'password',
+  'token',
+  'authorization',
+  'cookie',
+  'phone',
+  'databaseUrl',
+  'idToken',
+  'accessToken',
+  'refreshToken',
+  'invitationToken',
+  'csrfToken',
+  'callToken',
+  'secret',
+  'provisioningSecret',
+  'deviceSecret',
+  'webhookSecret',
+  'signedUrl',
+  'otp',
+] as const;
+
+const REDACT_PATHS = [
+  ...REDACTED_FIELDS,
+  ...REDACTED_FIELDS.map((field) => `*.${field}`),
+  'req.headers.authorization',
+  'req.headers.cookie',
+  'req.headers["x-palito-device-secret"]',
+  'req.headers["x-csrf-token"]',
+  'req.headers["x-palito-webhook-signature"]',
+];
+
 export const APP_LOGGER = Symbol('APP_LOGGER');
 export function createLogger(config: AppConfig, destination?: DestinationStream): Logger {
   const options = {
     level: config.LOG_LEVEL,
     base: { service: 'palito-api' },
     redact: {
-      paths: ['password', 'token', 'authorization', 'cookie', 'phone', 'databaseUrl', '*.password', '*.token', '*.authorization', '*.cookie', '*.phone', '*.databaseUrl', 'req.headers.authorization', 'req.headers.cookie'],
+      paths: REDACT_PATHS,
       censor: '[REDACTED]',
     },
   };

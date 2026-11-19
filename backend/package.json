@@ -13,6 +13,7 @@
     "dev": "npm run build && node --env-file=.env --watch dist/main.js",
     "start": "node --env-file-if-exists=.env dist/main.js",
     "worker": "npm run build && node --env-file-if-exists=.env dist/worker.js",
+    "preflight:deploy": "npm run build && node --env-file-if-exists=.env scripts/verify-deployment-preflight.mjs",
     "rehearse:backup-restore": "node --env-file-if-exists=.env scripts/rehearse-backup-restore.mjs",
     "build": "npm run prisma:generate && tsc -p tsconfig.build.json",
     "typecheck": "npm run prisma:generate && tsc --noEmit",
