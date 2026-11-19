@@ -203,3 +203,83 @@ test("care workspace loads notifications, updates notify-v1 preferences, and mar
   await new Promise((r) => setImmediate(r));
   assert.ok(calls.some((c) => c.path === `/reminders/${reminderId}/adherence-events` && c.method === "POST"));
 });
+
+test("care workspace loads M8 published content, submits bounded AI triage, and views pharmacy catalog", async () => {
+  const calls: { path: string; method?: string; body?: unknown }[] = [];
+  const animalId = "00000000-0000-4000-8000-000000000301";
+  const transport: CareTransport = async <T>(path: string, request?: CareRequest) => {
+    calls.push({ path, method: request?.method, body: request?.body });
+    if (path === "/me") return profile as T;
+    if (path.startsWith("/animals?")) {
+      return {
+        items: [{ id: animalId, name: "Lal", tag: "TAG-1", species: "cattle", status: "ACTIVE", weightKg: "250" }],
+        nextCursor: null,
+      } as T;
+    }
+    if (path.startsWith("/content?")) {
+      return {
+        items: [
+          {
+            id: "c1",
+            slug: "heat-care",
+            titleBn: "গরমে যত্ন",
+            titleEn: "Summer Care",
+            bodyBn: "পর্যাপ্ত পানি দিন।",
+            bodyEn: "Ensure cool shade and water.",
+            category: "HEALTH",
+          },
+        ],
+        nextCursor: null,
+      } as T;
+    }
+    if (path === "/ai/requests" && request?.method === "POST") {
+      return {
+        guidanceText: "Observe temperature and book a vet consultation.",
+        uncertaintyNote: "Sandbox advisory only.",
+      } as T;
+    }
+    if (path.startsWith("/products?")) {
+      return {
+        items: [
+          {
+            id: "p1",
+            sku: "SKU-1",
+            nameBn: "ওআরএস",
+            nameEn: "Oral Rehydration",
+            category: "SUPPLEMENT",
+            requiresPrescription: false,
+            unitPriceMinor: "5000",
+            stockQuantity: 15,
+          },
+        ],
+        nextCursor: null,
+      } as T;
+    }
+    return { items: [], nextCursor: null } as T;
+  };
+
+  let seq = 0;
+  const workspace = new CareWorkspace(transport, () => `m8-${++seq}`, () => {});
+  await workspace.act(() => workspace.home());
+  workspace.view.actions.find((a) => a.label.includes("Published content"))!.run();
+  await new Promise((r) => setImmediate(r));
+  await new Promise((r) => setImmediate(r));
+  assert.match(workspace.view.title, /Published educational content/);
+  assert.equal(workspace.view.cards.length, 1);
+
+  await workspace.act(() => workspace.home());
+  workspace.view.actions.find((a) => a.label.includes("Pharmacy"))!.run();
+  await new Promise((r) => setImmediate(r));
+  await new Promise((r) => setImmediate(r));
+  assert.match(workspace.view.title, /Verified veterinary pharmacy/);
+
+  await workspace.act(() => workspace.home());
+  workspace.view.actions.find((a) => a.label.includes("AI triage"))!.run();
+  await new Promise((r) => setImmediate(r));
+  await workspace.submit({
+    animalId,
+    modality: "TEXT",
+    promptText: "Reduced appetite since morning",
+  });
+  assert.ok(calls.some((c) => c.path === "/ai/requests" && c.method === "POST"));
+});

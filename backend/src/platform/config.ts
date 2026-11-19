@@ -30,6 +30,7 @@ const schema = z.object({
   WORKER_ENABLED: z.enum(['true', 'false']).default('false').transform(value => value === 'true'),
   WORKER_POLL_MS: integer(5000, 500, 60000),
   WORKER_BATCH_SIZE: integer(25, 1, 100),
+  EXTENSIONS_SANDBOX_ENABLED: z.enum(['true', 'false']).default('false').transform(value => value === 'true'),
   DEMO_MODE: z.literal('false').default('false'),
 });
 
@@ -59,7 +60,8 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
       config.PAYMENT_PROVIDER === 'sandbox' ||
       config.FINANCE_SANDBOX_ENABLED ||
       config.NOTIFICATION_CHANNEL_MODE === 'sandbox' ||
-      config.SANDBOX_WEBHOOK_SECRET
+      config.SANDBOX_WEBHOOK_SECRET ||
+      config.EXTENSIONS_SANDBOX_ENABLED
     ) {
       throw new ConfigurationError('Production forbids development documentation, emulators and sandbox providers');
     }

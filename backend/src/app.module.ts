@@ -20,6 +20,8 @@ import { OpsService } from './ops/ops.service.js';
 import { OpsController } from './ops/ops.controller.js';
 import { FinanceService } from './finance/finance.service.js';
 import { FinanceController } from './finance/finance.controller.js';
+import { ExtensionsService } from './extensions/extensions.service.js';
+import { ExtensionsController } from './extensions/extensions.controller.js';
 
 @Module({})
 export class AppModule {
@@ -33,6 +35,7 @@ export class AppModule {
         CareController,
         OpsController,
         FinanceController,
+        ExtensionsController,
       ],
       providers: [
         { provide: APP_CONFIG, useValue: config },
@@ -46,6 +49,7 @@ export class AppModule {
         OutboxWorkerService,
         OpsService,
         FinanceService,
+        ExtensionsService,
         {
           provide: IDENTITY_VERIFIER,
           useClass:

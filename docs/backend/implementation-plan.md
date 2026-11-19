@@ -1,6 +1,6 @@
 # Backend implementation backlog
 
-Derived from the uploaded [source plan](source-plan.md), reconciled to source `b31b165bc92f2734776b608aeba241a6b9dd291e` on 2026-11-15. Engineering owns implementation/test evidence; product, clinical and partner policy owners are assigned in decisions. Read traceability for individual PAL IDs and planned acceptance tests. M0–M4 were delivered and reviewed; M5 (jobs, reminders & recovery), M6 (financial foundation & lending sandbox), and M7 (insurance & claim settlement sandbox) are implemented for review. See `progress.md`, `ops-m5.md`, `lending-m6.md`, and `insurance-m7.md` for actual evidence/limits. M8+ remain unimplemented.
+Derived from the uploaded [source plan](source-plan.md), reconciled to source `b31b165bc92f2734776b608aeba241a6b9dd291e` on 2026-11-15. Engineering owns implementation/test evidence; product, clinical and partner policy owners are assigned in decisions. Read traceability for individual PAL IDs and planned acceptance tests. M0–M9 (through extensions M8a–M8e and security QA M9) are implemented for review; M10 (deployment preparation & controlled pilot) remains stopped awaiting review and live-provider/partner gates. See `progress.md`, `extensions-m8.md`, and `qa-security-m9.md` for actual evidence/limits.
 
 Release A: identity + healthcare + reliable jobs; finance disabled or explicit sandbox. Release B: finance sandbox after approved terms/ledger/contracts. Release C: independently gated telemetry/AI/calls/commerce/reporting/provider pilot. These groups sequence all requirements; they do not remove any SRS/PAL scope. Initial API and conceptual tables are in architecture/API contracts; schema migrations are M2, not M0.
 
@@ -68,20 +68,17 @@ Release A: identity + healthcare + reliable jobs; finance disabled or explicit s
 **Exit:** approvals require authorized evidence review and maker/checker separation; allocations never exceed claim/debt; deceased animal cannot secure new borrowing; existing policy and debt history preserved.
 
 ### M8 — Remaining functional scope
-**Depends on:** relevant M3–7 contracts. Deliver each as its own milestone.
-- M8a telemetry: secure provisioning/binding, readings, event-time validation, replay resistance, retention, trends and tolerance-aware coverage. Handle stale data and device transfer. Automated claim decisions remain disabled pending validated policy.
-- M8b AI/voice/photo: server adapters, budgets, privacy, prompt/version tracking, vetted guidance and handoff; test Bangla/English, hostile inputs and provider outage. No autonomous clinical or financial authority.
-- M8c calls/emergencies: provider tokens limited to assigned appointment participants, reconnection, consent and expiry. Confirm actual emergency coverage before promising dispatch.
-- M8d commerce: catalog/stock, prescription item matching and dispensing limits, order/payment/fulfillment/refund lifecycle; trusted staff/provider advances delivery.
-- M8e administration/education/reporting: least-privilege user management, published-only content, audited exports, aggregates and real service metrics.
-**Exit:** each requirement has a real implementation or explicit deferral; mocks stay labeled; do not invent UC-004 because the matrix states it has no defined use case.
-**Skills:** relevant domain skill, provider docs, security and platform test tools.
+**Current status:** implemented for review behind `EXTENSIONS_SANDBOX_ENABLED=true`; actual contract in [extensions M8](extensions-m8.md).
+**Depends on:** relevant M3–7 contracts. Delivered across M8a–M8e:
+- M8a telemetry: device provisioning with SHA-256 secret verification, secret-authenticated telemetry ingestion, event-time window & replay checks, 7-day sample/missingness summary, farm dashboard counts, reviewed threshold alerts (`HIGH_TEMPERATURE`, `LOW_BATTERY`), and 4h worker escalation (`sweepAlerts`). Automated claim decisions remain disabled.
+- M8b AI/voice/photo: bounded AI triage (`ai-sandbox-v1`, 20/day budget), Bangla/English uncertainty & vet handoff, `VOICE` confirmed-transcript requirement, `PHOTO` `READY` private file validation, hostile override refusal (`sanitizeAiPrompt`), and provider outage fallback. Zero autonomous clinical or financial authority.
+- M8c calls/emergencies: participant-only call session tokens limited to accepted/in-progress consultations with active `CareGrant`, and emergency triage requests with honest real-time vet slot coverage reporting.
+- M8d commerce: versioned catalog, stock locking (`FOR UPDATE`), signed prescription medicine matching and cumulative dispensing cap, wallet/provider order settlement, paid cancellation refunds in ledger, and `ADMIN`-only fulfillment progression.
+- M8e administration/education/reporting: admin user directory, last-admin self-suspension guard, draft vs published educational content isolation, safe system aggregates, and audited SHA-256 expiring exports.
 
 ### M9 — System QA and security remediation
-**Depends on:** intended pilot scope implemented.
-**Work:** execute full API/database security matrix, cross-platform journeys, scanner triage, device accessibility and load/recovery tests. Fix actual defects and add regressions.
-**Exit:** UC-001/002/003 pass for enabled scope; no unresolved critical/high exploitable issue; residual risks have owner and release decision; unsupported hardware/provider checks are clearly listed.
-**Skills:** Palito backend; OWASP guidance; Playwright; Maestro; selected scanner; PostgreSQL performance skills.
+**Current status:** implemented for review in [QA & security M9](qa-security-m9.md), `backend/test/security-matrix.test.ts`, `backend/test/extensions.test.ts`, and `backend/test/integration/extensions.scenario.ts`.
+**Work:** automated security matrix (`SEC-DEMO`, `SEC-AUTH`, `SEC-INPUT`, `SEC-SCOPE`, `SEC-IOT`, `SEC-AI`, `SEC-LOG`), cross-tenant denial verification, strict mass-assignment refusal, and secret redaction checks. Unsupported physical-device and live-provider checks remain explicitly documented before M10.
 
 ### M10 — Deployment preparation and controlled pilot
 **Depends on:** M9 release evidence and business/provider readiness.
@@ -94,4 +91,4 @@ Release A: identity + healthcare + reliable jobs; finance disabled or explicit s
 
 Historical M3 boundary: M3 integrates Firebase verification and server-owned account/membership permissions, then real client session lifecycle and approved staff MFA. Review current provider prerequisites, emulator/project configuration, native SDK/device compatibility and the original B03–B06 gates. Do not treat synthetic UIDs, pending vet fixtures or database access as real identity verification. M3 must not silently implement all M4 care or M6 finance workflows.
 
-Current stop: user review after M5, M6, and M7. Do not implement M8 extensions until authorized.
+Current stop: user review after M8 and M9. Do not implement M10 deployment preparation until authorized.

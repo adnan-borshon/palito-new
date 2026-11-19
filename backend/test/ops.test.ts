@@ -80,6 +80,12 @@ test("ops-math: minimalNotificationCopy avoids clinical or PII content across al
     "CLAIM_VET_REVIEWED",
     "CLAIM_DECIDED",
     "CLAIM_SETTLED",
+    "DEVICE_ALERT_RAISED",
+    "DEVICE_ALERT_ESCALATION",
+    "EMERGENCY_TRIAGE_LOGGED",
+    "ORDER_PAID",
+    "ORDER_FULFILLMENT_UPDATED",
+    "ORDER_REFUNDED",
     "UNKNOWN_TOPIC_FALLBACK",
   ];
 

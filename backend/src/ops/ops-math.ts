@@ -193,6 +193,48 @@ export function minimalNotificationCopy(
         body: "স্যান্ডবক্স বীমা দাবির অর্থ ঋণ সমন্বয় ও লেজারে নিষ্পত্তি হয়েছে (উত্তোলনযোগ্য অর্থ নয়)। · Sandbox claim settlement allocated debt-first in the ledger.",
         urgent: false,
       };
+    case "DEVICE_ALERT_RAISED":
+      return {
+        category: "DEVICE_ALERT",
+        title: "পশুর টেলিমেট্রি সতর্কতা · Livestock sensor alert raised",
+        body: "ডিভাইস থেকে নতুন সতর্কতা পাওয়া গেছে। পালিতো অ্যাপে বিস্তারিত দেখুন। · A reviewed sensor alert rule triggered. Open Palito to review.",
+        urgent: true,
+      };
+    case "DEVICE_ALERT_ESCALATION":
+      return {
+        category: "ESCALATION",
+        title: "৪ ঘণ্টার জরুরি সতর্কতা বৃদ্ধি · 4h overdue device alert escalation",
+        body: "টেলিমেট্রি সতর্কতা ৪ ঘণ্টার বেশি সময় ধরে নিশ্চিত করা হয়নি। দ্রুত পরীক্ষা করুন। · An open device alert was not acknowledged within 4 hours.",
+        urgent: true,
+      };
+    case "EMERGENCY_TRIAGE_LOGGED":
+      return {
+        category: "EMERGENCY",
+        title: "জরুরি ট্রায়াজ অনুরোধ · Emergency triage request recorded",
+        body: "আপনার জরুরি পশুচিকিৎসা ট্রায়াজ অনুরোধ নথিভুক্ত হয়েছে। কভারেজ ও স্লট অ্যাপে দেখুন। · Your emergency veterinary triage request was recorded. Check coverage status in Palito.",
+        urgent: true,
+      };
+    case "ORDER_PAID":
+      return {
+        category: "COMMERCE",
+        title: "অর্ডার পেমেন্ট নিশ্চিত (স্যান্ডবক্স) · Sandbox order payment confirmed",
+        body: "আপনার অর্ডারের পেমেন্ট স্যান্ডবক্স লেজারে সমন্বয় হয়েছে। · Your sandbox pharmacy order payment has been confirmed.",
+        urgent: false,
+      };
+    case "ORDER_FULFILLMENT_UPDATED":
+      return {
+        category: "COMMERCE",
+        title: "অর্ডার ডেলিভারি আপডেট · Order fulfillment status updated",
+        body: "আপনার অর্ডারের ডেলিভারি অবস্থা হালনাগাদ হয়েছে। · Your order fulfillment status has been updated.",
+        urgent: false,
+      };
+    case "ORDER_REFUNDED":
+      return {
+        category: "COMMERCE",
+        title: "অর্ডার বাতিল ও রিফান্ড (স্যান্ডবক্স) · Sandbox order cancelled & refunded",
+        body: "বাতিলকৃত অর্ডারের অর্থ আপনার স্যান্ডবক্স ওয়ালেট লেজারে ফেরত দেওয়া হয়েছে। · Cancelled order funds were returned to your sandbox wallet ledger.",
+        urgent: false,
+      };
     default:
       return {
         category: "SYSTEM",

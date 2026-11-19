@@ -353,6 +353,8 @@ export class FinanceService {
         | "CARE_FEE"
         | "POLICY_PREMIUM"
         | "CLAIM_SETTLEMENT"
+        | "ORDER_PAYMENT"
+        | "ORDER_REFUND"
         | "REVERSAL"
         | "SANDBOX_TOPUP";
       referenceId: string;
@@ -392,6 +394,8 @@ export class FinanceService {
         | "CARE_FEE"
         | "POLICY_PREMIUM"
         | "CLAIM_SETTLEMENT"
+        | "ORDER_PAYMENT"
+        | "ORDER_REFUND"
         | "REVERSAL"
         | "SANDBOX_TOPUP";
       referenceId: string;
@@ -1849,6 +1853,49 @@ export class FinanceService {
           now,
         );
         ledgerTxId = settledClaim.ledgerTxId;
+      } else if (intent.kind === "ORDER_PAYMENT") {
+        await tx.$queryRaw`SELECT id FROM palito.orders WHERE id = ${intent.targetId}::uuid FOR UPDATE`;
+        const order = await tx.order.findUniqueOrThrow({
+          where: { id: intent.targetId },
+          include: { items: true },
+        });
+        if (order.status !== "PAYMENT_PENDING") {
+          throw new ConflictException("Order is not awaiting payment");
+        }
+        const clearingAccount = await this.ensureAccount(
+          tx,
+          "PROVIDER_CLEARING",
+        );
+        const escrowAccount = await this.ensureAccount(tx, "PLATFORM_ESCROW");
+        const ledgerTx = await this.postBalancedTransaction(tx, {
+          idempotencyKey: `payment-intent:${intent.id}`,
+          referenceKind: "ORDER_PAYMENT",
+          referenceId: intent.id,
+          description: `Sandbox commerce payment for order ${order.id}`,
+          debitAccountId: clearingAccount.id,
+          creditAccountId: escrowAccount.id,
+          amountMinor: intent.amountMinor,
+        });
+        ledgerTxId = ledgerTx.id;
+        await tx.order.update({
+          where: { id: order.id },
+          data: { status: "PAID", version: { increment: 1 } },
+        });
+        await tx.orderItem.updateMany({
+          where: { orderId: order.id, reservedStatus: "RESERVED" },
+          data: { reservedStatus: "COMMITTED" },
+        });
+        await OutboxWorkerService.enqueue(tx, {
+          topic: "ORDER_PAID",
+          dedupeKey: `order-paid:${order.id}`,
+          aggregateKind: "order",
+          aggregateId: order.id,
+          payload: {
+            recipientId: order.farmerId,
+            linkKind: "order",
+            linkId: order.id,
+          },
+        });
       }
 
       await tx.paymentIntent.update({

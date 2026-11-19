@@ -1,10 +1,11 @@
 # Palito backend review
 
-M5 (jobs, reminders & recovery), M6 (financial foundation & lending sandbox), and M7 (insurance & claim settlement sandbox) are implemented for review after verified M4. **Stop before M8.** Read [current progress](progress.md), [ops M5](ops-m5.md), [lending M6](lending-m6.md), [insurance M7](insurance-m7.md), [healthcare](healthcare.md), [identity](identity.md) and [runnable setup](../../backend/README.md). No production deployment/migration, merge, paid activation, real money transfer, or real OTP campaign is included.
+M5 (jobs, reminders & recovery), M6 (financial foundation & lending sandbox), M7 (insurance & claim settlement sandbox), M8 (telemetry/AI/calls/commerce/admin extensions), and M9 (system QA & security matrix) are implemented for review after verified M4. **Stop before M10.** Read [current progress](progress.md), [ops M5](ops-m5.md), [lending M6](lending-m6.md), [insurance M7](insurance-m7.md), [extensions M8](extensions-m8.md), [QA & security M9](qa-security-m9.md), [healthcare](healthcare.md), [identity](identity.md) and [runnable setup](../../backend/README.md). No production deployment/migration, merge, paid activation, real money transfer, or real OTP campaign is included.
 
 Real workspaces on web and Expo mobile are separate from preserved local demo routes:
-- `/care` includes M4 care plus M5 notification inbox, `notify-v1` channel preferences, and daily `Asia/Dhaka` reminder adherence. Booking defaults off (`HEALTHCARE_NO_CHARGE_PILOT=true` enables BDT 0 pilot only).
-- `/finance` exposes M6 lending & M7 insurance/claim settlement sandbox workflows (`FINANCE_SANDBOX_ENABLED=true`, default off `503`), clearly displaying non-withdrawable sandbox disclosures. IoT/AI/calls/commerce/admin extensions (`M8+`) remain stopped for review.
+- `/care` includes M4 care plus M5 notification inbox, `notify-v1` preferences, daily `Asia/Dhaka` adherence, and M8 published content, bounded AI triage, and pharmacy catalog/orders. Booking defaults off (`HEALTHCARE_NO_CHARGE_PILOT=true` enables BDT 0 pilot only).
+- `/finance` exposes M6 lending & M7 insurance/claim settlement sandbox workflows (`FINANCE_SANDBOX_ENABLED=true`, default off `503`), clearly displaying non-withdrawable sandbox disclosures.
+- M8 telemetry, AI, call tokens, commerce, and admin extensions fail closed (`503`) unless `EXTENSIONS_SANDBOX_ENABLED=true`. Production deployment preparation (`M10`) remains stopped for review.
 
 | Document | Purpose |
 |---|---|
@@ -12,10 +13,12 @@ Real workspaces on web and Expo mobile are separate from preserved local demo ro
 | [Ops M5](ops-m5.md) | Outbox worker, reminder/escalation sweeps, adherence, file cleanup, ops admin endpoints, backup rehearsal |
 | [Lending M6](lending-m6.md) | Opt-in sandbox gate, maker/checker valuations, 70% LTV cap, collateral locks, ledger triggers, HMAC webhooks |
 | [Insurance M7](insurance-m7.md) | Policy enrollment, confirmed-premium activation, vet referral/opinion, maker/checker claim decision, debt-first settlement |
+| [Extensions M8](extensions-m8.md) | Telemetry/alerts (M8a), bounded AI (M8b), call tokens/emergencies (M8c), commerce (M8d), admin content/exports (M8e) |
+| [QA & Security M9](qa-security-m9.md) | Automated security matrix (`SEC-DEMO`, `SEC-AUTH`, `SEC-INPUT`, `SEC-SCOPE`, `SEC-IOT`, `SEC-AI`, `SEC-LOG`) & residual boundaries |
 | [Healthcare](healthcare.md) | Actual M4 routes, consent, state/time rules and private file protocol |
 | [Identity](identity.md) / [M3 operator runbook](m3-operator-runbook.md) | Firebase, current memberships, staff MFA, sessions and live setup gates |
-| [Database](database.md) | Relational foundation and restricted roles; 8 migrations through M7 |
-| [Architecture](architecture.md) / [API contracts](api-contracts.md) | Baseline contracts superseded per milestone by `identity.md`, `healthcare.md`, `ops-m5.md`, `lending-m6.md`, `insurance-m7.md` |
+| [Database](database.md) | Relational foundation and restricted roles; 9 migrations through M8 |
+| [Architecture](architecture.md) / [API contracts](api-contracts.md) | Baseline contracts superseded per milestone by `identity.md`, `healthcare.md`, `ops-m5.md`, `lending-m6.md`, `insurance-m7.md`, `extensions-m8.md` |
 | [Traceability](requirements-traceability.md) / [Command inventory](command-inventory.md) | Preserved 65 PAL requirements and 53 demo command mappings |
 | [Decisions](decisions.md) / [Security](security.md) | Policy ownership, sandbox gates, and trust boundaries |
 | [Milestones](implementation-plan.md) / [Runbook](runbook.md) | Delivery gates, worker startup, and verification commands |

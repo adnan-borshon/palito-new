@@ -67,6 +67,6 @@ Domain contracts remain M0 design. M1 implements only GET `/api/v1/health/live`,
 
 Any method not listed remains denied until its feature contract is reviewed. No generic `/commands` endpoint and no global role overwrite route.
 
-## Actual M4–M7 contracts
+## Actual M4–M9 contracts
 
-See [healthcare](healthcare.md), [ops M5](ops-m5.md), [lending M6](lending-m6.md), and [insurance M7](insurance-m7.md) for implemented M4–M7 DTOs, headers (`Idempotency-Key`, `If-Match`, `X-Palito-Signature`), consent/permission rules, outbox recovery, and lending/insurance ledger sandbox contracts; [progress](progress.md) records actual checks. Existing M8+ proposals above remain future unimplemented contracts. Both `HEALTHCARE_NO_CHARGE_PILOT=true` and `FINANCE_SANDBOX_ENABLED=true` are explicit opt-in development/staging choices forbidden in production. Apply migrations 1–8 only to authorized development/test databases using the migration role. Stop for review before M8.
+See [healthcare](healthcare.md), [ops M5](ops-m5.md), [lending M6](lending-m6.md), [insurance M7](insurance-m7.md), [extensions M8](extensions-m8.md), and [QA & security M9](qa-security-m9.md) for implemented M4–M9 DTOs, headers (`Idempotency-Key`, `If-Match`, `X-Palito-Signature`, `X-Palito-Device-Secret`), consent/permission rules, outbox recovery, financial/extension sandboxes, and security matrix checks; [progress](progress.md) records actual checks. `HEALTHCARE_NO_CHARGE_PILOT=true`, `FINANCE_SANDBOX_ENABLED=true`, and `EXTENSIONS_SANDBOX_ENABLED=true` are explicit opt-in development/staging choices forbidden in production. Apply migrations 1–9 only to authorized development/test databases using the migration role. Stop for review before M10.

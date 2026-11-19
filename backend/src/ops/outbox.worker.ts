@@ -520,12 +520,75 @@ export class OutboxWorkerService implements OnApplicationShutdown {
     return `${this.config.NOTIFICATION_CHANNEL_MODE}:${item.dedupeKey}`;
   }
 
+  /**
+   * Escalates OPEN device alerts whose acknowledgement is overdue after 4 hours.
+   */
+  async sweepAlerts(
+    workerId: string,
+    now: Date = new Date(),
+  ): Promise<number> {
+    const fourHoursAgo = new Date(now.getTime() - 4 * 3_600_000);
+    return this.db.prisma.$transaction(async (tx) => {
+      const overdue = await tx.$queryRaw<
+        {
+          id: string;
+          animal_id: string;
+          farmer_id: string;
+        }[]
+      >`
+        SELECT id, animal_id, farmer_id
+        FROM palito.device_alerts
+        WHERE status = 'OPEN'
+          AND escalated_at IS NULL
+          AND created_at <= ${fourHoursAgo}
+        ORDER BY created_at ASC, id ASC
+        LIMIT 50
+        FOR UPDATE SKIP LOCKED
+      `;
+      for (const a of overdue) {
+        await tx.deviceAlert.update({
+          where: { id: a.id },
+          data: {
+            status: "ESCALATED",
+            escalatedAt: now,
+            version: { increment: 1 },
+          },
+        });
+        await this.enqueue(tx, {
+          topic: "DEVICE_ALERT_ESCALATION",
+          dedupeKey: `alert-escalation:${a.id}`,
+          aggregateKind: "device_alert",
+          aggregateId: a.id,
+          payload: {
+            recipientId: a.farmer_id,
+            alertId: a.id,
+            animalId: a.animal_id,
+            linkKind: "device_alert",
+            linkId: a.id,
+          },
+          nextAttemptAt: now,
+        });
+        await tx.auditEvent.create({
+          data: {
+            actorKind: "WORKER",
+            action: "ALERT_ESCALATED_4H",
+            targetKind: "device_alert",
+            targetId: a.id,
+            metadata: { workerId, animalId: a.animal_id },
+          },
+        });
+      }
+      return overdue.length;
+    });
+  }
+
   async runCycle(
     workerId = "palito-worker",
     now: Date = new Date(),
   ): Promise<{
     dueDispatched: number;
     escalated: number;
+    alertsEscalated: number;
     expiredFilesRemoved: number;
     batch: {
       reclaimed: number;
@@ -535,10 +598,12 @@ export class OutboxWorkerService implements OnApplicationShutdown {
     };
   }> {
     const reminders = await this.sweepReminders(workerId, now);
+    const alertsEscalated = await this.sweepAlerts(workerId, now);
     const expiredFilesRemoved = await this.cleanupExpiredFiles(workerId, now);
     const batch = await this.processBatch(workerId, { now });
     return {
       ...reminders,
+      alertsEscalated,
       expiredFilesRemoved,
       batch,
     };

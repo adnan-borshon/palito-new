@@ -384,6 +384,19 @@ export class CareWorkspace {
         this.action("বিজ্ঞপ্তি পছন্দ · Notification prefs", () =>
           this.preferencesForm(),
         ),
+        this.action("তথ্যভাণ্ডার · Published content", () =>
+          this.publishedContent(),
+        ),
+        ...(animals.length
+          ? [
+              this.action("এআই সহায়তা · AI triage (sandbox)", () =>
+                this.aiTriageForm(animals),
+              ),
+            ]
+          : []),
+        this.action("ফার্মেসি ও অর্ডার · Pharmacy & orders", () =>
+          this.pharmacyCatalog(),
+        ),
         ...(profile.memberships.some((m) => m.role === "VET")
           ? [
               this.action("Professional profile", () =>
@@ -1230,6 +1243,129 @@ export class CareWorkspace {
         await this.home();
       },
     );
+  }
+  async publishedContent() {
+    const page = await this.request<{
+      items: {
+        id: string;
+        slug: string;
+        titleBn: string;
+        titleEn: string;
+        bodyBn: string;
+        bodyEn: string;
+        category: string;
+      }[];
+    }>("/content?limit=25");
+    this.returnTo = () => this.publishedContent();
+    this.emit({
+      title: "তথ্যভাণ্ডার · Published educational content",
+      uploadAnimalId: null,
+      form: null,
+      image: null,
+      actions: [this.action("Back to workspace", () => this.home())],
+      cards: page.items.map((item) => ({
+        id: item.id,
+        title: `${item.titleBn} · ${item.titleEn}`,
+        lines: [`Category: ${item.category}`, item.bodyEn],
+        actions: [],
+      })),
+    });
+  }
+  async aiTriageForm(animals: CareAnimal[]) {
+    this.form(
+      "এআই সহায়তা · Bounded AI triage (advisory only, sandbox)",
+      [
+        select(
+          "animalId",
+          "Animal",
+          animals.map((a) => ({ value: a.id, label: `${a.name} (${a.tag})` })),
+        ),
+        select("modality", "Input modality", [
+          { value: "TEXT", label: "Text prompt" },
+          { value: "VOICE", label: "Confirmed voice transcript" },
+          { value: "PHOTO", label: "READY private animal photo" },
+        ]),
+        f("promptText", "Describe symptoms or question", "", "multiline"),
+      ],
+      async (v) => {
+        const res = await this.write<{
+          guidanceText: string;
+          uncertaintyNote: string;
+        }>("/ai/requests", {
+          animalId: v.animalId,
+          modality: v.modality,
+          promptText: v.promptText,
+          ...(v.modality === "VOICE"
+            ? { transcriptText: v.promptText, transcriptConfirmed: true }
+            : {}),
+          locale: "bn",
+        });
+        this.emit({
+          title: "এআই পরামর্শ · Bounded AI triage response",
+          form: null,
+          actions: [this.action("Back to workspace", () => this.home())],
+          cards: [
+            {
+              id: "ai-latest-response",
+              title: "Advisory guidance (consult a verified vet)",
+              lines: [res.guidanceText, res.uncertaintyNote],
+              actions: [],
+            },
+          ],
+        });
+      },
+    );
+  }
+  async pharmacyCatalog() {
+    const [productsPage, ordersPage] = await Promise.all([
+      this.request<{
+        items: {
+          id: string;
+          sku: string;
+          nameBn: string;
+          nameEn: string;
+          category: string;
+          requiresPrescription: boolean;
+          unitPriceMinor: string;
+          stockQuantity: number;
+        }[];
+      }>("/products?limit=25"),
+      this.request<{
+        items: {
+          id: string;
+          status: string;
+          totalMinor: string;
+          createdAt: string;
+        }[];
+      }>("/orders?limit=25"),
+    ]);
+    this.returnTo = () => this.pharmacyCatalog();
+    this.emit({
+      title: "ফার্মেসি ও অর্ডার · Verified veterinary pharmacy (sandbox)",
+      uploadAnimalId: null,
+      form: null,
+      image: null,
+      actions: [this.action("Back to workspace", () => this.home())],
+      cards: [
+        ...productsPage.items.map((p) => ({
+          id: p.id,
+          title: `${p.nameBn} · ${p.nameEn} (${p.sku})`,
+          lines: [
+            `Category: ${p.category} · Price: ${p.unitPriceMinor} poisha · Stock: ${p.stockQuantity}`,
+            p.requiresPrescription
+              ? "Prescription required (must match signed vet Rx)"
+              : "Over-the-counter veterinary supply",
+          ],
+          actions: [],
+        })),
+        ...ordersPage.items.map((o) => ({
+          id: o.id,
+          title: `Order ${o.status} · ${o.totalMinor} poisha`,
+          lines: [careTime(o.createdAt)],
+          actions: [],
+        })),
+      ],
+    });
   }
 }
 /** Small portable encoder avoids Node Buffer in native/browser bundles. */

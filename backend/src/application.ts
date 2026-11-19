@@ -33,7 +33,7 @@ export function configureApplication(app: INestApplication, config: AppConfig, l
     },
     credentials: true,
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'If-Match', 'X-CSRF-Token', 'X-Palito-Signature'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'If-Match', 'X-CSRF-Token', 'X-Palito-Signature', 'X-Palito-Device-Secret'],
     exposedHeaders: ['X-Request-Id'],
     maxAge: 600,
   });

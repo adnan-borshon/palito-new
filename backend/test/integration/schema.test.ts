@@ -71,7 +71,7 @@ after(async () => {
 
 test('clean official migrations and idempotent synthetic seed expose typed Prisma data with exact money/date values', async () => {
   const rows=await migrator.query('SELECT migration_name FROM palito._prisma_migrations ORDER BY migration_name');
-  assert.equal(rows.rowCount,8); assert.equal(await prisma.user.count(),4);
+  assert.equal(rows.rowCount,9); assert.equal(await prisma.user.count(),4);
   const animal=await prisma.animal.findUniqueOrThrow({where:{id:ids.animalA}});
   assert.equal(animal.estimateMinor,14000000n); assert.equal(animal.birthDate.toISOString(),'2020-01-01T00:00:00.000Z');
   assert.equal(animal.weightKg.toFixed(3),'450.000');
@@ -383,6 +383,10 @@ test('M6 lending & ledger sandbox: maker/checker valuations, redacted risk, 70% 
 
 test('M7 insurance & claim settlement sandbox: policy enrollment, confirmed premium, incident coverage, vet referral/opinion, maker/checker decision, deceased animal borrowing block & debt-first settlement',async()=>{
  const {insuranceScenario}=await import('./insurance.scenario.js');await insuranceScenario(prisma,urls(databaseName));
+});
+
+test('M8 extensions (telemetry, alerts, bounded AI, call tokens, commerce/refund, published content & exports) and M9 cross-tenant security isolation',async()=>{
+ const {extensionsScenario}=await import('./extensions.scenario.js');await extensionsScenario(prisma,urls(databaseName));
 });
 
 if(process.env.FIREBASE_AUTH_EMULATOR_HOST)test('M4 official Firebase phone/MFA HTTP workflow and raw private upload boundaries',async()=>{

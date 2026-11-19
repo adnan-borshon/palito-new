@@ -18,6 +18,7 @@ test('CORS uses exact origins and production forbids insecure development config
   assert.equal(testConfig(production).SWAGGER_ENABLED, false);
   assert.equal(testConfig(production).FINANCE_SANDBOX_ENABLED, false);
   assert.equal(testConfig(production).NOTIFICATION_CHANNEL_MODE, 'in-app-only');
+  assert.equal(testConfig(production).EXTENSIONS_SANDBOX_ENABLED, false);
   for (const env of [
     { SWAGGER_ENABLED: 'true' },
     { FIREBASE_AUTH_EMULATOR_HOST: 'localhost:9099' },
@@ -25,6 +26,7 @@ test('CORS uses exact origins and production forbids insecure development config
     { FINANCE_SANDBOX_ENABLED: 'true' },
     { NOTIFICATION_CHANNEL_MODE: 'sandbox' },
     { SANDBOX_WEBHOOK_SECRET: 'sandbox-webhook-secret-16+' },
+    { EXTENSIONS_SANDBOX_ENABLED: 'true' },
     { CORS_ORIGINS: 'http://localhost:3000' },
     { DATABASE_URL: 'postgresql://user:secret@db/palito' },
   ]) assert.throws(() => testConfig({ ...production, ...env }));
@@ -36,6 +38,7 @@ test('CORS uses exact origins and production forbids insecure development config
   assert.equal(defaults.WORKER_ENABLED, false);
   assert.equal(defaults.WORKER_POLL_MS, 5000);
   assert.equal(defaults.WORKER_BATCH_SIZE, 25);
+  assert.equal(defaults.EXTENSIONS_SANDBOX_ENABLED, false);
   const config = testConfig({ CORS_ORIGINS: 'http://localhost:3000' });
   assert.ok(Object.isFrozen(config)); assert.ok(Object.isFrozen(config.CORS_ORIGINS));
   assert.throws(()=>testConfig({NODE_ENV:'development'}),/dedicated palito_runtime role/);

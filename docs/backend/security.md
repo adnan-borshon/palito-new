@@ -43,13 +43,11 @@ Care/claim grant expiry, staff departure, account suspension, consent withdrawal
 
 Apply OWASP ASVS/API Security guidance to enabled API scope; guidance is not an installed scanner. Scan only authorized local/staging systems. Retention/deletion/consent policies need approval; amendments/reversals preserve necessary clinical/financial history. Do not declare legal compliance from this design.
 
-## M4–M7 enforced boundaries
+## M4–M9 enforced boundaries
 
-See [healthcare](healthcare.md), [ops M5](ops-m5.md), [lending M6](lending-m6.md), and [insurance M7](insurance-m7.md) for implemented DTOs, consent rules, outbox/ledger/claim invariants, client boundaries, and exact pilot/sandbox limits; [progress](progress.md) records executed checks.
-- Care booking defaults off (`HEALTHCARE_NO_CHARGE_PILOT=true` enables BDT 0 pilot only).
-- Lending, insurance policies/claims, wallet balances, and payment intents fail closed (`503`) unless `FINANCE_SANDBOX_ENABLED=true`, and production refuses `FINANCE_SANDBOX_ENABLED=true`, `PAYMENT_PROVIDER=sandbox`, `NOTIFICATION_CHANNEL_MODE=sandbox`, and `SANDBOX_WEBHOOK_SECRET`.
-- Bank risk projections (`/animals/:id/collateral-risk`) return redacted counts and exclude clinical notes/prescriptions (`clinicalDetailsRedacted: true`). Maker/checker enforces `assessorId !== approvedById` on bank valuations and `decidedById !== initiatingReviewerId` on insurer claim payout approvals.
-- Policy approval (`APPROVED_AWAITING_PREMIUM`) never activates coverage without confirmed premium payment. Claim evidence files require `READY` private uploads and grant download access only to the owner, the claim's active `INSURER_STAFF`, or the referred verified `VET` holding an active non-expired `ClaimReferralGrant`. Approved `DEATH` claims mark the animal `DECEASED` and settle debt-first under animal advisory locks.
-- Webhooks authenticate solely via HMAC-SHA256 canonical JSON signature (`X-Palito-Signature`) and deduplicate `(provider, externalEventId)` in `provider_events`.
-- M5 admin monitoring (`/admin/system-health`, `/admin/outbox/dead-letter`, `/admin/outbox/:id/retry`, `/admin/audit-events`) and M6 `/admin/ledger/reconciliation` enforce active `ADMIN` membership (with M3 MFA/recent auth). Notifications never leak clinical diagnoses or prescriptions.
-- Stop for review before M8 extensions.
+See [healthcare](healthcare.md), [ops M5](ops-m5.md), [lending M6](lending-m6.md), [insurance M7](insurance-m7.md), [extensions M8](extensions-m8.md), and [QA & security M9](qa-security-m9.md) for implemented DTOs, consent rules, outbox/ledger/claim/extension invariants, and security matrix verification; [progress](progress.md) records executed checks.
+- Care booking defaults off (`HEALTHCARE_NO_CHARGE_PILOT=true` enables BDT 0 pilot only); financial sandbox fails closed (`503`) unless `FINANCE_SANDBOX_ENABLED=true`; M8 extensions fail closed (`503`) unless `EXTENSIONS_SANDBOX_ENABLED=true`. Production rejects all sandbox, emulator, and swagger flags.
+- IoT ingestion (`POST /devices/:id/telemetry`) authenticates strictly via `X-Palito-Device-Secret`, `sessionEpoch`, monotonic `sequenceNumber`, owner continuity, and bounded event time (`+5m` / `-24h`).
+- AI endpoints enforce explicit voice confirmation (`transcriptConfirmed=true`), prompt sanitization (`sanitizeAiPrompt`), 20/day budget, and zero autonomous clinical/financial authority. Call tokens require consultation participants + active `CareGrant`. Commerce fulfillment transitions deny farmers (`403`) and enforce cumulative prescription limits.
+- M9 security matrix (`security-matrix.test.ts`, `extensions.scenario.ts`) exercises `SEC-DEMO`, `SEC-AUTH`, `SEC-INPUT`, `SEC-SCOPE`, `SEC-IOT`, `SEC-AI`, and `SEC-LOG`, and `staff.controller.ts` blocks self-suspension or suspending the last active admin.
+- Stop for review before M10 deployment preparation.

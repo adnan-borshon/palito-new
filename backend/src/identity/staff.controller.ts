@@ -38,6 +38,13 @@ export class StaffController {
     administrator(req.principal);
     if(id===req.principal.userId) throw new ForbiddenException();
     await this.db.prisma.$transaction(async tx=>{
+      if (body.status === 'SUSPENDED') {
+        const targetIsAdmin = await tx.membership.count({ where: { userId: id, role: 'ADMIN', status: 'ACTIVE', organization: { kind: 'PLATFORM', status: 'ACTIVE' } } });
+        if (targetIsAdmin > 0) {
+          const otherAdmins = await tx.membership.count({ where: { userId: { not: id }, role: 'ADMIN', status: 'ACTIVE', user: { status: 'ACTIVE' }, organization: { kind: 'PLATFORM', status: 'ACTIVE' } } });
+          if (otherAdmins === 0) throw new ForbiddenException();
+        }
+      }
       await tx.user.update({where:{id},data:{status:body.status,tokensRevokedAfter:new Date()}});
       await tx.webSession.updateMany({where:{user:{id},revokedAt:null},data:{revokedAt:new Date()}});
       await tx.identityAudit.create({data:{actorId:req.principal.userId,subjectId:id,action:`ACCOUNT_${body.status}`}});
