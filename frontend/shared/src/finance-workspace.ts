@@ -98,6 +98,72 @@ export interface FinanceLoan {
   installments?: FinanceInstallment[];
 }
 
+export interface FinancePolicy {
+  id: string;
+  animalId: string;
+  farmerId: string;
+  insurerOrganizationId: string;
+  evidenceFileId: string | null;
+  renewedFromPolicyId: string | null;
+  policyVersion: number;
+  termVersion: string;
+  consentVersion: string;
+  coverageMinor: string;
+  premiumMinor: string;
+  termMonths: number;
+  waitingDays: number;
+  currency: string;
+  status: string;
+  decisionNote: string;
+  startsAt: string | null;
+  endsAt: string | null;
+  version: number;
+  createdAt: string;
+}
+
+export interface FinanceClaimReview {
+  id: string;
+  authorId: string;
+  authorRole: string;
+  kind: string;
+  recommendation: string;
+  notes: string;
+  createdAt: string;
+}
+
+export interface FinanceClaimAllocation {
+  id: string;
+  claimId: string;
+  loanId: string | null;
+  debtAllocatedMinor: string;
+  farmerAllocatedMinor: string;
+  totalSettledMinor: string;
+  currency: string;
+}
+
+export interface FinanceClaim {
+  id: string;
+  policyId: string;
+  animalId: string;
+  farmerId: string;
+  insurerOrganizationId: string;
+  incidentKind: string;
+  incidentAt: string;
+  description: string;
+  claimedAmountMinor: string;
+  approvedAmountMinor: string | null;
+  currency: string;
+  status: string;
+  reviewTargetAt: string;
+  decisionNote: string;
+  version: number;
+  createdAt: string;
+  evidenceLinks?: { id: string; fileId: string }[];
+  reviews?: FinanceClaimReview[];
+  referralGrants?: { id: string; vetId: string; status: string; expiresAt: string }[];
+  settlementAllocation?: FinanceClaimAllocation | null;
+}
+
 export interface FinanceWallet {
   accountCode: string;
   balanceMinor: string;
@@ -345,6 +411,10 @@ export class FinanceWorkspace {
       form: null,
       actions: [
         this.action("রিলোড · Refresh", () => this.home()),
+        this.action(
+          "বীমা ও দাবি স্যান্ডবক্স · Insurance & claims",
+          () => this.insuranceHome(),
+        ),
         ...(animalsPage.items.length
           ? [
               this.action(
@@ -761,5 +831,374 @@ export class FinanceWorkspace {
         },
       ],
     });
+  }
+
+  async insuranceHome() {
+    const profile = await this.request<CareProfile>("/me");
+    const [policiesPage, claimsPage] = await Promise.all([
+      this.request<CarePage<FinancePolicy>>("/policies?limit=25"),
+      this.request<CarePage<FinanceClaim>>("/claims?limit=25"),
+    ]);
+    const isInsurerStaff = profile.memberships.some(
+      (m) => m.role === "INSURER_STAFF",
+    );
+    const isVet = profile.memberships.some((m) => m.role === "VET");
+
+    this.emit({
+      profile,
+      title: "স্যান্ডবক্স বীমা ও দাবি · Insurance & claim settlement sandbox",
+      notice:
+        "Insurance sandbox (ins-sandbox-v1): policy activation requires confirmed premium; death claims require private READY evidence, review/referral, maker/checker separation, and debt-first ledger settlement.",
+      form: null,
+      actions: [
+        this.action("Back to finance sandbox", () => this.home()),
+        this.action("Refresh insurance", () => this.insuranceHome()),
+        this.action("নতুন বীমা আবেদন · Apply for policy", async () =>
+          this.applyPolicyForm(),
+        ),
+      ],
+      cards: [
+        ...policiesPage.items.map((policy) =>
+          this.policyCard(policy, profile, isInsurerStaff),
+        ),
+        ...claimsPage.items.map((claim) =>
+          this.claimCard(claim, profile, isInsurerStaff, isVet),
+        ),
+      ],
+    });
+  }
+
+  private policyCard(
+    policy: FinancePolicy,
+    profile: CareProfile,
+    isInsurerStaff: boolean,
+  ): CareCard {
+    const isOwner = policy.farmerId === profile.userId;
+    return {
+      id: policy.id,
+      title: `বীমা পলিসি · Policy v${policy.policyVersion} · ${policy.status} · Coverage ${formatMinorBdt(policy.coverageMinor)}`,
+      lines: [
+        `Premium: ${formatMinorBdt(policy.premiumMinor)} · Term: ${policy.termMonths} month(s) (${policy.termVersion})`,
+        policy.startsAt && policy.endsAt
+          ? `Active window: ${careTime(policy.startsAt)} → ${careTime(policy.endsAt)}`
+          : "Coverage window activates only after premium confirmation.",
+        ...(policy.decisionNote ? [`Insurer note: ${policy.decisionNote}`] : []),
+      ],
+      actions: [
+        ...(isInsurerStaff && policy.status === "SUBMITTED"
+          ? [
+              this.action("Approve policy (awaiting premium)", async () =>
+                this.decidePolicyForm(policy, "approve"),
+              ),
+              this.action("Reject policy", async () =>
+                this.decidePolicyForm(policy, "reject"),
+              ),
+            ]
+          : []),
+        ...(isOwner && policy.status === "APPROVED_AWAITING_PREMIUM"
+          ? [
+              this.action("Pay premium from sandbox wallet", async () => {
+                await this.write(
+                  `/policies/${policy.id}/premium-intents`,
+                  { provider: "WALLET" },
+                  policy.version,
+                );
+                await this.insuranceHome();
+              }),
+              this.action("Create sandbox premium intent", async () => {
+                await this.write(
+                  `/policies/${policy.id}/premium-intents`,
+                  { provider: "SANDBOX_SIMULATOR" },
+                  policy.version,
+                );
+                await this.insuranceHome();
+              }),
+            ]
+          : []),
+        ...(isOwner && policy.status === "ACTIVE"
+          ? [
+              this.action("Submit death claim", async () =>
+                this.submitClaimForm(policy),
+              ),
+            ]
+          : []),
+        ...(isOwner && policy.status === "EXPIRED"
+          ? [
+              this.action("Renew policy", async () =>
+                this.renewPolicyForm(policy),
+              ),
+            ]
+          : []),
+      ],
+    };
+  }
+
+  private claimCard(
+    claim: FinanceClaim,
+    profile: CareProfile,
+    isInsurerStaff: boolean,
+    isVet: boolean,
+  ): CareCard {
+    const alloc = claim.settlementAllocation;
+    return {
+      id: claim.id,
+      title: `বীমা দাবি · Claim (${claim.incidentKind}) · ${claim.status} · Claimed ${formatMinorBdt(claim.claimedAmountMinor)}`,
+      lines: [
+        `Incident: ${careTime(claim.incidentAt)} · 7-day review target: ${careTime(claim.reviewTargetAt)}`,
+        `Description: ${claim.description}`,
+        `Evidence files: ${claim.evidenceLinks?.length ?? 0} · Reviews/opinions: ${claim.reviews?.length ?? 0}`,
+        ...(claim.approvedAmountMinor
+          ? [`Approved payout: ${formatMinorBdt(claim.approvedAmountMinor)}`]
+          : []),
+        ...(alloc
+          ? [
+              `Debt-first settlement: Loan debt paid ${formatMinorBdt(alloc.debtAllocatedMinor)} · Farmer remainder ${formatMinorBdt(alloc.farmerAllocatedMinor)}`,
+            ]
+          : []),
+      ],
+      actions: [
+        ...(isInsurerStaff &&
+        ["SUBMITTED", "UNDER_REVIEW"].includes(claim.status)
+          ? [
+              this.action("Run advisory review check", async () => {
+                await this.write(
+                  `/claims/${claim.id}/review-requests`,
+                  {},
+                  claim.version,
+                );
+                await this.insuranceHome();
+              }),
+              this.action("Refer claim to verified vet", async () =>
+                this.referClaimForm(claim),
+              ),
+            ]
+          : []),
+        ...(isVet && claim.status === "REFERRED_TO_VET"
+          ? [
+              this.action("Submit vet clinical opinion", async () =>
+                this.vetOpinionForm(claim),
+              ),
+            ]
+          : []),
+        ...(isInsurerStaff &&
+        ["UNDER_REVIEW", "VET_REVIEWED"].includes(claim.status)
+          ? [
+              this.action("Approve claim (maker/checker)", async () =>
+                this.decideClaimForm(claim, "approve"),
+              ),
+              this.action("Reject claim", async () =>
+                this.decideClaimForm(claim, "reject"),
+              ),
+            ]
+          : []),
+        ...(isInsurerStaff && claim.status === "APPROVED"
+          ? [
+              this.action("Settle claim (debt-first ledger)", async () => {
+                await this.write(
+                  `/claims/${claim.id}/settlements`,
+                  { provider: "WALLET" },
+                  claim.version,
+                );
+                await this.insuranceHome();
+              }),
+            ]
+          : []),
+      ],
+    };
+  }
+
+  private applyPolicyForm() {
+    this.openForm(
+      "নতুন বীমা আবেদন · Apply for sandbox livestock insurance (ins-sandbox-v1)",
+      [
+        f("animalId", "Animal UUID"),
+        f("insurerOrganizationId", "Insurer organization UUID"),
+        f("coverageMinor", "Coverage amount in poisha", "8000000", "number"),
+        f("premiumMinor", "Premium amount in poisha", "200000", "number"),
+        select("termMonths", "Coverage term (months)", [
+          { value: "6", label: "6 months" },
+          { value: "12", label: "12 months" },
+        ]),
+        f("evidenceFileId", "Optional READY evidence file UUID", "", "text", true),
+      ],
+      async (v) => {
+        await this.write("/policies", {
+          animalId: v.animalId,
+          insurerOrganizationId: v.insurerOrganizationId,
+          coverageMinor: v.coverageMinor,
+          premiumMinor: v.premiumMinor,
+          termMonths: Number(v.termMonths),
+          ...(v.evidenceFileId?.trim()
+            ? { evidenceFileId: v.evidenceFileId.trim() }
+            : {}),
+          consent: true,
+          consentVersion: "ins-sandbox-v1",
+        });
+        await this.insuranceHome();
+      },
+    );
+  }
+
+  private decidePolicyForm(
+    policy: FinancePolicy,
+    decision: "approve" | "reject",
+  ) {
+    this.openForm(
+      `${decision === "approve" ? "Approve" : "Reject"} insurance policy`,
+      [f("note", "Decision note", "", "multiline")],
+      async (v) => {
+        await this.write(
+          `/policies/${policy.id}/decision`,
+          { decision, note: v.note },
+          policy.version,
+        );
+        await this.insuranceHome();
+      },
+    );
+  }
+
+  private renewPolicyForm(policy: FinancePolicy) {
+    this.openForm(
+      "পলিসি নবায়ন · Renew expired insurance policy (ins-sandbox-v1)",
+      [
+        f(
+          "coverageMinor",
+          "Coverage amount in poisha",
+          policy.coverageMinor,
+          "number",
+        ),
+        f(
+          "premiumMinor",
+          "Premium amount in poisha",
+          policy.premiumMinor,
+          "number",
+        ),
+        select("termMonths", "Coverage term (months)", [
+          { value: "6", label: "6 months" },
+          { value: "12", label: "12 months" },
+        ]),
+      ],
+      async (v) => {
+        await this.write(`/policies/${policy.id}/renewals`, {
+          coverageMinor: v.coverageMinor,
+          premiumMinor: v.premiumMinor,
+          termMonths: Number(v.termMonths),
+          consent: true,
+          consentVersion: "ins-sandbox-v1",
+        });
+        await this.insuranceHome();
+      },
+    );
+  }
+
+  private submitClaimForm(policy: FinancePolicy) {
+    this.openForm(
+      "বীমা দাবি জমা · Submit mortality claim with READY private evidence",
+      [
+        f(
+          "incidentAt",
+          "Incident UTC timestamp (within active coverage)",
+          new Date().toISOString(),
+        ),
+        f(
+          "claimedAmountMinor",
+          `Claimed amount in poisha (<= ${policy.coverageMinor})`,
+          policy.coverageMinor,
+          "number",
+        ),
+        f("evidenceFileId", "READY private evidence file UUID"),
+        f("description", "Incident description", "", "multiline"),
+      ],
+      async (v) => {
+        await this.write("/claims", {
+          policyId: policy.id,
+          incidentKind: "DEATH",
+          incidentAt: v.incidentAt,
+          claimedAmountMinor: v.claimedAmountMinor,
+          description: v.description,
+          evidenceFileIds: [v.evidenceFileId!.trim()],
+        });
+        await this.insuranceHome();
+      },
+    );
+  }
+
+  private referClaimForm(claim: FinanceClaim) {
+    this.openForm(
+      "পশুচিকিৎসকের কাছে রেফার · Refer claim to verified veterinarian",
+      [
+        f("vetId", "Verified veterinarian user UUID"),
+        f("note", "Referral scope and instruction", "", "multiline"),
+      ],
+      async (v) => {
+        await this.write(
+          `/claims/${claim.id}/referrals`,
+          { vetId: v.vetId, note: v.note, expiresInHours: 72 },
+          claim.version,
+        );
+        await this.insuranceHome();
+      },
+    );
+  }
+
+  private vetOpinionForm(claim: FinanceClaim) {
+    this.openForm(
+      "ক্লিনিক্যাল মতামত · Submit referred veterinarian clinical opinion",
+      [
+        select("recommendation", "Clinical recommendation", [
+          { value: "CONFIRM_MORTALITY", label: "Confirm mortality evidence" },
+          { value: "INCONCLUSIVE", label: "Inconclusive evidence" },
+          { value: "REJECT_EVIDENCE", label: "Reject inconsistent evidence" },
+        ]),
+        f("clinicalOpinion", "Signed clinical assessment", "", "multiline"),
+      ],
+      async (v) => {
+        await this.write(
+          `/claims/${claim.id}/opinions`,
+          {
+            recommendation: v.recommendation,
+            clinicalOpinion: v.clinicalOpinion,
+          },
+          claim.version,
+        );
+        await this.insuranceHome();
+      },
+    );
+  }
+
+  private decideClaimForm(
+    claim: FinanceClaim,
+    decision: "approve" | "reject",
+  ) {
+    this.openForm(
+      `${decision === "approve" ? "Approve" : "Reject"} insurance claim (maker/checker)`,
+      [
+        ...(decision === "approve"
+          ? [
+              f(
+                "approvedAmountMinor",
+                `Approved payout in poisha (<= ${claim.claimedAmountMinor})`,
+                claim.claimedAmountMinor,
+                "number",
+              ),
+            ]
+          : []),
+        f("reason", "Decision reason", "", "multiline"),
+      ],
+      async (v) => {
+        await this.write(
+          `/claims/${claim.id}/decision`,
+          {
+            decision,
+            ...(decision === "approve"
+              ? { approvedAmountMinor: v.approvedAmountMinor }
+              : {}),
+            reason: v.reason,
+          },
+          claim.version,
+        );
+        await this.insuranceHome();
+      },
+    );
   }
 }

@@ -1,6 +1,6 @@
 # Backend implementation backlog
 
-Derived from the uploaded [source plan](source-plan.md), reconciled to source `b31b165bc92f2734776b608aeba241a6b9dd291e` on 2026-11-15. Engineering owns implementation/test evidence; product, clinical and partner policy owners are assigned in decisions. Read traceability for individual PAL IDs and planned acceptance tests. M0–M4 were delivered and reviewed; M5 (jobs, reminders & recovery) and M6 (financial foundation & lending sandbox) are implemented for review. See `progress.md`, `ops-m5.md`, and `lending-m6.md` for actual evidence/limits. M7+ remain unimplemented.
+Derived from the uploaded [source plan](source-plan.md), reconciled to source `b31b165bc92f2734776b608aeba241a6b9dd291e` on 2026-11-15. Engineering owns implementation/test evidence; product, clinical and partner policy owners are assigned in decisions. Read traceability for individual PAL IDs and planned acceptance tests. M0–M4 were delivered and reviewed; M5 (jobs, reminders & recovery), M6 (financial foundation & lending sandbox), and M7 (insurance & claim settlement sandbox) are implemented for review. See `progress.md`, `ops-m5.md`, `lending-m6.md`, and `insurance-m7.md` for actual evidence/limits. M8+ remain unimplemented.
 
 Release A: identity + healthcare + reliable jobs; finance disabled or explicit sandbox. Release B: finance sandbox after approved terms/ledger/contracts. Release C: independently gated telemetry/AI/calls/commerce/reporting/provider pilot. These groups sequence all requirements; they do not remove any SRS/PAL scope. Initial API and conceptual tables are in architecture/API contracts; schema migrations are M2, not M0.
 
@@ -60,12 +60,12 @@ Release A: identity + healthcare + reliable jobs; finance disabled or explicit s
 **Exit:** ledger, schedules and allocations reconcile (`balanced: true`); production forbids `FINANCE_SANDBOX_ENABLED`, `PAYMENT_PROVIDER=sandbox`, and `SANDBOX_WEBHOOK_SECRET`; B08–B10 partner terms remain required before real-money launch.
 
 ### M7 — Insurance and claim settlement sandbox
+**Current status:** implemented for review behind `FINANCE_SANDBOX_ENABLED=true` (`ins-sandbox-v1`); actual contract in [insurance M7](insurance-m7.md), checks in [progress](progress.md).
 **Depends on:** M6 ledger/loan contracts.
 **Submilestones:** enrollment/premium/coverage; private claim evidence; referral/review/appeal; settlement.
-**Work:** incident-time eligibility, coverage version, reviewer permissions, seven-day review target and notification rules. Distinguish policy decision from confirmed premium. Approve/settle with audit trails. Atomically allocate approved funds to eligible debt and remainder, then perform external effects durably.
-**Tests planned:** expired/renewed policy boundary, repeat illness claim policy, unauthorized vet review, simultaneous repayment and claim settlement, partial settlement, callback duplication and unsupported evidence.
-**Exit:** approvals require authorized evidence review; allocations never exceed claim/debt; deceased animal cannot secure new borrowing; existing policy and debt history preserved.
-**Skills:** Palito backend, PostgreSQL, security guidance and browser tests.
+**Work:** incident-time eligibility, `ins-sandbox-v1` coverage version, confirmed-premium activation (`APPROVED_AWAITING_PREMIUM -> ACTIVE`), policy renewal, READY private evidence linkage, 7-day review target tracking, advisory review, verified vet referral & signed clinical opinion, maker/checker claim decision, deceased animal status transition blocking new borrowing/insurance, and atomic debt-first claim settlement (`allocateClaimSettlement`) across `INSURER_POOL`, `BANK_POOL`, and `USER_WALLET`.
+**Tests:** unit/math/DTO/HTTP tests (`finance.test.ts`), shared `FinanceWorkspace` insurance tests (`finance-workspace.test.ts`), and PostgreSQL integration suite (`insurance.scenario.ts`, requires CI/PostgreSQL).
+**Exit:** approvals require authorized evidence review and maker/checker separation; allocations never exceed claim/debt; deceased animal cannot secure new borrowing; existing policy and debt history preserved.
 
 ### M8 — Remaining functional scope
 **Depends on:** relevant M3–7 contracts. Deliver each as its own milestone.
@@ -94,4 +94,4 @@ Release A: identity + healthcare + reliable jobs; finance disabled or explicit s
 
 Historical M3 boundary: M3 integrates Firebase verification and server-owned account/membership permissions, then real client session lifecycle and approved staff MFA. Review current provider prerequisites, emulator/project configuration, native SDK/device compatibility and the original B03–B06 gates. Do not treat synthetic UIDs, pending vet fixtures or database access as real identity verification. M3 must not silently implement all M4 care or M6 finance workflows.
 
-Current stop: user review after M5 and M6. Do not implement M7 insurance/claims until authorized.
+Current stop: user review after M5, M6, and M7. Do not implement M8 extensions until authorized.

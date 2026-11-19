@@ -175,3 +175,36 @@ export function verifyWebhookSignature(
   if (expected.length !== provided.length) return false;
   return timingSafeEqual(expected, provided);
 }
+
+export interface ClaimSettlementSplit {
+  debtPayoffMinor: bigint;
+  farmerRemainderMinor: bigint;
+  totalSettledMinor: bigint;
+}
+
+/**
+ * Computes deterministic debt-first claim settlement allocation:
+ * existing eligible debt on the insured animal is satisfied first (`min(approvedAmountMinor, currentDebtMinor)`),
+ * and the exact non-negative remainder is allocated to the farmer (`approvedAmountMinor - debtPayoffMinor`).
+ */
+export function allocateClaimSettlement(
+  approvedAmountMinor: bigint,
+  currentDebtMinor: bigint,
+): ClaimSettlementSplit {
+  if (approvedAmountMinor <= 0n) {
+    throw new RangeError("approvedAmountMinor must be positive");
+  }
+  if (currentDebtMinor < 0n) {
+    throw new RangeError("currentDebtMinor cannot be negative");
+  }
+  const debtPayoffMinor =
+    approvedAmountMinor < currentDebtMinor
+      ? approvedAmountMinor
+      : currentDebtMinor;
+  const farmerRemainderMinor = approvedAmountMinor - debtPayoffMinor;
+  return {
+    debtPayoffMinor,
+    farmerRemainderMinor,
+    totalSettledMinor: approvedAmountMinor,
+  };
+}

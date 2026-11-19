@@ -98,6 +98,13 @@ model User {
   loansAsOfficer Loan[] @relation("LoanAssignedOfficer")
   loansDecided Loan[] @relation("LoanDecider")
   collateralReservations CollateralReservation[]
+  policiesAsFarmer InsurancePolicy[] @relation("PolicyFarmer")
+  policiesDecided InsurancePolicy[] @relation("PolicyDecider")
+  claimsAsFarmer InsuranceClaim[] @relation("ClaimFarmer")
+  claimsDecided InsuranceClaim[] @relation("ClaimDecider")
+  claimReferralsAsVet ClaimReferralGrant[] @relation("ClaimReferralVet")
+  claimReferralsCreated ClaimReferralGrant[] @relation("ClaimReferralAuthor")
+  claimReviews ClaimReview[]
 
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tokensRevokedAfter DateTime? @map("tokens_revoked_after") @db.Timestamptz(3)
@@ -139,6 +146,9 @@ model Organization {
   loanQuotes LoanQuote[]
   loans Loan[]
   collateralReservations CollateralReservation[]
+  insurancePolicies InsurancePolicy[]
+  insuranceClaims InsuranceClaim[]
+  claimSettlementAllocations ClaimSettlementAllocation[]
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   kind OrganizationKind
   name String @db.VarChar(160)
@@ -227,6 +237,9 @@ model Animal {
   loanQuotes LoanQuote[]
   loans Loan[]
   collateralReservations CollateralReservation[]
+  insurancePolicies InsurancePolicy[]
+  insuranceClaims InsuranceClaim[]
+  claimReferralGrants ClaimReferralGrant[]
 
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   farmId String @map("farm_id") @db.Uuid
@@ -494,6 +507,8 @@ model PrivateFile {
   uploader User @relation("Uploader",fields:[uploaderId],references:[id],onDelete:Restrict,onUpdate:NoAction)
   owner User @relation("FileOwner",fields:[ownerAtUploadId],references:[id],onDelete:Restrict,onUpdate:NoAction)
   photos Animal[] @relation("AnimalPhoto")
+  policyEvidences InsurancePolicy[] @relation("PolicyEvidenceFile")
+  claimEvidences ClaimEvidenceLink[]
   @@index([animalId,status,createdAt])
   @@map("private_files")
   @@schema("palito")
@@ -683,6 +698,7 @@ model LedgerTransaction {
   reversedBy LedgerTransaction? @relation("LedgerReversal")
   entries LedgerEntry[]
   paymentIntent PaymentIntent?
+  claimSettlementAllocation ClaimSettlementAllocation?
   @@index([referenceKind, referenceId])
   @@map("ledger_transactions")
   @@schema("palito")
@@ -725,6 +741,8 @@ model PaymentIntent {
   ledgerTx LedgerTransaction? @relation(fields:[ledgerTxId],references:[id],onDelete:Restrict,onUpdate:NoAction)
   providerEvents ProviderEvent[]
   allocations RepaymentAllocation[]
+  premiumPolicy InsurancePolicy? @relation("PolicyPremiumIntent")
+  claimSettlementAllocation ClaimSettlementAllocation?
   @@unique([actorId, kind, idempotencyKey])
   @@index([targetKind, targetId, createdAt])
   @@map("payment_intents")
@@ -812,6 +830,7 @@ model Loan {
   collateralReservation CollateralReservation?
   installments LoanInstallment[]
   allocations RepaymentAllocation[]
+  claimSettlementAllocations ClaimSettlementAllocation[]
   @@index([farmerId, createdAt, id])
   @@index([bankOrganizationId, status, createdAt])
   @@map("loans")
@@ -884,5 +903,155 @@ model FinanceCommand {
   actor User @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
   @@id([actorId, key])
   @@map("finance_commands")
+  @@schema("palito")
+}
+
+model InsurancePolicy {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  animalId String @map("animal_id") @db.Uuid
+  farmerId String @map("farmer_id") @db.Uuid
+  insurerOrganizationId String @map("insurer_organization_id") @db.Uuid
+  evidenceFileId String? @map("evidence_file_id") @db.Uuid
+  renewedFromPolicyId String? @unique @map("renewed_from_policy_id") @db.Uuid
+  policyVersion Int @default(1) @map("policy_version")
+  termVersion String @default("ins-sandbox-v1") @map("term_version") @db.VarChar(32)
+  consentVersion String @default("ins-sandbox-v1") @map("consent_version") @db.VarChar(32)
+  coverageMinor BigInt @map("coverage_minor")
+  premiumMinor BigInt @map("premium_minor")
+  termMonths Int @map("term_months")
+  waitingDays Int @default(0) @map("waiting_days")
+  currency String @default("BDT") @db.Char(3)
+  status String @default("SUBMITTED") @db.VarChar(32)
+  decisionNote String @default("") @map("decision_note") @db.VarChar(1000)
+  decidedById String? @map("decided_by_id") @db.Uuid
+  decidedAt DateTime? @map("decided_at") @db.Timestamptz(3)
+  premiumPaymentIntentId String? @unique @map("premium_payment_intent_id") @db.Uuid
+  premiumConfirmedAt DateTime? @map("premium_confirmed_at") @db.Timestamptz(3)
+  startsAt DateTime? @map("starts_at") @db.Timestamptz(3)
+  endsAt DateTime? @map("ends_at") @db.Timestamptz(3)
+  version Int @default(1)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  animal Animal @relation(fields:[animalId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  farmer User @relation("PolicyFarmer",fields:[farmerId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  insurer Organization @relation(fields:[insurerOrganizationId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  evidenceFile PrivateFile? @relation("PolicyEvidenceFile",fields:[evidenceFileId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  renewedFrom InsurancePolicy? @relation("PolicyRenewal",fields:[renewedFromPolicyId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  renewedBy InsurancePolicy? @relation("PolicyRenewal")
+  decidedBy User? @relation("PolicyDecider",fields:[decidedById],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  premiumPaymentIntent PaymentIntent? @relation("PolicyPremiumIntent",fields:[premiumPaymentIntentId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  claims InsuranceClaim[]
+  @@index([farmerId, createdAt, id])
+  @@index([insurerOrganizationId, status, createdAt])
+  @@index([animalId, status])
+  @@map("insurance_policies")
+  @@schema("palito")
+}
+
+model InsuranceClaim {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  policyId String @map("policy_id") @db.Uuid
+  animalId String @map("animal_id") @db.Uuid
+  farmerId String @map("farmer_id") @db.Uuid
+  insurerOrganizationId String @map("insurer_organization_id") @db.Uuid
+  incidentKind String @map("incident_kind") @db.VarChar(32)
+  incidentAt DateTime @map("incident_at") @db.Timestamptz(3)
+  description String @db.VarChar(2000)
+  claimedAmountMinor BigInt @map("claimed_amount_minor")
+  approvedAmountMinor BigInt? @map("approved_amount_minor")
+  currency String @default("BDT") @db.Char(3)
+  status String @default("SUBMITTED") @db.VarChar(32)
+  reviewTargetAt DateTime @map("review_target_at") @db.Timestamptz(3)
+  decisionNote String @default("") @map("decision_note") @db.VarChar(1000)
+  decidedById String? @map("decided_by_id") @db.Uuid
+  decidedAt DateTime? @map("decided_at") @db.Timestamptz(3)
+  settledAt DateTime? @map("settled_at") @db.Timestamptz(3)
+  version Int @default(1)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  policy InsurancePolicy @relation(fields:[policyId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  animal Animal @relation(fields:[animalId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  farmer User @relation("ClaimFarmer",fields:[farmerId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  insurer Organization @relation(fields:[insurerOrganizationId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  decidedBy User? @relation("ClaimDecider",fields:[decidedById],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  evidenceLinks ClaimEvidenceLink[]
+  referralGrants ClaimReferralGrant[]
+  reviews ClaimReview[]
+  settlementAllocation ClaimSettlementAllocation?
+  @@index([farmerId, createdAt, id])
+  @@index([insurerOrganizationId, status, createdAt])
+  @@index([policyId, status])
+  @@map("insurance_claims")
+  @@schema("palito")
+}
+
+model ClaimEvidenceLink {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  claimId String @map("claim_id") @db.Uuid
+  fileId String @map("file_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  claim InsuranceClaim @relation(fields:[claimId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  file PrivateFile @relation(fields:[fileId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  @@unique([claimId, fileId])
+  @@index([fileId])
+  @@map("claim_evidence_links")
+  @@schema("palito")
+}
+
+model ClaimReferralGrant {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  claimId String @map("claim_id") @db.Uuid
+  animalId String @map("animal_id") @db.Uuid
+  vetId String @map("vet_id") @db.Uuid
+  referredById String @map("referred_by_id") @db.Uuid
+  note String @db.VarChar(1000)
+  status String @default("ACTIVE") @db.VarChar(20)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  claim InsuranceClaim @relation(fields:[claimId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  animal Animal @relation(fields:[animalId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  vet User @relation("ClaimReferralVet",fields:[vetId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  referredBy User @relation("ClaimReferralAuthor",fields:[referredById],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  @@index([claimId, vetId, status])
+  @@index([vetId, status, expiresAt])
+  @@map("claim_referral_grants")
+  @@schema("palito")
+}
+
+model ClaimReview {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  claimId String @map("claim_id") @db.Uuid
+  authorId String @map("author_id") @db.Uuid
+  authorRole String @map("author_role") @db.VarChar(24)
+  kind String @db.VarChar(32)
+  recommendation String @db.VarChar(32)
+  notes String @db.VarChar(2000)
+  metadata Json @default("{}") @db.JsonB
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  claim InsuranceClaim @relation(fields:[claimId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  author User @relation(fields:[authorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  @@index([claimId, createdAt])
+  @@map("claim_reviews")
+  @@schema("palito")
+}
+
+model ClaimSettlementAllocation {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  claimId String @unique @map("claim_id") @db.Uuid
+  paymentIntentId String @unique @map("payment_intent_id") @db.Uuid
+  ledgerTxId String @unique @map("ledger_tx_id") @db.Uuid
+  loanId String? @map("loan_id") @db.Uuid
+  bankOrganizationId String? @map("bank_organization_id") @db.Uuid
+  debtAllocatedMinor BigInt @map("debt_allocated_minor")
+  farmerAllocatedMinor BigInt @map("farmer_allocated_minor")
+  totalSettledMinor BigInt @map("total_settled_minor")
+  currency String @default("BDT") @db.Char(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  claim InsuranceClaim @relation(fields:[claimId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  paymentIntent PaymentIntent @relation(fields:[paymentIntentId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  ledgerTx LedgerTransaction @relation(fields:[ledgerTxId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  loan Loan? @relation(fields:[loanId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  bank Organization? @relation(fields:[bankOrganizationId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  @@index([loanId])
+  @@map("claim_settlement_allocations")
   @@schema("palito")
 }

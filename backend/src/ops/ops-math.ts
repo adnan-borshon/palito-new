@@ -137,6 +137,62 @@ export function minimalNotificationCopy(
         body: "ব্যাংক পর্যালোচনার পর আপনার কিস্তির নির্ধারিত তারিখ বৃদ্ধি করা হয়েছে। · Your installment due date was extended after manual bank review.",
         urgent: false,
       };
+    case "POLICY_SUBMITTED":
+      return {
+        category: "INSURANCE",
+        title: "বীমা আবেদন নথিভুক্ত (স্যান্ডবক্স) · Sandbox policy application submitted",
+        body: "আপনার পশুর বীমা আবেদন পর্যালোচনার জন্য জমা হয়েছে। · Your livestock insurance policy application was submitted.",
+        urgent: false,
+      };
+    case "POLICY_DECIDED":
+      return {
+        category: "INSURANCE",
+        title: "বীমা আবেদনের সিদ্ধান্ত (স্যান্ডবক্স) · Sandbox policy decision",
+        body: "বীমা প্রতিষ্ঠান আপনার আবেদনের সিদ্ধান্ত দিয়েছে। সক্রিয়করণের জন্য প্রিমিয়াম নিশ্চিতকরণ প্রয়োজন। · Insurer recorded a policy decision; confirmed premium activates coverage.",
+        urgent: false,
+      };
+    case "POLICY_ACTIVATED":
+      return {
+        category: "INSURANCE",
+        title: "বীমা পলিসি সক্রিয় (স্যান্ডবক্স) · Sandbox policy coverage active",
+        body: "প্রিমিয়াম নিশ্চিত হওয়ার পর আপনার স্যান্ডবক্স বীমা পলিসি সক্রিয় হয়েছে। · Your sandbox livestock insurance coverage is now active.",
+        urgent: false,
+      };
+    case "CLAIM_SUBMITTED":
+      return {
+        category: "INSURANCE",
+        title: "বীমা দাবি জমা (স্যান্ডবক্স) · Sandbox insurance claim submitted",
+        body: "প্রমাণসহ বীমা দাবি পর্যালোচনার জন্য নথিভুক্ত হয়েছে। · Your insurance claim and private evidence were recorded for review.",
+        urgent: false,
+      };
+    case "CLAIM_REFERRED_TO_VET":
+      return {
+        category: "INSURANCE",
+        title: "বীমা দাবির ক্লিনিক্যাল মতামত অনুরোধ · Claim clinical review referral",
+        body: "একটি বীমা দাবির জন্য আপনার ক্লিনিক্যাল মতামত অনুরোধ করা হয়েছে। · An insurer referred a livestock claim for your clinical opinion.",
+        urgent: false,
+      };
+    case "CLAIM_VET_REVIEWED":
+      return {
+        category: "INSURANCE",
+        title: "পশুচিকিৎসকের মতামত সংরক্ষিত · Veterinarian claim opinion recorded",
+        body: "রেফারকৃত পশুচিকিৎসক বীমা দাবিতে ক্লিনিক্যাল মতামত যুক্ত করেছেন। · The referred veterinarian submitted a signed clinical opinion.",
+        urgent: false,
+      };
+    case "CLAIM_DECIDED":
+      return {
+        category: "INSURANCE",
+        title: "বীমা দাবির সিদ্ধান্ত (স্যান্ডবক্স) · Sandbox claim decision updated",
+        body: "আপনার স্যান্ডবক্স বীমা দাবির পর্যালোচনার সিদ্ধান্ত আপডেট হয়েছে। · A decision was recorded on your sandbox insurance claim.",
+        urgent: false,
+      };
+    case "CLAIM_SETTLED":
+      return {
+        category: "INSURANCE",
+        title: "বীমা দাবি নিষ্পত্তি (স্যান্ডবক্স) · Sandbox claim settlement posted",
+        body: "স্যান্ডবক্স বীমা দাবির অর্থ ঋণ সমন্বয় ও লেজারে নিষ্পত্তি হয়েছে (উত্তোলনযোগ্য অর্থ নয়)। · Sandbox claim settlement allocated debt-first in the ledger.",
+        urgent: false,
+      };
     default:
       return {
         category: "SYSTEM",

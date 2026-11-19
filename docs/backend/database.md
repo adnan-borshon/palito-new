@@ -56,8 +56,9 @@ Development/production API configuration requires the `palito_runtime` username;
 
 ## Explicitly later scope
 
-**M5 and M6 migrations added:**
+**M5, M6, and M7 migrations added:**
 6. `20261115000600_jobs_notifications_ops`: `outbox_events`, `job_attempts`, `notifications`, `notification_preferences`, `reminder_adherence_events`, and `audit_events` with `FOR UPDATE SKIP LOCKED` polling indexes, immutable `audit_events` / `notifications` triggers (allowing only `read_at` updates on notifications), and `palito_runtime` grants.
 7. `20261115000700_lending_ledger_sandbox`: `finance_commands`, `ledger_accounts`, `ledger_transactions`, `ledger_entries`, `loan_quotes`, `loans`, `collateral_reservations` (`one_live_collateral_per_animal` partial unique index), `loan_installments`, `payment_intents`, `repayment_allocations`, and `provider_events` with `DEFERRABLE INITIALLY DEFERRED` double-entry balance trigger (`SUM(DEBIT) = SUM(CREDIT)`) and immutable ledger triggers.
+8. `20261115000800_insurance_claim_settlement_sandbox`: extends `ledger_accounts` (`INSURER_POOL`) and `ledger_transactions` (`POLICY_PREMIUM`), and adds `insurance_policies` (`one_live_policy_per_animal` partial unique index), `insurance_claims` (`one_live_claim_per_policy` partial unique index), `claim_evidence_links`, `claim_referral_grants`, `claim_reviews`, and `claim_settlement_allocations` (`debt_allocated_minor + farmer_allocated_minor = total_settled_minor`) with immutability triggers and `palito_runtime` grants.
 
-M7 (insurance claims/policies/settlements) and M8 (devices/telemetry/AI/calls/commerce/content) remain future schema additions and are unimplemented.
+M8 (devices/telemetry/AI/calls/commerce/content) remains future schema work and is unimplemented.

@@ -1,27 +1,47 @@
-# M4 healthcare implementation and review checkpoint
+# M5, M6 and M7 implementation and review checkpoint
 
-Updated 2026-11-15. The user authorized the next milestone after M3. Work is on the existing review branch/PR #2, based on verified M3 `5abab0fc619c778c7ff7de62b47d284188bac44d`. **Stop for review before M5.** No merge, production migration/deployment, paid activation or live OTP campaign is included.
+Updated 2026-11-19. The user authorized Milestones 5 (jobs, reminders & recovery), 6 (financial foundation & lending sandbox), and 7 (insurance & claim settlement sandbox) after verified M4. **Stop for review before M8.** No production deployment/migration, merge, paid activation, real-money transfer, or live OTP/SMS campaign is included.
 
-Read [healthcare implementation](healthcare.md) for actual routes, consent/state/time rules, client behavior and pilot limits. [M3 completion](milestone-3-completion-checkpoint.md) is retained as history; its final hosted CI/security and actual Android compilation passed before M4.
+Read [ops M5](ops-m5.md), [lending M6](lending-m6.md), and [insurance M7](insurance-m7.md) for actual routes, state machines, SQL invariants, and sandbox boundaries. [M4 healthcare](healthcare.md) and [M3 identity](milestone-3-completion-checkpoint.md) remain active foundations.
 
-## Implemented M4 scope
+## Implemented M5, M6 and M7 scope
 
-- Owner-scoped farms, animal registration/edit/soft archive, immutable farmer observations, current-location passport, paginated clinical history/private gallery and exact decimal/minor-unit inputs.
-- Verified professional discovery, self-reported practice profile and filters, future 30-minute slots with overlap protection, explicit BDT 0 pilot booking, cancellation/rescheduling, assigned-vet acceptance and current-consent patient queue.
-- Irreversible consent withdrawal, 72-hour post-slot expiry, fresh current account/membership/credential checks, owner-snapshot invalidation and current-authority checks on idempotent receipt replay. No bank/insurer/admin clinical bypass.
-- Appointment-based consultation, immutable signed prescription/items, linked reasoned clinical amendments, explicit vet-authored follow-up reminders and atomic append-only event intents. Delivery remains M5.
-- Private bounded PNG/JPEG initialization, decoded/re-encoded metadata-stripped canonical images, quarantine/hash/finalization, lost-response recovery, immutable READY bytes and authenticated revocable download access. PostgreSQL byte objects are an explicit small-pilot adapter, not claimed S3/production object storage.
-- Real Next `/care` and configured Expo native `/care` farmer/vet screens, shared portable transport/model separate from DemoState, consent and no-charge wording, account-aware memory-only views, private photo/evidence, forms and signed prescription display. Demo screens are preserved.
-- One additive fifth migration; previous published migrations unchanged. Database constraints preserve slot uniqueness/overlap, linked records/photos, immutable clinical evidence/commands/events and restricted runtime grants.
+- **M5 — Jobs, reminders and recovery (`20261115000600_jobs_notifications_ops`, `backend/src/ops/`, `backend/src/worker.ts`)**:
+  - Transactional PostgreSQL `outbox_events` enqueue (`createMany({ skipDuplicates: true })` on unique `dedupeKey`), `FOR UPDATE SKIP LOCKED` worker batch claiming, `job_attempts` tracking, expired `PROCESSING` lease reclamation (`reclaimExpiredLeases`), exponential retry backoff (`computeBackoffMs`), and `DEAD_LETTER` triage/retry (`GET /admin/outbox/dead-letter`, `POST /admin/outbox/:id/retry`).
+  - Care reminder due sweep (`CARE_REMINDER_DUE`) and 4-hour overdue escalation sweep (`CARE_REMINDER_ESCALATION`) with same-day `Asia/Dhaka` (`UTC+6`) adherence suppression (`POST /reminders/:id/adherence-events`, `taken | skipped`).
+  - Privacy-minimized bilingual notification templates (`minimalNotificationCopy`, zero clinical diagnosis/prescription/phone leakage), recipient-scoped inbox (`GET /notifications`, `POST /notifications/read`), and versioned `notify-v1` preferences (`GET/PATCH /me/notification-preferences`).
+  - Expired non-`READY` (`PENDING`, `QUARANTINED`) `private_files` cleanup (`cleanupExpiredFiles`), preserving `READY` evidence/photos.
+  - Admin operational endpoints (`GET /admin/system-health`, `GET /admin/audit-events`), immutable `audit_events` / `notifications` database triggers, and local loopback backup/restore rehearsal script (`backend/scripts/rehearse-backup-restore.mjs`).
+- **M6 — Financial foundation and lending sandbox (`20261115000700_lending_ledger_sandbox`, `backend/src/finance/`)**:
+  - Explicit opt-in gate (`FINANCE_SANDBOX_ENABLED=true`, default `false` returning `503`; forbidden in `NODE_ENV=production` along with `PAYMENT_PROVIDER=sandbox`, `NOTIFICATION_CHANNEL_MODE=sandbox`, and `SANDBOX_WEBHOOK_SECRET`).
+  - Immutable double-entry ledger (`ledger_accounts`, `ledger_transactions`, `ledger_entries`) enforced by a `DEFERRABLE INITIALLY DEFERRED` PostgreSQL constraint trigger verifying `SUM(DEBIT) = SUM(CREDIT)` with at least two legs per transaction, plus admin reconciliation (`GET /admin/ledger/reconciliation`).
+  - Maker/checker bank collateral valuations (`POST /valuations`, `POST /valuations/:id/approve` requiring `assessorId !== approvedById` in the same active `BANK` org), collateral eligibility (`GET /animals/:id/collateral-eligibility`), and redacted bank risk projection (`GET /animals/:id/collateral-risk` with `clinicalDetailsRedacted: true`).
+  - Exact 70% LTV cap (`maxLoanCap70`), expiring `sandbox-v1` quotes (`POST /loans/quotes`), loan submission (`POST /loans`) guarded by `one_live_collateral_per_animal`, bank decision (`POST /loans/:id/decision` releasing collateral on reject), disbursement (`POST /loans/:id/disburse`), calendar-month installment schedule (`buildInstallmentSchedule`), FIFO repayment allocation (`allocateRepayment`), manual reviewed grace (`POST /loans/:id/grace`), care fee intents (`POST /payments/care-fee-intents`), non-withdrawable sandbox wallet (`GET /me/wallet`), and timing-safe HMAC-SHA256 webhook verification & deduplication (`POST /webhooks/payments/sandbox`).
+- **M7 — Insurance and claim settlement sandbox (`20261115000800_insurance_claim_settlement_sandbox`, `backend/src/finance/`)**:
+  - Livestock policy enrollment (`POST /policies`, `ins-sandbox-v1`, guarded by `one_live_policy_per_animal`), insurer decision (`POST /policies/:id/decision` transitioning to `APPROVED_AWAITING_PREMIUM` without bypassing confirmed premium), premium payment confirmation (`POST /policies/:id/premium-intents` via `WALLET` or `SANDBOX_SIMULATOR` webhook activating `[startsAt, endsAt]`), and expired policy renewal (`POST /policies/:id/renewals`).
+  - Mortality claim submission (`POST /claims` requiring incident-time active confirmed coverage, `READY` owned private `evidenceFileIds[]`, 7-day `reviewTargetAt`, and `one_live_claim_per_policy`; illness/repeat illness claims rejected per `SRS-GAP-09`).
+  - Advisory review (`POST /claims/:id/review-requests` with `autonomousApprovalAllowed: false`), verified vet referral (`POST /claims/:id/referrals` issuing time-limited `ClaimReferralGrant` and scoped `CareService` private file download access), referred vet clinical opinion (`POST /claims/:id/opinions`), maker/checker claim decision (`POST /claims/:id/decision` marking approved mortality animals `DECEASED` so they cannot secure new valuations, quotes, loans, or policies), and atomic debt-first claim settlement (`POST /claims/:id/settlements`, `GET /loans/:id/settlements`, `allocateClaimSettlement`).
+- **Clients (`frontend/shared`, `frontend/web`, `frontend/mobile`)**:
+  - Extended `CareWorkspace` (`/care`) with M5 notifications inbox, `notify-v1` preferences form, and `Taken today` / `Skipped today` adherence actions.
+  - Added `FinanceWorkspace` (`frontend/shared/src/finance-workspace.ts`, zero `DemoState` import) and `/finance` routes on Next.js web (`frontend/web/src/app/finance/page.tsx`) and Expo mobile (`frontend/mobile/src/app/finance.tsx`, `screen.native.tsx`, `screen-enabled.native.tsx`) covering both M6 lending/ledger and M7 insurance/claim settlement workflows.
 
-## Verification evidence
+## Verification evidence (executed locally on Node v24.22.3)
 
-Final local validation passed **81 tests**, zero failed/skipped: **61 default** (16 native component, 2 web workflow, 21 shared and 22 backend) plus **20 real PostgreSQL/official Firebase emulator integration tests**. Both M4 service/HTTP scenarios, two independent connection pools racing a slot, professional filtering, ownership/consent/credential revocation, binary upload/hash recovery, signed prescription/amendment linkage, exact money and retained-row upgrade/repeatable migration/Prisma drift passed. Invalid cursor/version/input boundaries are covered.
+All local checks passed with **zero failures and zero warnings**:
 
-Final lint, all workspace types, backend build, Next production build and Expo browser export passed. Dependency audit reports **zero high/critical**, existing 1 low + 20 moderate. The final staged-source scan is performed before push; its result and exact commit/hosted Chrome/native/security outcomes are recorded in PR #2. Pending hosted checks are not asserted passed here.
+- **83 executed unit, HTTP, shared domain, web workflow, and native component tests passed (0 failed, 0 skipped)**:
+  - `@palito/backend`: **36 passed** (`care.test.js`, `config.test.js`, `data-contracts.test.js`, `finance.test.js`, `http.test.js`, `identity.test.js`, `logger.test.js`, `native-config.test.js`, `ops.test.js`, `setup.test.js`).
+  - `@palito/shared`: **26 passed** (`care.test.ts` [4], `finance-workspace.test.ts` [4], `invariants.test.ts` [11], `journeys.test.ts` [7]).
+  - `@palito/web`: **3 passed** (`src/__tests__/web-workflows.test.ts`).
+  - `@palito/mobile`: **18 passed across 6 Jest test suites** (`finance.test.tsx`, `care.test.tsx`, `farmer.test.tsx`, `roles-and-journeys.test.tsx`, `lifecycle.test.tsx`, `navigation.test.ts`).
+- **Schema, lint, typecheck, and production builds passed**:
+  - `npm run prisma:validate --workspace @palito/backend` (valid schema across 8 migrations).
+  - `npm run build:test --workspace @palito/backend` (compiles all unit and PostgreSQL integration scenarios including `ops.scenario.ts`, `finance.scenario.ts`, and `insurance.scenario.ts` against Prisma Client 7.10.1).
+  - `npm run lint:all` (`@palito/mobile`, `@palito/web`, `@palito/backend` with `--max-warnings=0`).
+  - `npm run typecheck` (`@palito/mobile`, `@palito/web`, `@palito/shared`, `@palito/backend`).
+  - `npm run build:backend`, `npm run build:web` (11 routes including `/care` and `/finance`), and `npm run export:web`.
 
-The local browser IPC limitation persists from M3; hosted Chrome executes the required actual browser journey. Native component tests mock SDK/transport. The existing actual Android arm64 build CI remains mandatory after adding SDK-compatible picker/file-system/crypto modules; compilation is not physical-device evidence.
+## Environment & rollout boundaries
 
-## Explicit remaining rollout boundaries
-
-Live Firebase project/ADC/native app identities, real SMS, Android/iOS hardware lifecycle and app verification still need owner configuration/devices. No live care data or clinical schedule is invented. Managed object-store selection, quotas/retention and additional-format malware scanning precede larger live use. The pilot accepts only bounded sanitized images. Video-call provider/token flow is M8c; paid care is M6; reliable reminder delivery/cleanup/recovery is M5. All 65 PAL requirements and 53 command mappings are preserved with later-milestone portions explicitly marked.
+- **Local PostgreSQL/Docker boundary**: PostgreSQL and Docker are not installed on this local Windows host. The PostgreSQL + Firebase Auth Emulator integration scenarios (`backend/test/integration/schema.test.ts`, including `ops.scenario.ts`, `finance.scenario.ts`, and `insurance.scenario.ts`) and `backend/scripts/rehearse-backup-restore.mjs` are compiled and typechecked locally (`npm run build:test --workspace @palito/backend`) and execute against `postgres:18.7-alpine` in GitHub Actions CI (`.github/workflows/ci.yml`); they are not claimed as executed locally.
+- **Partner policy & live provider gates**: Production financial terms (B08–B11), automated SLA claims (B12), live SMS/push/payment/storage/video providers (B13), and physical Android/iOS device testing remain explicit release gates before any non-sandbox or production activation. Stop for user review before M8.

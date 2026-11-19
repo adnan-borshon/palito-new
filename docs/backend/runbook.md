@@ -63,11 +63,11 @@ Keep admin, migration and runtime URLs separate. Existing M1 environments must r
 
 Before applying a future migration, review its SQL and locking/data effect, run clean and prior-version upgrade tests on disposable PostgreSQL, verify runtime denial and model drift, and retain the immutable published history. If a migration fails, inspect status and affected state with the migration/administrator owner; do not automatically reset or delete real data. Production migration rollout/restore rehearsal remains M10.
 
-## M4–M6 review, worker and sandbox setup
+## M4–M7 review, worker and sandbox setup
 
-See [healthcare](healthcare.md), [ops M5](ops-m5.md), and [lending M6](lending-m6.md) for implemented DTOs, worker operations, ledger invariants, and client lifecycles; [progress](progress.md) records actual checks.
+See [healthcare](healthcare.md), [ops M5](ops-m5.md), [lending M6](lending-m6.md), and [insurance M7](insurance-m7.md) for implemented DTOs, worker operations, ledger & claim settlement invariants, and client lifecycles; [progress](progress.md) records actual checks.
 - Enable `HEALTHCARE_NO_CHARGE_PILOT=true` only for an explicit no-charge development/staging pilot.
 - Configure `NOTIFICATION_CHANNEL_MODE=in-app-only` (default) or `sandbox`; run the M5 worker with `npm run worker --workspace @palito/backend` or `WORKER_ENABLED=true`.
-- Enable `FINANCE_SANDBOX_ENABLED=true`, `PAYMENT_PROVIDER=sandbox`, and a >=16-char `SANDBOX_WEBHOOK_SECRET` **only** in development/staging to exercise `/finance` sandbox workflows; production fails closed if any sandbox or emulator option is set.
+- Enable `FINANCE_SANDBOX_ENABLED=true`, `PAYMENT_PROVIDER=sandbox`, and a >=16-char `SANDBOX_WEBHOOK_SECRET` **only** in development/staging to exercise `/finance` lending and insurance sandbox workflows; production fails closed if any sandbox or emulator option is set.
 - Local backup/restore rehearsal (`npm run rehearse:backup-restore --workspace @palito/backend`) requires loopback PostgreSQL with `pg_dump`/`pg_restore`, `DATABASE_ADMIN_URL`, and `DATABASE_URL` in development/test.
-- Stop for review before M7 insurance/claims implementation.
+- Stop for review before M8 extension milestones.

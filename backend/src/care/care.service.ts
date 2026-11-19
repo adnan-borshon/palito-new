@@ -1565,13 +1565,74 @@ export class CareService {
       return { id, status: "READY" };
     });
   }
+  private async canReadClaimEvidenceFile(
+    tx: Tx,
+    p: AccountPrincipal,
+    fileId: string,
+    animalId: string,
+  ): Promise<boolean> {
+    const links = await tx.claimEvidenceLink.findMany({
+      where: { fileId, claim: { animalId } },
+      include: { claim: true },
+    });
+    if (links.length === 0) return false;
+    const insurerOrgIds = p.memberships
+      .filter((m) => m.role === "INSURER_STAFF")
+      .map((m) => m.organizationId);
+    if (insurerOrgIds.length > 0) {
+      const matchingOrgIds = links
+        .map((l) => l.claim.insurerOrganizationId)
+        .filter((orgId) => insurerOrgIds.includes(orgId));
+      if (matchingOrgIds.length > 0) {
+        const activeInsurer = await tx.membership.findFirst({
+          where: {
+            userId: p.userId,
+            role: "INSURER_STAFF",
+            status: "ACTIVE",
+            organizationId: { in: matchingOrgIds },
+            user: { status: "ACTIVE" },
+            organization: { kind: "INSURER", status: "ACTIVE" },
+          },
+        });
+        if (activeInsurer) return true;
+      }
+    }
+    if (p.memberships.some((m) => m.role === "VET")) {
+      await this.vet(tx, p);
+      const claimIds = links.map((l) => l.claimId);
+      const referral = await tx.claimReferralGrant.findFirst({
+        where: {
+          claimId: { in: claimIds },
+          animalId,
+          vetId: p.userId,
+          status: "ACTIVE",
+          expiresAt: { gt: new Date() },
+        },
+      });
+      if (referral) return true;
+    }
+    return false;
+  }
+
   private async fileAccess(tx: Tx, p: AccountPrincipal, id: string) {
     const file = await tx.privateFile.findUnique({ where: { id } });
     if (!file || (file.status !== "READY" && file.uploaderId !== p.userId))
       throw new NotFoundException();
-    const animal = await this.patient(tx, p, file.animalId);
-    if (animal.ownerId !== file.ownerAtUploadId) throw new NotFoundException();
-    return file;
+    const animal = await tx.animal.findUnique({ where: { id: file.animalId } });
+    if (!animal || animal.ownerId !== file.ownerAtUploadId)
+      throw new NotFoundException();
+    try {
+      await this.patient(tx, p, file.animalId);
+      return file;
+    } catch (err) {
+      if (
+        file.status === "READY" &&
+        (await this.canReadClaimEvidenceFile(tx, p, file.id, file.animalId))
+      ) {
+        return file;
+      }
+      throw err;
+    }
   }
   async fileInfo(p: AccountPrincipal, id: string) {
     return this.db.prisma.$transaction(async (tx) => {
@@ -1587,13 +1648,8 @@ export class CareService {
   }
   async download(p: AccountPrincipal, id: string) {
     return this.db.prisma.$transaction(async (tx) => {
-      const file = await tx.privateFile.findFirst({
-        where: { id, status: "READY" },
-      });
-      if (!file?.bytes) throw new NotFoundException();
-      const animal = await this.patient(tx, p, file.animalId);
-      if (animal.ownerId !== file.ownerAtUploadId)
-        throw new NotFoundException();
+      const file = await this.fileAccess(tx, p, id);
+      if (file.status !== "READY" || !file.bytes) throw new NotFoundException();
       return Buffer.from(file.bytes);
     });
   }

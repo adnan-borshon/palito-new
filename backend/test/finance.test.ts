@@ -1,16 +1,22 @@
+import "reflect-metadata";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import request from "supertest";
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
 import {
+  ClaimDecisionDto,
+  ClaimVetOpinionDto,
+  CreateClaimDto,
   CreateLoanQuoteDto,
+  CreatePolicyDto,
   GraceDecisionDto,
   ProviderWebhookDto,
   RepaymentIntentDto,
 } from "../src/finance/dto.js";
 import {
   addCalendarMonthsUtc,
+  allocateClaimSettlement,
   allocateRepayment,
   buildInstallmentSchedule,
   canonicalWebhookJson,
@@ -95,6 +101,35 @@ test("lending-math: allocateRepayment applies FIFO across installments and rejec
   assert.throws(() => allocateRepayment(installments, 1301n), RangeError);
 });
 
+test("lending-math: allocateClaimSettlement enforces debt-first allocation for debt below, above, and zero debt", () => {
+  // Debt below claim amount: pays full debt first, exact remainder to farmer
+  const below = allocateClaimSettlement(5_000_000n, 3_200_000n);
+  assert.deepEqual(below, {
+    debtPayoffMinor: 3_200_000n,
+    farmerRemainderMinor: 1_800_000n,
+    totalSettledMinor: 5_000_000n,
+  });
+
+  // Debt above claim amount: 100% to debt, 0 remainder to farmer
+  const above = allocateClaimSettlement(3_000_000n, 4_500_000n);
+  assert.deepEqual(above, {
+    debtPayoffMinor: 3_000_000n,
+    farmerRemainderMinor: 0n,
+    totalSettledMinor: 3_000_000n,
+  });
+
+  // Zero debt: 100% to farmer
+  const noDebt = allocateClaimSettlement(2_500_000n, 0n);
+  assert.deepEqual(noDebt, {
+    debtPayoffMinor: 0n,
+    farmerRemainderMinor: 2_500_000n,
+    totalSettledMinor: 2_500_000n,
+  });
+
+  assert.throws(() => allocateClaimSettlement(0n, 100n), RangeError);
+  assert.throws(() => allocateClaimSettlement(100n, -1n), RangeError);
+});
+
 test("lending-math: canonical webhook signing and timing-safe HMAC verification", () => {
   const secret = "test-sandbox-webhook-secret-value";
   const a = { b: 2, a: 1, nested: { y: true, x: "ok", skip: undefined } };
@@ -141,6 +176,40 @@ test("M6 DTOs validate positive integer minor units, term bounds, and grace limi
     currency: "BDT",
   });
   assert.equal((await validate(goodWebhook)).length, 0);
+
+  const badPolicy = plainToInstance(CreatePolicyDto, {
+    animalId: "00000000-0000-4000-8000-000000000001",
+    insurerOrganizationId: "00000000-0000-4000-8000-000000000002",
+    coverageMinor: "5000000",
+    premiumMinor: "100000",
+    termMonths: 12,
+    consent: true,
+    consentVersion: "wrong-v0",
+  });
+  assert.ok((await validate(badPolicy)).length > 0);
+
+  const badClaim = plainToInstance(CreateClaimDto, {
+    policyId: "00000000-0000-4000-8000-000000000001",
+    incidentKind: "DEATH",
+    incidentAt: "2026-11-15T10:00:00Z",
+    claimedAmountMinor: "5000000",
+    description: "Sudden mortality",
+    evidenceFileIds: [],
+  });
+  assert.ok((await validate(badClaim)).length > 0);
+
+  const goodOpinion = plainToInstance(ClaimVetOpinionDto, {
+    recommendation: "CONFIRM_MORTALITY",
+    clinicalOpinion: "Post-mortem evidence consistent with sudden mortality.",
+  });
+  assert.equal((await validate(goodOpinion)).length, 0);
+
+  const badDecision = plainToInstance(ClaimDecisionDto, {
+    decision: "approve",
+    approvedAmountMinor: "0",
+    reason: "",
+  });
+  assert.ok((await validate(badDecision)).length >= 2);
 });
 
 test("HTTP harness: sandbox disabled returns 503 on webhook and protected finance routes return 401", async () => {
@@ -163,6 +232,11 @@ test("HTTP harness: sandbox disabled returns 503 on webhook and protected financ
 
     await request(server).get("/api/v1/loans").expect(401);
     await request(server).get("/api/v1/me/wallet").expect(401);
+    await request(server).get("/api/v1/policies").expect(401);
+    await request(server).get("/api/v1/claims").expect(401);
+    await request(server)
+      .get("/api/v1/loans/00000000-0000-4000-8000-000000000001/settlements")
+      .expect(401);
     await request(server)
       .post("/api/v1/valuations")
       .send({

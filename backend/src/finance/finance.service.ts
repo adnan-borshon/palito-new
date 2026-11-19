@@ -17,17 +17,30 @@ import { DatabaseService } from "../platform/database.js";
 import { OutboxWorkerService } from "../ops/outbox.worker.js";
 import type {
   CareFeeIntentDto,
+  ClaimDecisionDto,
+  ClaimReferralDto,
+  ClaimSettlementDto,
+  ClaimVetOpinionDto,
+  ClaimsPageDto,
+  CreateClaimDto,
   CreateLoanDto,
   CreateLoanQuoteDto,
+  CreatePolicyDto,
   CreateValuationDto,
   DisburseLoanDto,
   GraceDecisionDto,
   LoanDecisionDto,
   LoansPageDto,
+  PoliciesPageDto,
+  PolicyDecisionDto,
+  PolicyPremiumIntentDto,
   ProviderWebhookDto,
+  RenewPolicyDto,
   RepaymentIntentDto,
 } from "./dto.js";
 import {
+  addCalendarMonthsUtc,
+  allocateClaimSettlement,
   allocateRepayment,
   buildInstallmentSchedule,
   maxLoanCap70,
@@ -156,6 +169,49 @@ export class FinanceService {
     return membership;
   }
 
+  private async requireInsurerStaff(
+    tx: Tx,
+    p: AccountPrincipal,
+    organizationId?: string,
+  ) {
+    const membership = await tx.membership.findFirst({
+      where: {
+        userId: p.userId,
+        role: "INSURER_STAFF",
+        status: "ACTIVE",
+        ...(organizationId ? { organizationId } : {}),
+        user: { status: "ACTIVE" },
+        organization: { kind: "INSURER", status: "ACTIVE" },
+      },
+    });
+    if (!membership) throw new ForbiddenException();
+    return membership;
+  }
+
+  private async requireVerifiedVet(tx: Tx, p: AccountPrincipal) {
+    if (!p.memberships.some((m) => m.role === "VET")) {
+      throw new ForbiddenException();
+    }
+    const valid = await tx.vetCredential.findFirst({
+      where: {
+        userId: p.userId,
+        status: "VERIFIED",
+        user: {
+          status: "ACTIVE",
+          memberships: {
+            some: {
+              role: "VET",
+              status: "ACTIVE",
+              organization: { status: "ACTIVE", kind: "CLINIC" },
+            },
+          },
+        },
+      },
+    });
+    if (!valid) throw new ForbiddenException();
+    return valid;
+  }
+
   private async verifyReplayAuthority(
     tx: Tx,
     p: AccountPrincipal,
@@ -178,7 +234,31 @@ export class FinanceService {
       await this.requireBankStaff(tx, p, orgId);
       return;
     }
-    if (operation === "quote.create" || operation === "loan.create") {
+    if (
+      operation.startsWith("policy.decide:") ||
+      operation.startsWith("claim.review-request:") ||
+      operation.startsWith("claim.refer:") ||
+      operation.startsWith("claim.decide:") ||
+      operation.startsWith("claim.settle:")
+    ) {
+      const orgId =
+        typeof body?.insurerOrganizationId === "string"
+          ? body.insurerOrganizationId
+          : undefined;
+      await this.requireInsurerStaff(tx, p, orgId);
+      return;
+    }
+    if (operation.startsWith("claim.opinion:")) {
+      await this.requireVerifiedVet(tx, p);
+      return;
+    }
+    if (
+      operation === "quote.create" ||
+      operation === "loan.create" ||
+      operation === "policy.apply" ||
+      operation.startsWith("policy.renew:") ||
+      operation === "claim.submit"
+    ) {
       const animalId =
         typeof body?.animalId === "string" ? body.animalId : undefined;
       if (animalId) {
@@ -239,6 +319,7 @@ export class FinanceService {
       | "USER_WALLET"
       | "BANK_POOL"
       | "BANK_RECEIVABLE"
+      | "INSURER_POOL"
       | "PLATFORM_ESCROW"
       | "PROVIDER_CLEARING",
     opts: { ownerUserId?: string; organizationId?: string } = {},
@@ -270,6 +351,7 @@ export class FinanceService {
         | "LOAN_DISBURSEMENT"
         | "LOAN_REPAYMENT"
         | "CARE_FEE"
+        | "POLICY_PREMIUM"
         | "CLAIM_SETTLEMENT"
         | "REVERSAL"
         | "SANDBOX_TOPUP";
@@ -280,10 +362,74 @@ export class FinanceService {
       amountMinor: bigint;
     },
   ) {
-    if (input.amountMinor <= 0n) {
-      throw new BadRequestException("Ledger entry amount must be positive");
+    return this.postMultiLegBalancedTransaction(tx, {
+      idempotencyKey: input.idempotencyKey,
+      referenceKind: input.referenceKind,
+      referenceId: input.referenceId,
+      description: input.description,
+      legs: [
+        {
+          accountId: input.debitAccountId,
+          direction: "DEBIT",
+          amountMinor: input.amountMinor,
+        },
+        {
+          accountId: input.creditAccountId,
+          direction: "CREDIT",
+          amountMinor: input.amountMinor,
+        },
+      ],
+    });
+  }
+
+  private async postMultiLegBalancedTransaction(
+    tx: Tx,
+    input: {
+      idempotencyKey: string;
+      referenceKind:
+        | "LOAN_DISBURSEMENT"
+        | "LOAN_REPAYMENT"
+        | "CARE_FEE"
+        | "POLICY_PREMIUM"
+        | "CLAIM_SETTLEMENT"
+        | "REVERSAL"
+        | "SANDBOX_TOPUP";
+      referenceId: string;
+      description: string;
+      legs: Array<{
+        accountId: string;
+        direction: "DEBIT" | "CREDIT";
+        amountMinor: bigint;
+      }>;
+    },
+  ) {
+    const activeLegs = input.legs.filter((leg) => leg.amountMinor > 0n);
+    if (activeLegs.length < 2) {
+      throw new BadRequestException("Ledger transaction requires at least 2 legs");
     }
-    if (input.debitAccountId === input.creditAccountId) {
+    let debitSum = 0n;
+    let creditSum = 0n;
+    const debitAccounts = new Set<string>();
+    const creditAccounts = new Set<string>();
+    for (const leg of activeLegs) {
+      if (leg.direction === "DEBIT") {
+        debitSum += leg.amountMinor;
+        debitAccounts.add(leg.accountId);
+      } else {
+        creditSum += leg.amountMinor;
+        creditAccounts.add(leg.accountId);
+      }
+    }
+    if (debitSum <= 0n || debitSum !== creditSum) {
+      throw new BadRequestException(
+        "Ledger transaction debit and credit totals must balance",
+      );
+    }
+    if (
+      debitAccounts.size === 1 &&
+      creditAccounts.size === 1 &&
+      [...debitAccounts][0] === [...creditAccounts][0]
+    ) {
       throw new BadRequestException("Debit and credit accounts must differ");
     }
     const existing = await tx.ledgerTransaction.findUnique({
@@ -301,22 +447,13 @@ export class FinanceService {
       },
     });
     await tx.ledgerEntry.createMany({
-      data: [
-        {
-          transactionId: ledgerTx.id,
-          accountId: input.debitAccountId,
-          direction: "DEBIT",
-          amountMinor: input.amountMinor,
-          currency: "BDT",
-        },
-        {
-          transactionId: ledgerTx.id,
-          accountId: input.creditAccountId,
-          direction: "CREDIT",
-          amountMinor: input.amountMinor,
-          currency: "BDT",
-        },
-      ],
+      data: activeLegs.map((leg) => ({
+        transactionId: ledgerTx.id,
+        accountId: leg.accountId,
+        direction: leg.direction,
+        amountMinor: leg.amountMinor,
+        currency: "BDT",
+      })),
     });
     return ledgerTx;
   }
@@ -1218,6 +1355,14 @@ export class FinanceService {
     d: RepaymentIntentDto,
   ) {
     return this.command(p, key, `loan.repay:${loanId}`, d, async (tx) => {
+      const targetLoan = await tx.loan.findUnique({
+        where: { id: loanId },
+        select: { animalId: true, farmerId: true },
+      });
+      if (!targetLoan || targetLoan.farmerId !== p.userId) {
+        throw new NotFoundException();
+      }
+      await this.lockAnimal(tx, targetLoan.animalId);
       await tx.$queryRaw`SELECT id FROM palito.loans WHERE id = ${loanId}::uuid FOR UPDATE`;
       const loan = await tx.loan.findUnique({ where: { id: loanId } });
       if (!loan || loan.farmerId !== p.userId) {
@@ -1230,7 +1375,7 @@ export class FinanceService {
       }
       const amountMinor = parseMinorUnits(d.amountMinor);
       if (amountMinor > loan.outstandingMinor) {
-        throw new BadRequestException(
+        throw new ConflictException(
           "Repayment amount cannot exceed loan outstandingMinor",
         );
       }
@@ -1523,6 +1668,14 @@ export class FinanceService {
             where: { id: intent.targetId, status: "DISBURSING" },
             data: { status: "APPROVED", version: { increment: 1 } },
           });
+        } else if (
+          intent.kind === "CLAIM_PAYOUT" &&
+          intent.targetKind === "claim"
+        ) {
+          await tx.insuranceClaim.updateMany({
+            where: { id: intent.targetId, status: "SETTLING" },
+            data: { status: "APPROVED", version: { increment: 1 } },
+          });
         }
         const ev = await tx.providerEvent.create({
           data: {
@@ -1611,10 +1764,22 @@ export class FinanceService {
           },
         });
       } else if (intent.kind === "LOAN_REPAYMENT") {
+        const targetLoan = await tx.loan.findUnique({
+          where: { id: intent.targetId },
+          select: { animalId: true },
+        });
+        if (targetLoan) {
+          await this.lockAnimal(tx, targetLoan.animalId);
+        }
         await tx.$queryRaw`SELECT id FROM palito.loans WHERE id = ${intent.targetId}::uuid FOR UPDATE`;
         const loan = await tx.loan.findUniqueOrThrow({
           where: { id: intent.targetId },
         });
+        if (loan.status !== "ACTIVE" || intent.amountMinor > loan.outstandingMinor) {
+          throw new ConflictException(
+            "Loan debt was already reduced or settled before provider repayment confirmation",
+          );
+        }
         const clearingAccount = await this.ensureAccount(
           tx,
           "PROVIDER_CLEARING",
@@ -1665,6 +1830,25 @@ export class FinanceService {
             linkId: intent.id,
           },
         });
+      } else if (intent.kind === "POLICY_PREMIUM") {
+        const settledPremium = await this.applyPolicyPremiumConfirmation(
+          tx,
+          intent.targetId,
+          intent.id,
+          intent.amountMinor,
+          "PROVIDER_CLEARING",
+          now,
+        );
+        ledgerTxId = settledPremium.ledgerTxId;
+      } else if (intent.kind === "CLAIM_PAYOUT") {
+        const settledClaim = await this.applyClaimSettlementConfirmation(
+          tx,
+          intent.targetId,
+          intent.id,
+          intent.amountMinor,
+          now,
+        );
+        ledgerTxId = settledClaim.ledgerTxId;
       }
 
       await tx.paymentIntent.update({
@@ -1806,6 +1990,1601 @@ export class FinanceService {
         totalDebitMinor: totalDebitMinor.toString(),
         totalCreditMinor: totalCreditMinor.toString(),
         unbalancedTransactionIds: unbalancedRows.map((r) => r.transaction_id),
+      });
+    });
+  }
+
+  private async validatePolicyEvidenceFile(
+    tx: Tx,
+    farmerId: string,
+    animalId: string,
+    evidenceFileId?: string,
+  ) {
+    if (!evidenceFileId) return null;
+    const file = await tx.privateFile.findFirst({
+      where: {
+        id: evidenceFileId,
+        animalId,
+        ownerAtUploadId: farmerId,
+        status: "READY",
+      },
+    });
+    if (!file) {
+      throw new BadRequestException(
+        "Policy evidenceFileId must be a READY private file owned by the farmer for this animal",
+      );
+    }
+    return file.id;
+  }
+
+  async applyPolicy(
+    p: AccountPrincipal,
+    key: string | undefined,
+    d: CreatePolicyDto,
+  ) {
+    return this.command(p, key, "policy.apply", d, async (tx) => {
+      await this.lockAnimal(tx, d.animalId);
+      const animal = await this.requireActiveFarmerOwner(tx, p, d.animalId);
+      if (animal.status !== "ACTIVE") {
+        throw new ConflictException(
+          "Only ACTIVE animals can enroll in an insurance policy",
+        );
+      }
+      const insurer = await tx.organization.findFirst({
+        where: {
+          id: d.insurerOrganizationId,
+          kind: "INSURER",
+          status: "ACTIVE",
+        },
+      });
+      if (!insurer) {
+        throw new NotFoundException("Active insurer organization not found");
+      }
+      const coverageMinor = parseMinorUnits(d.coverageMinor);
+      const premiumMinor = parseMinorUnits(d.premiumMinor);
+      if (premiumMinor > coverageMinor) {
+        throw new BadRequestException(
+          "premiumMinor cannot exceed coverageMinor",
+        );
+      }
+      const evidenceFileId = await this.validatePolicyEvidenceFile(
+        tx,
+        p.userId,
+        animal.id,
+        d.evidenceFileId,
+      );
+      const liveExisting = await tx.insurancePolicy.findFirst({
+        where: {
+          animalId: animal.id,
+          status: {
+            in: ["SUBMITTED", "APPROVED_AWAITING_PREMIUM", "ACTIVE"],
+          },
+        },
+      });
+      if (liveExisting) {
+        throw new ConflictException(
+          "Animal already has a submitted, awaiting-premium, or active insurance policy",
+        );
+      }
+      const lastPolicy = await tx.insurancePolicy.findFirst({
+        where: { animalId: animal.id },
+        orderBy: { policyVersion: "desc" },
+      });
+      const policyVersion = (lastPolicy?.policyVersion ?? 0) + 1;
+      let policy;
+      try {
+        policy = await tx.insurancePolicy.create({
+          data: {
+            animalId: animal.id,
+            farmerId: p.userId,
+            insurerOrganizationId: insurer.id,
+            evidenceFileId,
+            policyVersion,
+            termVersion: "ins-sandbox-v1",
+            consentVersion: d.consentVersion,
+            coverageMinor,
+            premiumMinor,
+            termMonths: d.termMonths,
+            waitingDays: 0,
+            currency: "BDT",
+            status: "SUBMITTED",
+          },
+        });
+      } catch (err) {
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === "P2002"
+        ) {
+          throw new ConflictException(
+            "Animal already has a live insurance policy",
+          );
+        }
+        throw err;
+      }
+      await OutboxWorkerService.enqueue(tx, {
+        topic: "POLICY_SUBMITTED",
+        dedupeKey: `policy-submitted:${policy.id}`,
+        aggregateKind: "insurance_policy",
+        aggregateId: policy.id,
+        payload: {
+          recipientId: p.userId,
+          linkKind: "policy",
+          linkId: policy.id,
+        },
+      });
+      await tx.auditEvent.create({
+        data: {
+          actorId: p.userId,
+          actorKind: "USER",
+          action: "POLICY_APPLIED",
+          targetKind: "insurance_policy",
+          targetId: policy.id,
+          metadata: {
+            animalId: animal.id,
+            insurerOrganizationId: insurer.id,
+            coverageMinor: coverageMinor.toString(),
+            premiumMinor: premiumMinor.toString(),
+            policyVersion,
+          },
+        },
+      });
+      return policy;
+    });
+  }
+
+  async listPolicies(p: AccountPrincipal, q: PoliciesPageDto = {}) {
+    this.requireSandboxEnabled();
+    const limit = q.limit ?? 25;
+    let after: { createdAt: Date; id: string } | undefined;
+    if (q.cursor) {
+      try {
+        const parsed = JSON.parse(
+          Buffer.from(q.cursor, "base64url").toString("utf8"),
+        );
+        if (
+          !Array.isArray(parsed) ||
+          parsed.length !== 2 ||
+          typeof parsed[0] !== "string" ||
+          typeof parsed[1] !== "string"
+        ) {
+          throw new Error("Bad cursor");
+        }
+        after = { createdAt: instant(parsed[0]), id: parsed[1] };
+      } catch {
+        throw new BadRequestException("Invalid cursor");
+      }
+    }
+    const insurerOrgIds = p.memberships
+      .filter((m) => m.role === "INSURER_STAFF")
+      .map((m) => m.organizationId);
+
+    const rows = await this.db.prisma.insurancePolicy.findMany({
+      where: {
+        OR: [
+          { farmerId: p.userId },
+          ...(insurerOrgIds.length > 0
+            ? [{ insurerOrganizationId: { in: insurerOrgIds } }]
+            : []),
+        ],
+        ...(q.status ? { status: q.status } : {}),
+        ...(after
+          ? {
+              AND: [
+                {
+                  OR: [
+                    { createdAt: { lt: after.createdAt } },
+                    { createdAt: after.createdAt, id: { lt: after.id } },
+                  ],
+                },
+              ],
+            }
+          : {}),
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: limit + 1,
+    });
+    const more = rows.length > limit;
+    const items = rows.slice(0, limit);
+    const last = items.at(-1);
+    return json({
+      items,
+      nextCursor:
+        more && last
+          ? Buffer.from(
+              JSON.stringify([last.createdAt.toISOString(), last.id]),
+            ).toString("base64url")
+          : null,
+      sandboxMode: true,
+    });
+  }
+
+  async policyDetail(p: AccountPrincipal, id: string) {
+    this.requireSandboxEnabled();
+    return this.db.prisma.$transaction(async (tx) => {
+      const policy = await tx.insurancePolicy.findUnique({
+        where: { id },
+        include: { claims: true },
+      });
+      if (!policy) throw new NotFoundException();
+      const isFarmer = policy.farmerId === p.userId;
+      const isInsurer = p.memberships.some(
+        (m) =>
+          m.role === "INSURER_STAFF" &&
+          m.organizationId === policy.insurerOrganizationId,
+      );
+      if (!isFarmer && !isInsurer) {
+        throw new NotFoundException();
+      }
+      return json(policy);
+    });
+  }
+
+  async decidePolicy(
+    p: AccountPrincipal,
+    id: string,
+    key: string | undefined,
+    version: number,
+    d: PolicyDecisionDto,
+  ) {
+    return this.command(
+      p,
+      key,
+      `policy.decide:${id}`,
+      { version, d },
+      async (tx) => {
+        const before = await tx.insurancePolicy.findUnique({ where: { id } });
+        if (!before) throw new NotFoundException();
+        await this.lockAnimal(tx, before.animalId);
+        await this.requireInsurerStaff(tx, p, before.insurerOrganizationId);
+        if (before.farmerId === p.userId) {
+          throw new ForbiddenException(
+            "Insurer staff cannot decide their own policy application",
+          );
+        }
+        if (before.status !== "SUBMITTED") {
+          throw new ConflictException("Policy is not in SUBMITTED status");
+        }
+        const animal = await tx.animal.findUnique({
+          where: { id: before.animalId },
+        });
+        if (!animal || animal.status !== "ACTIVE") {
+          throw new ConflictException("Insured animal is not ACTIVE");
+        }
+        const nextStatus =
+          d.decision === "approve" ? "APPROVED_AWAITING_PREMIUM" : "REJECTED";
+        const updated = await tx.insurancePolicy.updateMany({
+          where: { id, version, status: "SUBMITTED" },
+          data: {
+            status: nextStatus,
+            decisionNote: d.note.trim(),
+            decidedById: p.userId,
+            decidedAt: new Date(),
+            version: { increment: 1 },
+          },
+        });
+        if (!updated.count) throw new ConflictException();
+        const row = await tx.insurancePolicy.findUniqueOrThrow({
+          where: { id },
+        });
+        await OutboxWorkerService.enqueue(tx, {
+          topic: "POLICY_DECIDED",
+          dedupeKey: `policy-decided:${id}:${row.version}`,
+          aggregateKind: "insurance_policy",
+          aggregateId: id,
+          payload: {
+            recipientId: row.farmerId,
+            linkKind: "policy",
+            linkId: id,
+          },
+        });
+        await tx.auditEvent.create({
+          data: {
+            actorId: p.userId,
+            actorKind: "USER",
+            action:
+              d.decision === "approve"
+                ? "POLICY_APPROVED_AWAITING_PREMIUM"
+                : "POLICY_REJECTED",
+            targetKind: "insurance_policy",
+            targetId: id,
+            metadata: {
+              insurerOrganizationId: row.insurerOrganizationId,
+              animalId: row.animalId,
+              status: row.status,
+            },
+          },
+        });
+        return row;
+      },
+    );
+  }
+
+  private async applyPolicyPremiumConfirmation(
+    tx: Tx,
+    policyId: string,
+    paymentIntentId: string,
+    amountMinor: bigint,
+    debitSource: "USER_WALLET" | "PROVIDER_CLEARING",
+    now: Date,
+  ) {
+    await tx.$queryRaw`SELECT id FROM palito.insurance_policies WHERE id = ${policyId}::uuid FOR UPDATE`;
+    const policy = await tx.insurancePolicy.findUniqueOrThrow({
+      where: { id: policyId },
+    });
+    await this.lockAnimal(tx, policy.animalId);
+    if (policy.status !== "APPROVED_AWAITING_PREMIUM") {
+      throw new ConflictException(
+        "Policy is not awaiting premium confirmation",
+      );
+    }
+    if (amountMinor !== policy.premiumMinor) {
+      throw new ConflictException(
+        "Premium amount does not match policy premiumMinor",
+      );
+    }
+    const animal = await tx.animal.findUniqueOrThrow({
+      where: { id: policy.animalId },
+    });
+    if (animal.status !== "ACTIVE") {
+      throw new ConflictException(
+        "Cannot activate coverage on a non-ACTIVE animal",
+      );
+    }
+    const debitAccount =
+      debitSource === "USER_WALLET"
+        ? await this.ensureAccount(tx, "USER_WALLET", {
+            ownerUserId: policy.farmerId,
+          })
+        : await this.ensureAccount(tx, "PROVIDER_CLEARING");
+    const insurerAccount = await this.ensureAccount(tx, "INSURER_POOL", {
+      organizationId: policy.insurerOrganizationId,
+    });
+    const ledgerTx = await this.postBalancedTransaction(tx, {
+      idempotencyKey: `payment-intent:${paymentIntentId}`,
+      referenceKind: "POLICY_PREMIUM",
+      referenceId: paymentIntentId,
+      description: `Sandbox insurance premium for policy ${policy.id}`,
+      debitAccountId: debitAccount.id,
+      creditAccountId: insurerAccount.id,
+      amountMinor: policy.premiumMinor,
+    });
+    const startsAt = new Date(
+      now.getTime() + policy.waitingDays * 86_400_000,
+    );
+    const endsAt = addCalendarMonthsUtc(startsAt, policy.termMonths);
+    const updatedPolicy = await tx.insurancePolicy.update({
+      where: { id: policy.id },
+      data: {
+        status: "ACTIVE",
+        premiumPaymentIntentId: paymentIntentId,
+        premiumConfirmedAt: now,
+        startsAt,
+        endsAt,
+        version: { increment: 1 },
+      },
+    });
+    await OutboxWorkerService.enqueue(tx, {
+      topic: "POLICY_ACTIVATED",
+      dedupeKey: `policy-activated:${policy.id}`,
+      aggregateKind: "insurance_policy",
+      aggregateId: policy.id,
+      payload: {
+        recipientId: policy.farmerId,
+        linkKind: "policy",
+        linkId: policy.id,
+      },
+    });
+    await tx.auditEvent.create({
+      data: {
+        actorId: policy.farmerId,
+        actorKind: "USER",
+        action: "POLICY_ACTIVATED",
+        targetKind: "insurance_policy",
+        targetId: policy.id,
+        metadata: {
+          paymentIntentId,
+          ledgerTxId: ledgerTx.id,
+          startsAt: startsAt.toISOString(),
+          endsAt: endsAt.toISOString(),
+        },
+      },
+    });
+    return { updatedPolicy, ledgerTxId: ledgerTx.id };
+  }
+
+  async createPolicyPremiumIntent(
+    p: AccountPrincipal,
+    policyId: string,
+    key: string | undefined,
+    version: number,
+    d: PolicyPremiumIntentDto,
+  ) {
+    return this.command(
+      p,
+      key,
+      `policy.premium:${policyId}`,
+      { version, d },
+      async (tx) => {
+        const before = await tx.insurancePolicy.findUnique({
+          where: { id: policyId },
+        });
+        if (!before || before.farmerId !== p.userId) {
+          throw new NotFoundException();
+        }
+        await this.lockAnimal(tx, before.animalId);
+        await tx.$queryRaw`SELECT id FROM palito.insurance_policies WHERE id = ${policyId}::uuid FOR UPDATE`;
+        const policy = await tx.insurancePolicy.findUniqueOrThrow({
+          where: { id: policyId },
+        });
+        if (policy.version !== version) {
+          throw new ConflictException();
+        }
+        if (policy.status !== "APPROVED_AWAITING_PREMIUM") {
+          throw new ConflictException(
+            "Policy must be APPROVED_AWAITING_PREMIUM before paying premium",
+          );
+        }
+        const provider = d.provider ?? "SANDBOX_SIMULATOR";
+        const now = new Date();
+        if (provider === "WALLET") {
+          const walletAccount = await this.ensureAccount(tx, "USER_WALLET", {
+            ownerUserId: p.userId,
+          });
+          await tx.$queryRaw`SELECT id FROM palito.ledger_accounts WHERE id = ${walletAccount.id}::uuid FOR UPDATE`;
+          const balance = await this.computeAccountBalanceMinor(
+            tx,
+            walletAccount.id,
+          );
+          if (balance < policy.premiumMinor) {
+            throw new ConflictException("Insufficient sandbox wallet balance");
+          }
+          const intent = await tx.paymentIntent.create({
+            data: {
+              actorId: p.userId,
+              kind: "POLICY_PREMIUM",
+              targetKind: "policy",
+              targetId: policy.id,
+              provider: "WALLET",
+              status: "CONFIRMED",
+              amountMinor: policy.premiumMinor,
+              currency: "BDT",
+              idempotencyKey: `policy-premium-wallet:${p.userId}:${key}`,
+              confirmedAt: now,
+            },
+          });
+          const { updatedPolicy, ledgerTxId } =
+            await this.applyPolicyPremiumConfirmation(
+              tx,
+              policy.id,
+              intent.id,
+              policy.premiumMinor,
+              "USER_WALLET",
+              now,
+            );
+          await tx.paymentIntent.update({
+            where: { id: intent.id },
+            data: { ledgerTxId },
+          });
+          return {
+            paymentIntent: { ...intent, ledgerTxId },
+            policy: updatedPolicy,
+          };
+        }
+
+        const intent = await tx.paymentIntent.create({
+          data: {
+            actorId: p.userId,
+            kind: "POLICY_PREMIUM",
+            targetKind: "policy",
+            targetId: policy.id,
+            provider,
+            status: "PROVIDER_ACCEPTED",
+            amountMinor: policy.premiumMinor,
+            currency: "BDT",
+            idempotencyKey: `policy-premium:${p.userId}:${key}`,
+          },
+        });
+        const updatedPolicy = await tx.insurancePolicy.update({
+          where: { id: policy.id },
+          data: {
+            premiumPaymentIntentId: intent.id,
+            version: { increment: 1 },
+          },
+        });
+        return {
+          paymentIntent: intent,
+          policy: updatedPolicy,
+        };
+      },
+    );
+  }
+
+  async renewPolicy(
+    p: AccountPrincipal,
+    policyId: string,
+    key: string | undefined,
+    d: RenewPolicyDto,
+  ) {
+    return this.command(
+      p,
+      key,
+      `policy.renew:${policyId}`,
+      d,
+      async (tx) => {
+        const previous = await tx.insurancePolicy.findUnique({
+          where: { id: policyId },
+        });
+        if (!previous || previous.farmerId !== p.userId) {
+          throw new NotFoundException();
+        }
+        await this.lockAnimal(tx, previous.animalId);
+        const animal = await this.requireActiveFarmerOwner(
+          tx,
+          p,
+          previous.animalId,
+        );
+        if (animal.status !== "ACTIVE") {
+          throw new ConflictException(
+            "Only ACTIVE animals can renew insurance coverage",
+          );
+        }
+        const now = new Date();
+        if (
+          previous.status === "ACTIVE" &&
+          previous.endsAt &&
+          previous.endsAt.getTime() <= now.getTime()
+        ) {
+          await tx.insurancePolicy.update({
+            where: { id: previous.id },
+            data: { status: "EXPIRED", version: { increment: 1 } },
+          });
+        } else if (previous.status !== "EXPIRED") {
+          throw new ConflictException(
+            "Only EXPIRED policies (or policies past their endsAt window) can be renewed without overlapping coverage",
+          );
+        }
+        const coverageMinor = parseMinorUnits(d.coverageMinor);
+        const premiumMinor = parseMinorUnits(d.premiumMinor);
+        if (premiumMinor > coverageMinor) {
+          throw new BadRequestException(
+            "premiumMinor cannot exceed coverageMinor",
+          );
+        }
+        const evidenceFileId = await this.validatePolicyEvidenceFile(
+          tx,
+          p.userId,
+          animal.id,
+          d.evidenceFileId,
+        );
+        const lastPolicy = await tx.insurancePolicy.findFirst({
+          where: { animalId: animal.id },
+          orderBy: { policyVersion: "desc" },
+        });
+        const nextPolicyVersion = (lastPolicy?.policyVersion ?? 0) + 1;
+        let renewed;
+        try {
+          renewed = await tx.insurancePolicy.create({
+            data: {
+              animalId: animal.id,
+              farmerId: p.userId,
+              insurerOrganizationId: previous.insurerOrganizationId,
+              evidenceFileId,
+              renewedFromPolicyId: previous.id,
+              policyVersion: nextPolicyVersion,
+              termVersion: "ins-sandbox-v1",
+              consentVersion: d.consentVersion,
+              coverageMinor,
+              premiumMinor,
+              termMonths: d.termMonths,
+              waitingDays: 0,
+              currency: "BDT",
+              status: "SUBMITTED",
+            },
+          });
+        } catch (err) {
+          if (
+            err instanceof Prisma.PrismaClientKnownRequestError &&
+            err.code === "P2002"
+          ) {
+            throw new ConflictException(
+              "Policy was already renewed or animal already has a live policy",
+            );
+          }
+          throw err;
+        }
+        await tx.auditEvent.create({
+          data: {
+            actorId: p.userId,
+            actorKind: "USER",
+            action: "POLICY_RENEWED",
+            targetKind: "insurance_policy",
+            targetId: renewed.id,
+            metadata: {
+              renewedFromPolicyId: previous.id,
+              animalId: animal.id,
+              policyVersion: nextPolicyVersion,
+            },
+          },
+        });
+        return renewed;
+      },
+    );
+  }
+
+  async submitClaim(
+    p: AccountPrincipal,
+    key: string | undefined,
+    d: CreateClaimDto,
+  ) {
+    return this.command(p, key, "claim.submit", d, async (tx) => {
+      if (d.incidentKind !== "DEATH") {
+        throw new ConflictException(
+          "Illness and repeat illness claims are disabled in ins-sandbox-v1 until insurer repeat/partial policy is approved (SRS-GAP-09)",
+        );
+      }
+      const policy = await tx.insurancePolicy.findUnique({
+        where: { id: d.policyId },
+      });
+      if (!policy || policy.farmerId !== p.userId) {
+        throw new NotFoundException();
+      }
+      await this.lockAnimal(tx, policy.animalId);
+      const animal = await this.requireActiveFarmerOwner(
+        tx,
+        p,
+        policy.animalId,
+      );
+      const incidentAt = instant(d.incidentAt);
+      const now = new Date();
+      if (incidentAt.getTime() > now.getTime()) {
+        throw new BadRequestException("incidentAt cannot be in the future");
+      }
+      if (
+        !policy.premiumConfirmedAt ||
+        !policy.startsAt ||
+        !policy.endsAt ||
+        !["ACTIVE", "EXPIRED"].includes(policy.status) ||
+        incidentAt.getTime() < policy.startsAt.getTime() ||
+        incidentAt.getTime() > policy.endsAt.getTime()
+      ) {
+        throw new ConflictException(
+          "Policy did not have active confirmed coverage at incidentAt",
+        );
+      }
+      const claimedAmountMinor = parseMinorUnits(d.claimedAmountMinor);
+      if (claimedAmountMinor > policy.coverageMinor) {
+        throw new BadRequestException(
+          "claimedAmountMinor cannot exceed policy coverageMinor",
+        );
+      }
+      const uniqueFileIds = [...new Set(d.evidenceFileIds)];
+      const readyFiles = await tx.privateFile.findMany({
+        where: {
+          id: { in: uniqueFileIds },
+          animalId: animal.id,
+          ownerAtUploadId: p.userId,
+          status: "READY",
+        },
+      });
+      if (readyFiles.length !== uniqueFileIds.length) {
+        throw new BadRequestException(
+          "All claim evidenceFileIds must be READY private files owned by the farmer for this animal",
+        );
+      }
+      const reviewTargetAt = new Date(now.getTime() + 7 * 86_400_000);
+      let claim;
+      try {
+        claim = await tx.insuranceClaim.create({
+          data: {
+            policyId: policy.id,
+            animalId: animal.id,
+            farmerId: p.userId,
+            insurerOrganizationId: policy.insurerOrganizationId,
+            incidentKind: "DEATH",
+            incidentAt,
+            description: d.description.trim(),
+            claimedAmountMinor,
+            currency: "BDT",
+            status: "SUBMITTED",
+            reviewTargetAt,
+          },
+        });
+      } catch (err) {
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === "P2002"
+        ) {
+          throw new ConflictException(
+            "Policy already has an active or settled claim",
+          );
+        }
+        throw err;
+      }
+      await tx.claimEvidenceLink.createMany({
+        data: uniqueFileIds.map((fileId) => ({
+          claimId: claim.id,
+          fileId,
+        })),
+      });
+      await OutboxWorkerService.enqueue(tx, {
+        topic: "CLAIM_SUBMITTED",
+        dedupeKey: `claim-submitted:${claim.id}`,
+        aggregateKind: "insurance_claim",
+        aggregateId: claim.id,
+        payload: {
+          recipientId: p.userId,
+          linkKind: "claim",
+          linkId: claim.id,
+        },
+      });
+      await tx.auditEvent.create({
+        data: {
+          actorId: p.userId,
+          actorKind: "USER",
+          action: "CLAIM_SUBMITTED",
+          targetKind: "insurance_claim",
+          targetId: claim.id,
+          metadata: {
+            policyId: policy.id,
+            animalId: animal.id,
+            incidentKind: "DEATH",
+            claimedAmountMinor: claimedAmountMinor.toString(),
+            evidenceCount: uniqueFileIds.length,
+          },
+        },
+      });
+      return tx.insuranceClaim.findUniqueOrThrow({
+        where: { id: claim.id },
+        include: { evidenceLinks: true, reviews: true, referralGrants: true },
+      });
+    });
+  }
+
+  async listClaims(p: AccountPrincipal, q: ClaimsPageDto = {}) {
+    this.requireSandboxEnabled();
+    const limit = q.limit ?? 25;
+    let after: { createdAt: Date; id: string } | undefined;
+    if (q.cursor) {
+      try {
+        const parsed = JSON.parse(
+          Buffer.from(q.cursor, "base64url").toString("utf8"),
+        );
+        if (
+          !Array.isArray(parsed) ||
+          parsed.length !== 2 ||
+          typeof parsed[0] !== "string" ||
+          typeof parsed[1] !== "string"
+        ) {
+          throw new Error("Bad cursor");
+        }
+        after = { createdAt: instant(parsed[0]), id: parsed[1] };
+      } catch {
+        throw new BadRequestException("Invalid cursor");
+      }
+    }
+    const insurerOrgIds = p.memberships
+      .filter((m) => m.role === "INSURER_STAFF")
+      .map((m) => m.organizationId);
+    const isVet = p.memberships.some((m) => m.role === "VET");
+
+    const rows = await this.db.prisma.insuranceClaim.findMany({
+      where: {
+        OR: [
+          { farmerId: p.userId },
+          ...(insurerOrgIds.length > 0
+            ? [{ insurerOrganizationId: { in: insurerOrgIds } }]
+            : []),
+          ...(isVet
+            ? [
+                {
+                  referralGrants: {
+                    some: {
+                      vetId: p.userId,
+                      status: { in: ["ACTIVE", "COMPLETED"] },
+                    },
+                  },
+                },
+              ]
+            : []),
+        ],
+        ...(q.status ? { status: q.status } : {}),
+        ...(after
+          ? {
+              AND: [
+                {
+                  OR: [
+                    { createdAt: { lt: after.createdAt } },
+                    { createdAt: after.createdAt, id: { lt: after.id } },
+                  ],
+                },
+              ],
+            }
+          : {}),
+      },
+      include: {
+        evidenceLinks: true,
+        reviews: { orderBy: { createdAt: "asc" } },
+        referralGrants: { orderBy: { createdAt: "desc" } },
+        settlementAllocation: true,
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: limit + 1,
+    });
+    const more = rows.length > limit;
+    const items = rows.slice(0, limit);
+    const last = items.at(-1);
+    return json({
+      items,
+      nextCursor:
+        more && last
+          ? Buffer.from(
+              JSON.stringify([last.createdAt.toISOString(), last.id]),
+            ).toString("base64url")
+          : null,
+      sandboxMode: true,
+    });
+  }
+
+  async claimDetail(p: AccountPrincipal, id: string) {
+    this.requireSandboxEnabled();
+    return this.db.prisma.$transaction(async (tx) => {
+      const claim = await tx.insuranceClaim.findUnique({
+        where: { id },
+        include: {
+          policy: true,
+          evidenceLinks: true,
+          reviews: { orderBy: { createdAt: "asc" } },
+          referralGrants: { orderBy: { createdAt: "desc" } },
+          settlementAllocation: true,
+        },
+      });
+      if (!claim) throw new NotFoundException();
+      const isFarmer = claim.farmerId === p.userId;
+      const isInsurer = p.memberships.some(
+        (m) =>
+          m.role === "INSURER_STAFF" &&
+          m.organizationId === claim.insurerOrganizationId,
+      );
+      const isReferredVet =
+        p.memberships.some((m) => m.role === "VET") &&
+        claim.referralGrants.some(
+          (g) =>
+            g.vetId === p.userId &&
+            (g.status === "COMPLETED" ||
+              (g.status === "ACTIVE" && g.expiresAt.getTime() > Date.now())),
+        );
+      if (!isFarmer && !isInsurer && !isReferredVet) {
+        throw new NotFoundException();
+      }
+      return json(claim);
+    });
+  }
+
+  async requestClaimReview(
+    p: AccountPrincipal,
+    id: string,
+    key: string | undefined,
+    version: number,
+  ) {
+    return this.command(
+      p,
+      key,
+      `claim.review-request:${id}`,
+      { version },
+      async (tx) => {
+        const claim = await tx.insuranceClaim.findUnique({
+          where: { id },
+          include: { policy: true, evidenceLinks: true },
+        });
+        if (!claim) throw new NotFoundException();
+        await this.requireInsurerStaff(tx, p, claim.insurerOrganizationId);
+        if (!["SUBMITTED", "UNDER_REVIEW"].includes(claim.status)) {
+          throw new ConflictException(
+            "Advisory review check is only valid on SUBMITTED or UNDER_REVIEW claims",
+          );
+        }
+        const vetRecordsCount = await tx.healthRecord.count({
+          where: { animalId: claim.animalId, source: "VET" },
+        });
+        const updated = await tx.insuranceClaim.updateMany({
+          where: { id, version, status: { in: ["SUBMITTED", "UNDER_REVIEW"] } },
+          data: {
+            status: "UNDER_REVIEW",
+            version: { increment: 1 },
+          },
+        });
+        if (!updated.count) throw new ConflictException();
+        const review = await tx.claimReview.create({
+          data: {
+            claimId: claim.id,
+            authorId: p.userId,
+            authorRole: "INSURER_STAFF",
+            kind: "ADVISORY_CHECK",
+            recommendation:
+              vetRecordsCount > 0 ? "PROCEED_TO_REVIEW" : "REFER_TO_VET",
+            notes:
+              "Advisory coverage & evidence check only; IoT/weather providers pending M8a/b and no autonomous payout is permitted.",
+            metadata: {
+              incidentWithinCoverageWindow: true,
+              evidenceFileCount: claim.evidenceLinks.length,
+              verifiedVetRecordCount: vetRecordsCount,
+              autonomousApprovalAllowed: false,
+            },
+          },
+        });
+        return {
+          claimId: claim.id,
+          insurerOrganizationId: claim.insurerOrganizationId,
+          status: "UNDER_REVIEW",
+          version: version + 1,
+          review,
+        };
+      },
+    );
+  }
+
+  async referClaimToVet(
+    p: AccountPrincipal,
+    id: string,
+    key: string | undefined,
+    version: number,
+    d: ClaimReferralDto,
+  ) {
+    return this.command(
+      p,
+      key,
+      `claim.refer:${id}`,
+      { version, d },
+      async (tx) => {
+        const claim = await tx.insuranceClaim.findUnique({ where: { id } });
+        if (!claim) throw new NotFoundException();
+        await this.requireInsurerStaff(tx, p, claim.insurerOrganizationId);
+        if (
+          !["SUBMITTED", "UNDER_REVIEW", "REFERRED_TO_VET"].includes(
+            claim.status,
+          )
+        ) {
+          throw new ConflictException(
+            "Claim cannot be referred in its current status",
+          );
+        }
+        const verifiedVet = await tx.vetCredential.findFirst({
+          where: {
+            userId: d.vetId,
+            status: "VERIFIED",
+            user: {
+              status: "ACTIVE",
+              memberships: {
+                some: {
+                  role: "VET",
+                  status: "ACTIVE",
+                  organization: { kind: "CLINIC", status: "ACTIVE" },
+                },
+              },
+            },
+          },
+        });
+        if (!verifiedVet) {
+          throw new BadRequestException(
+            "Target vetId must be an active VERIFIED veterinarian in an active clinic",
+          );
+        }
+        if (d.vetId === claim.farmerId) {
+          throw new ForbiddenException(
+            "Claim claimant cannot be referred as reviewing veterinarian",
+          );
+        }
+        const updated = await tx.insuranceClaim.updateMany({
+          where: {
+            id,
+            version,
+            status: { in: ["SUBMITTED", "UNDER_REVIEW", "REFERRED_TO_VET"] },
+          },
+          data: {
+            status: "REFERRED_TO_VET",
+            version: { increment: 1 },
+          },
+        });
+        if (!updated.count) throw new ConflictException();
+        await tx.claimReferralGrant.updateMany({
+          where: { claimId: claim.id, status: "ACTIVE" },
+          data: { status: "REVOKED" },
+        });
+        const hours = d.expiresInHours ?? 72;
+        const expiresAt = new Date(Date.now() + hours * 3_600_000);
+        const grant = await tx.claimReferralGrant.create({
+          data: {
+            claimId: claim.id,
+            animalId: claim.animalId,
+            vetId: d.vetId,
+            referredById: p.userId,
+            note: d.note.trim(),
+            status: "ACTIVE",
+            expiresAt,
+          },
+        });
+        await OutboxWorkerService.enqueue(tx, {
+          topic: "CLAIM_REFERRED_TO_VET",
+          dedupeKey: `claim-referred:${grant.id}`,
+          aggregateKind: "insurance_claim",
+          aggregateId: claim.id,
+          payload: {
+            recipientId: d.vetId,
+            linkKind: "claim",
+            linkId: claim.id,
+          },
+        });
+        await tx.auditEvent.create({
+          data: {
+            actorId: p.userId,
+            actorKind: "USER",
+            action: "CLAIM_REFERRED_TO_VET",
+            targetKind: "insurance_claim",
+            targetId: claim.id,
+            metadata: {
+              vetId: d.vetId,
+              grantId: grant.id,
+              expiresAt: expiresAt.toISOString(),
+            },
+          },
+        });
+        return {
+          claimId: claim.id,
+          insurerOrganizationId: claim.insurerOrganizationId,
+          status: "REFERRED_TO_VET",
+          version: version + 1,
+          referralGrant: grant,
+        };
+      },
+    );
+  }
+
+  async submitClaimVetOpinion(
+    p: AccountPrincipal,
+    id: string,
+    key: string | undefined,
+    version: number,
+    d: ClaimVetOpinionDto,
+  ) {
+    return this.command(
+      p,
+      key,
+      `claim.opinion:${id}`,
+      { version, d },
+      async (tx) => {
+        await this.requireVerifiedVet(tx, p);
+        const claim = await tx.insuranceClaim.findUnique({ where: { id } });
+        if (!claim) throw new NotFoundException();
+        const grant = await tx.claimReferralGrant.findFirst({
+          where: {
+            claimId: claim.id,
+            vetId: p.userId,
+            status: "ACTIVE",
+            expiresAt: { gt: new Date() },
+          },
+        });
+        if (!grant) {
+          throw new ForbiddenException(
+            "An active, non-expired claim referral grant is required to submit a clinical opinion",
+          );
+        }
+        if (claim.status !== "REFERRED_TO_VET") {
+          throw new ConflictException("Claim is not awaiting vet referral review");
+        }
+        const updated = await tx.insuranceClaim.updateMany({
+          where: { id, version, status: "REFERRED_TO_VET" },
+          data: {
+            status: "VET_REVIEWED",
+            version: { increment: 1 },
+          },
+        });
+        if (!updated.count) throw new ConflictException();
+        const now = new Date();
+        await tx.claimReferralGrant.update({
+          where: { id: grant.id },
+          data: { status: "COMPLETED", completedAt: now },
+        });
+        const review = await tx.claimReview.create({
+          data: {
+            claimId: claim.id,
+            authorId: p.userId,
+            authorRole: "VET",
+            kind: "VET_OPINION",
+            recommendation: d.recommendation,
+            notes: d.clinicalOpinion.trim(),
+            metadata: { referralGrantId: grant.id },
+          },
+        });
+        await OutboxWorkerService.enqueue(tx, {
+          topic: "CLAIM_VET_REVIEWED",
+          dedupeKey: `claim-vet-reviewed:${review.id}`,
+          aggregateKind: "insurance_claim",
+          aggregateId: claim.id,
+          payload: {
+            recipientId: grant.referredById,
+            linkKind: "claim",
+            linkId: claim.id,
+          },
+        });
+        await tx.auditEvent.create({
+          data: {
+            actorId: p.userId,
+            actorKind: "USER",
+            action: "CLAIM_VET_OPINION_SIGNED",
+            targetKind: "insurance_claim",
+            targetId: claim.id,
+            metadata: {
+              reviewId: review.id,
+              recommendation: d.recommendation,
+            },
+          },
+        });
+        return {
+          claimId: claim.id,
+          status: "VET_REVIEWED",
+          version: version + 1,
+          review,
+        };
+      },
+    );
+  }
+
+  async decideClaim(
+    p: AccountPrincipal,
+    id: string,
+    key: string | undefined,
+    version: number,
+    d: ClaimDecisionDto,
+  ) {
+    return this.command(
+      p,
+      key,
+      `claim.decide:${id}`,
+      { version, d },
+      async (tx) => {
+        const claim = await tx.insuranceClaim.findUnique({
+          where: { id },
+          include: {
+            policy: true,
+            reviews: true,
+            referralGrants: true,
+            evidenceLinks: true,
+          },
+        });
+        if (!claim) throw new NotFoundException();
+        await this.lockAnimal(tx, claim.animalId);
+        await this.requireInsurerStaff(tx, p, claim.insurerOrganizationId);
+        if (claim.farmerId === p.userId) {
+          throw new ForbiddenException(
+            "Insurer staff cannot decide their own insurance claim",
+          );
+        }
+        if (
+          !["UNDER_REVIEW", "VET_REVIEWED", "SUBMITTED"].includes(claim.status)
+        ) {
+          throw new ConflictException(
+            "Claim cannot be decided in its current status",
+          );
+        }
+        if (d.decision === "approve") {
+          if (claim.evidenceLinks.length === 0 || claim.reviews.length === 0) {
+            throw new ConflictException(
+              "Claim approval requires linked private evidence and at least one recorded review or vet opinion",
+            );
+          }
+          const priorInsurerActorIds = new Set<string>([
+            ...claim.reviews
+              .filter((r) => r.authorRole === "INSURER_STAFF")
+              .map((r) => r.authorId),
+            ...claim.referralGrants.map((g) => g.referredById),
+          ]);
+          if (priorInsurerActorIds.has(p.userId)) {
+            throw new ForbiddenException(
+              "Maker/checker separation: insurer staff who initiated review or vet referral cannot approve the final claim payout decision",
+            );
+          }
+        }
+        const approvedAmountMinor =
+          d.decision === "approve"
+            ? d.approvedAmountMinor
+              ? parseMinorUnits(d.approvedAmountMinor)
+              : claim.claimedAmountMinor
+            : null;
+        if (
+          approvedAmountMinor !== null &&
+          (approvedAmountMinor <= 0n ||
+            approvedAmountMinor > claim.claimedAmountMinor ||
+            approvedAmountMinor > claim.policy.coverageMinor)
+        ) {
+          throw new BadRequestException(
+            "approvedAmountMinor must be positive and cannot exceed claimedAmountMinor or policy coverageMinor",
+          );
+        }
+        const nextStatus = d.decision === "approve" ? "APPROVED" : "REJECTED";
+        const now = new Date();
+        const updated = await tx.insuranceClaim.updateMany({
+          where: {
+            id,
+            version,
+            status: { in: ["SUBMITTED", "UNDER_REVIEW", "VET_REVIEWED"] },
+          },
+          data: {
+            status: nextStatus,
+            approvedAmountMinor,
+            decisionNote: d.reason.trim(),
+            decidedById: p.userId,
+            decidedAt: now,
+            version: { increment: 1 },
+          },
+        });
+        if (!updated.count) throw new ConflictException();
+        await tx.claimReview.create({
+          data: {
+            claimId: claim.id,
+            authorId: p.userId,
+            authorRole: "INSURER_STAFF",
+            kind: "DECISION_REVIEW",
+            recommendation: d.decision === "approve" ? "APPROVE" : "REJECT",
+            notes: d.reason.trim(),
+            metadata: {
+              approvedAmountMinor: approvedAmountMinor?.toString() ?? null,
+            },
+          },
+        });
+        if (d.decision === "approve" && claim.incidentKind === "DEATH") {
+          await tx.animal.update({
+            where: { id: claim.animalId },
+            data: { status: "DECEASED", version: { increment: 1 } },
+          });
+        }
+        const row = await tx.insuranceClaim.findUniqueOrThrow({
+          where: { id },
+          include: { evidenceLinks: true, reviews: true, referralGrants: true },
+        });
+        await OutboxWorkerService.enqueue(tx, {
+          topic: "CLAIM_DECIDED",
+          dedupeKey: `claim-decided:${id}:${row.version}`,
+          aggregateKind: "insurance_claim",
+          aggregateId: id,
+          payload: {
+            recipientId: row.farmerId,
+            linkKind: "claim",
+            linkId: id,
+          },
+        });
+        await tx.auditEvent.create({
+          data: {
+            actorId: p.userId,
+            actorKind: "USER",
+            action:
+              d.decision === "approve" ? "CLAIM_APPROVED" : "CLAIM_REJECTED",
+            targetKind: "insurance_claim",
+            targetId: id,
+            metadata: {
+              animalId: row.animalId,
+              insurerOrganizationId: row.insurerOrganizationId,
+              approvedAmountMinor: approvedAmountMinor?.toString() ?? null,
+            },
+          },
+        });
+        return row;
+      },
+    );
+  }
+
+  private async applyClaimSettlementConfirmation(
+    tx: Tx,
+    claimId: string,
+    paymentIntentId: string,
+    settledAmountMinor: bigint,
+    now: Date,
+  ) {
+    const targetClaim = await tx.insuranceClaim.findUniqueOrThrow({
+      where: { id: claimId },
+    });
+    await this.lockAnimal(tx, targetClaim.animalId);
+    await tx.$queryRaw`SELECT id FROM palito.insurance_claims WHERE id = ${claimId}::uuid FOR UPDATE`;
+    const claim = await tx.insuranceClaim.findUniqueOrThrow({
+      where: { id: claimId },
+    });
+    if (!["APPROVED", "SETTLING"].includes(claim.status)) {
+      throw new ConflictException("Claim is not in APPROVED or SETTLING state");
+    }
+    if (
+      !claim.approvedAmountMinor ||
+      claim.approvedAmountMinor !== settledAmountMinor
+    ) {
+      throw new ConflictException(
+        "Settlement amount does not match claim approvedAmountMinor",
+      );
+    }
+
+    const activeLoanRow = await tx.loan.findFirst({
+      where: { animalId: claim.animalId, status: "ACTIVE" },
+      orderBy: { createdAt: "asc" },
+    });
+    let activeLoan = activeLoanRow;
+    if (activeLoanRow) {
+      await tx.$queryRaw`SELECT id FROM palito.loans WHERE id = ${activeLoanRow.id}::uuid FOR UPDATE`;
+      activeLoan = await tx.loan.findUniqueOrThrow({
+        where: { id: activeLoanRow.id },
+      });
+    }
+    const currentDebtMinor =
+      activeLoan && activeLoan.status === "ACTIVE"
+        ? activeLoan.outstandingMinor
+        : 0n;
+    const split = allocateClaimSettlement(
+      claim.approvedAmountMinor,
+      currentDebtMinor,
+    );
+
+    const insurerAccount = await this.ensureAccount(tx, "INSURER_POOL", {
+      organizationId: claim.insurerOrganizationId,
+    });
+    const legs: Array<{
+      accountId: string;
+      direction: "DEBIT" | "CREDIT";
+      amountMinor: bigint;
+    }> = [
+      {
+        accountId: insurerAccount.id,
+        direction: "DEBIT",
+        amountMinor: split.totalSettledMinor,
+      },
+    ];
+
+    if (split.debtPayoffMinor > 0n && activeLoan) {
+      const bankAccount = await this.ensureAccount(tx, "BANK_POOL", {
+        organizationId: activeLoan.bankOrganizationId,
+      });
+      legs.push({
+        accountId: bankAccount.id,
+        direction: "CREDIT",
+        amountMinor: split.debtPayoffMinor,
+      });
+    }
+    if (split.farmerRemainderMinor > 0n) {
+      const farmerWallet = await this.ensureAccount(tx, "USER_WALLET", {
+        ownerUserId: claim.farmerId,
+      });
+      legs.push({
+        accountId: farmerWallet.id,
+        direction: "CREDIT",
+        amountMinor: split.farmerRemainderMinor,
+      });
+    }
+
+    const ledgerTx = await this.postMultiLegBalancedTransaction(tx, {
+      idempotencyKey: `payment-intent:${paymentIntentId}`,
+      referenceKind: "CLAIM_SETTLEMENT",
+      referenceId: paymentIntentId,
+      description: `Sandbox debt-first insurance claim settlement for claim ${claim.id}`,
+      legs,
+    });
+
+    if (split.debtPayoffMinor > 0n && activeLoan) {
+      await this.applyLoanRepaymentSettlement(
+        tx,
+        activeLoan,
+        paymentIntentId,
+        split.debtPayoffMinor,
+      );
+    }
+
+    const allocation = await tx.claimSettlementAllocation.create({
+      data: {
+        claimId: claim.id,
+        paymentIntentId,
+        ledgerTxId: ledgerTx.id,
+        loanId:
+          split.debtPayoffMinor > 0n && activeLoan ? activeLoan.id : null,
+        bankOrganizationId:
+          split.debtPayoffMinor > 0n && activeLoan
+            ? activeLoan.bankOrganizationId
+            : null,
+        debtAllocatedMinor: split.debtPayoffMinor,
+        farmerAllocatedMinor: split.farmerRemainderMinor,
+        totalSettledMinor: split.totalSettledMinor,
+        currency: "BDT",
+      },
+    });
+
+    const updatedClaim = await tx.insuranceClaim.update({
+      where: { id: claim.id },
+      data: {
+        status: "SETTLED",
+        settledAt: now,
+        version: { increment: 1 },
+      },
+    });
+    await tx.insurancePolicy.update({
+      where: { id: claim.policyId },
+      data: {
+        status: "CLAIMED",
+        version: { increment: 1 },
+      },
+    });
+    await tx.animal.updateMany({
+      where: { id: claim.animalId, status: { not: "DECEASED" } },
+      data: { status: "DECEASED", version: { increment: 1 } },
+    });
+    await OutboxWorkerService.enqueue(tx, {
+      topic: "CLAIM_SETTLED",
+      dedupeKey: `claim-settled:${claim.id}`,
+      aggregateKind: "insurance_claim",
+      aggregateId: claim.id,
+      payload: {
+        recipientId: claim.farmerId,
+        linkKind: "claim",
+        linkId: claim.id,
+      },
+    });
+    await tx.auditEvent.create({
+      data: {
+        actorId: claim.decidedById ?? claim.farmerId,
+        actorKind: "USER",
+        action: "CLAIM_SETTLED",
+        targetKind: "insurance_claim",
+        targetId: claim.id,
+        metadata: {
+          paymentIntentId,
+          ledgerTxId: ledgerTx.id,
+          loanId: allocation.loanId,
+          debtAllocatedMinor: split.debtPayoffMinor.toString(),
+          farmerAllocatedMinor: split.farmerRemainderMinor.toString(),
+          totalSettledMinor: split.totalSettledMinor.toString(),
+        },
+      },
+    });
+
+    return {
+      updatedClaim,
+      allocation,
+      ledgerTxId: ledgerTx.id,
+    };
+  }
+
+  async settleClaim(
+    p: AccountPrincipal,
+    id: string,
+    key: string | undefined,
+    version: number,
+    d: ClaimSettlementDto,
+  ) {
+    return this.command(
+      p,
+      key,
+      `claim.settle:${id}`,
+      { version, d },
+      async (tx) => {
+        const before = await tx.insuranceClaim.findUnique({ where: { id } });
+        if (!before) throw new NotFoundException();
+        await this.lockAnimal(tx, before.animalId);
+        await tx.$queryRaw`SELECT id FROM palito.insurance_claims WHERE id = ${id}::uuid FOR UPDATE`;
+        await this.requireInsurerStaff(tx, p, before.insurerOrganizationId);
+        const claim = await tx.insuranceClaim.findUniqueOrThrow({
+          where: { id },
+        });
+        if (claim.version !== version) {
+          throw new ConflictException();
+        }
+        if (claim.status !== "APPROVED" || !claim.approvedAmountMinor) {
+          throw new ConflictException(
+            "Only APPROVED claims with an approvedAmountMinor can be settled",
+          );
+        }
+        const provider = d.provider ?? "SANDBOX_SIMULATOR";
+        const now = new Date();
+        if (provider === "WALLET") {
+          const intent = await tx.paymentIntent.create({
+            data: {
+              actorId: p.userId,
+              kind: "CLAIM_PAYOUT",
+              targetKind: "claim",
+              targetId: claim.id,
+              provider: "WALLET",
+              status: "CONFIRMED",
+              amountMinor: claim.approvedAmountMinor,
+              currency: "BDT",
+              idempotencyKey: `claim-settle-wallet:${p.userId}:${key}`,
+              confirmedAt: now,
+            },
+          });
+          const { updatedClaim, allocation, ledgerTxId } =
+            await this.applyClaimSettlementConfirmation(
+              tx,
+              claim.id,
+              intent.id,
+              claim.approvedAmountMinor,
+              now,
+            );
+          await tx.paymentIntent.update({
+            where: { id: intent.id },
+            data: { ledgerTxId },
+          });
+          return {
+            insurerOrganizationId: claim.insurerOrganizationId,
+            paymentIntent: { ...intent, ledgerTxId },
+            claim: updatedClaim,
+            allocation,
+          };
+        }
+
+        const intent = await tx.paymentIntent.create({
+          data: {
+            actorId: p.userId,
+            kind: "CLAIM_PAYOUT",
+            targetKind: "claim",
+            targetId: claim.id,
+            provider,
+            status: "PROVIDER_ACCEPTED",
+            amountMinor: claim.approvedAmountMinor,
+            currency: "BDT",
+            idempotencyKey: `claim-settle:${p.userId}:${key}`,
+          },
+        });
+        const updatedClaim = await tx.insuranceClaim.update({
+          where: { id: claim.id },
+          data: {
+            status: "SETTLING",
+            version: { increment: 1 },
+          },
+        });
+        return {
+          insurerOrganizationId: claim.insurerOrganizationId,
+          paymentIntent: intent,
+          claim: updatedClaim,
+          allocation: null,
+        };
+      },
+    );
+  }
+
+  async listLoanSettlements(p: AccountPrincipal, loanId: string) {
+    this.requireSandboxEnabled();
+    return this.db.prisma.$transaction(async (tx) => {
+      const loan = await tx.loan.findUnique({
+        where: { id: loanId },
+        include: {
+          claimSettlementAllocations: {
+            orderBy: { createdAt: "asc" },
+          },
+        },
+      });
+      if (!loan) throw new NotFoundException();
+      const isFarmer = loan.farmerId === p.userId;
+      const isBankStaff = p.memberships.some(
+        (m) =>
+          m.role === "BANK_STAFF" &&
+          m.organizationId === loan.bankOrganizationId,
+      );
+      let isLinkedInsurer = false;
+      const insurerOrgIds = p.memberships
+        .filter((m) => m.role === "INSURER_STAFF")
+        .map((m) => m.organizationId);
+      if (
+        insurerOrgIds.length > 0 &&
+        loan.claimSettlementAllocations.length > 0
+      ) {
+        const linkedClaim = await tx.insuranceClaim.findFirst({
+          where: {
+            id: {
+              in: loan.claimSettlementAllocations.map((a) => a.claimId),
+            },
+            insurerOrganizationId: { in: insurerOrgIds },
+          },
+        });
+        if (linkedClaim) isLinkedInsurer = true;
+      }
+      if (!isFarmer && !isBankStaff && !isLinkedInsurer) {
+        throw new NotFoundException();
+      }
+      return json({
+        loanId: loan.id,
+        status: loan.status,
+        outstandingMinor: loan.outstandingMinor.toString(),
+        items: loan.claimSettlementAllocations,
       });
     });
   }

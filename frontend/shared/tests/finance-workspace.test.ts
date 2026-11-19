@@ -184,6 +184,94 @@ test("FinanceWorkspace clears state on identity change and never imports DemoSta
     new URL("../src/finance-workspace.ts", import.meta.url),
     "utf8",
   );
-  assert.ok(!source.includes("DemoState"));
+  assert.doesNotMatch(source, /from\s+["']\.\/(?:types|repository|state)/);
   assert.ok(!source.includes("./repository"));
+});
+
+test("FinanceWorkspace supports M7 insurance policy application, premium payment, and death claim submission", async () => {
+  const calls: { path: string; method?: string; body?: unknown }[] = [];
+  let policyStatus = "APPROVED_AWAITING_PREMIUM";
+
+  const transport: CareTransport = async <T>(path: string, request?: CareRequest) => {
+    calls.push({ path, method: request?.method, body: request?.body });
+    if (path === "/me") return farmerProfile as T;
+    if (path.startsWith("/policies?")) {
+      return {
+        items: [
+          {
+            id: "00000000-0000-4000-8000-000000000701",
+            animalId: "00000000-0000-4000-8000-000000000301",
+            farmerId: "farmer-1",
+            insurerOrganizationId: "00000000-0000-4000-8000-000000000801",
+            evidenceFileId: null,
+            renewedFromPolicyId: null,
+            policyVersion: 1,
+            termVersion: "ins-sandbox-v1",
+            consentVersion: "ins-sandbox-v1",
+            coverageMinor: "8000000",
+            premiumMinor: "200000",
+            termMonths: 6,
+            waitingDays: 0,
+            currency: "BDT",
+            status: policyStatus,
+            decisionNote: "Approved awaiting premium",
+            startsAt: policyStatus === "ACTIVE" ? "2026-11-15T00:00:00.000Z" : null,
+            endsAt: policyStatus === "ACTIVE" ? "2027-05-15T00:00:00.000Z" : null,
+            version: 2,
+            createdAt: "2026-11-15T00:00:00.000Z",
+          },
+        ],
+        nextCursor: null,
+      } as T;
+    }
+    if (path.startsWith("/claims?")) {
+      return { items: [], nextCursor: null } as T;
+    }
+    if (path.endsWith("/premium-intents") && request?.method === "POST") {
+      policyStatus = "ACTIVE";
+      return { paymentIntent: { id: "pi-prem", status: "CONFIRMED" } } as T;
+    }
+    if (path === "/claims" && request?.method === "POST") {
+      return { id: "claim-1", status: "SUBMITTED" } as T;
+    }
+    return { items: [], nextCursor: null } as T;
+  };
+
+  let seq = 0;
+  const workspace = new FinanceWorkspace(
+    transport,
+    () => `ins-cmd-${++seq}`,
+    () => {},
+  );
+
+  await workspace.act(() => workspace.insuranceHome());
+  assert.match(workspace.view.title, /Insurance & claim settlement sandbox/);
+  const policyCard = workspace.view.cards.find(
+    (c) => c.id === "00000000-0000-4000-8000-000000000701",
+  );
+  assert.ok(policyCard);
+  policyCard.actions
+    .find((a) => a.label === "Pay premium from sandbox wallet")!
+    .run();
+  await new Promise((r) => setImmediate(r));
+  await new Promise((r) => setImmediate(r));
+
+  const activePolicyCard = workspace.view.cards.find(
+    (c) => c.id === "00000000-0000-4000-8000-000000000701",
+  );
+  assert.ok(activePolicyCard);
+  activePolicyCard.actions.find((a) => a.label === "Submit death claim")!.run();
+  await new Promise((r) => setImmediate(r));
+  assert.ok(workspace.view.form);
+
+  await workspace.submit({
+    incidentAt: "2026-11-16T08:00:00.000Z",
+    claimedAmountMinor: "8000000",
+    evidenceFileId: "00000000-0000-4000-8000-000000000901",
+    description: "Acute mortality with vet report",
+  });
+  assert.equal(workspace.view.form, null);
+  assert.ok(
+    calls.some((c) => c.path === "/claims" && c.method === "POST"),
+  );
 });

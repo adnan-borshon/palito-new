@@ -43,12 +43,13 @@ Care/claim grant expiry, staff departure, account suspension, consent withdrawal
 
 Apply OWASP ASVS/API Security guidance to enabled API scope; guidance is not an installed scanner. Scan only authorized local/staging systems. Retention/deletion/consent policies need approval; amendments/reversals preserve necessary clinical/financial history. Do not declare legal compliance from this design.
 
-## M4–M6 enforced boundaries
+## M4–M7 enforced boundaries
 
-See [healthcare](healthcare.md), [ops M5](ops-m5.md), and [lending M6](lending-m6.md) for implemented DTOs, consent rules, outbox/ledger invariants, client boundaries, and exact pilot/sandbox limits; [progress](progress.md) records executed checks.
+See [healthcare](healthcare.md), [ops M5](ops-m5.md), [lending M6](lending-m6.md), and [insurance M7](insurance-m7.md) for implemented DTOs, consent rules, outbox/ledger/claim invariants, client boundaries, and exact pilot/sandbox limits; [progress](progress.md) records executed checks.
 - Care booking defaults off (`HEALTHCARE_NO_CHARGE_PILOT=true` enables BDT 0 pilot only).
-- Lending, wallet balances, and payment intents fail closed (`503`) unless `FINANCE_SANDBOX_ENABLED=true`, and production refuses `FINANCE_SANDBOX_ENABLED=true`, `PAYMENT_PROVIDER=sandbox`, `NOTIFICATION_CHANNEL_MODE=sandbox`, and `SANDBOX_WEBHOOK_SECRET`.
-- Bank risk projections (`/animals/:id/collateral-risk`) return redacted counts and exclude clinical notes/prescriptions (`clinicalDetailsRedacted: true`). Maker/checker enforces `assessorId !== approvedById` within the same active `BANK` org.
+- Lending, insurance policies/claims, wallet balances, and payment intents fail closed (`503`) unless `FINANCE_SANDBOX_ENABLED=true`, and production refuses `FINANCE_SANDBOX_ENABLED=true`, `PAYMENT_PROVIDER=sandbox`, `NOTIFICATION_CHANNEL_MODE=sandbox`, and `SANDBOX_WEBHOOK_SECRET`.
+- Bank risk projections (`/animals/:id/collateral-risk`) return redacted counts and exclude clinical notes/prescriptions (`clinicalDetailsRedacted: true`). Maker/checker enforces `assessorId !== approvedById` on bank valuations and `decidedById !== initiatingReviewerId` on insurer claim payout approvals.
+- Policy approval (`APPROVED_AWAITING_PREMIUM`) never activates coverage without confirmed premium payment. Claim evidence files require `READY` private uploads and grant download access only to the owner, the claim's active `INSURER_STAFF`, or the referred verified `VET` holding an active non-expired `ClaimReferralGrant`. Approved `DEATH` claims mark the animal `DECEASED` and settle debt-first under animal advisory locks.
 - Webhooks authenticate solely via HMAC-SHA256 canonical JSON signature (`X-Palito-Signature`) and deduplicate `(provider, externalEventId)` in `provider_events`.
 - M5 admin monitoring (`/admin/system-health`, `/admin/outbox/dead-letter`, `/admin/outbox/:id/retry`, `/admin/audit-events`) and M6 `/admin/ledger/reconciliation` enforce active `ADMIN` membership (with M3 MFA/recent auth). Notifications never leak clinical diagnoses or prescriptions.
-- Stop for review before M7 insurance/claims implementation.
+- Stop for review before M8 extensions.

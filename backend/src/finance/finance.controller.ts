@@ -15,14 +15,25 @@ import { Public, type AuthRequest } from "../platform/auth.js";
 import { revision } from "../care/care.service.js";
 import {
   CareFeeIntentDto,
+  ClaimDecisionDto,
+  ClaimReferralDto,
+  ClaimSettlementDto,
+  ClaimVetOpinionDto,
+  ClaimsPageDto,
+  CreateClaimDto,
   CreateLoanDto,
   CreateLoanQuoteDto,
+  CreatePolicyDto,
   CreateValuationDto,
   DisburseLoanDto,
   GraceDecisionDto,
   LoanDecisionDto,
   LoansPageDto,
+  PoliciesPageDto,
+  PolicyDecisionDto,
+  PolicyPremiumIntentDto,
   ProviderWebhookDto,
+  RenewPolicyDto,
   RepaymentIntentDto,
 } from "./dto.js";
 import { FinanceService } from "./finance.service.js";
@@ -202,5 +213,170 @@ export class FinanceController {
   @Get("admin/ledger/reconciliation")
   reconcileLedger(@Req() r: AuthRequest) {
     return this.finance.reconcileLedger(r.principal);
+  }
+
+  @Get("loans/:id/settlements")
+  listLoanSettlements(
+    @Req() r: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+  ) {
+    return this.finance.listLoanSettlements(r.principal, id);
+  }
+
+  @Post("policies")
+  @HttpCode(200)
+  applyPolicy(
+    @Req() r: AuthRequest,
+    @Headers("idempotency-key") key: string | undefined,
+    @Body() d: CreatePolicyDto,
+  ) {
+    return this.finance.applyPolicy(r.principal, key, d);
+  }
+
+  @Get("policies")
+  listPolicies(@Req() r: AuthRequest, @Query() q: PoliciesPageDto) {
+    return this.finance.listPolicies(r.principal, q);
+  }
+
+  @Get("policies/:id")
+  policyDetail(@Req() r: AuthRequest, @Param("id", ParseUUIDPipe) id: string) {
+    return this.finance.policyDetail(r.principal, id);
+  }
+
+  @Post("policies/:id/decision")
+  @HttpCode(200)
+  decidePolicy(
+    @Req() r: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Headers("idempotency-key") key: string | undefined,
+    @Headers("if-match") match: string | undefined,
+    @Body() d: PolicyDecisionDto,
+  ) {
+    return this.finance.decidePolicy(r.principal, id, key, revision(match), d);
+  }
+
+  @Post("policies/:id/premium-intents")
+  @HttpCode(200)
+  createPolicyPremiumIntent(
+    @Req() r: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Headers("idempotency-key") key: string | undefined,
+    @Headers("if-match") match: string | undefined,
+    @Body() d: PolicyPremiumIntentDto,
+  ) {
+    return this.finance.createPolicyPremiumIntent(
+      r.principal,
+      id,
+      key,
+      revision(match),
+      d,
+    );
+  }
+
+  @Post("policies/:id/renewals")
+  @HttpCode(200)
+  renewPolicy(
+    @Req() r: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Headers("idempotency-key") key: string | undefined,
+    @Body() d: RenewPolicyDto,
+  ) {
+    return this.finance.renewPolicy(r.principal, id, key, d);
+  }
+
+  @Post("claims")
+  @HttpCode(200)
+  submitClaim(
+    @Req() r: AuthRequest,
+    @Headers("idempotency-key") key: string | undefined,
+    @Body() d: CreateClaimDto,
+  ) {
+    return this.finance.submitClaim(r.principal, key, d);
+  }
+
+  @Get("claims")
+  listClaims(@Req() r: AuthRequest, @Query() q: ClaimsPageDto) {
+    return this.finance.listClaims(r.principal, q);
+  }
+
+  @Get("claims/:id")
+  claimDetail(@Req() r: AuthRequest, @Param("id", ParseUUIDPipe) id: string) {
+    return this.finance.claimDetail(r.principal, id);
+  }
+
+  @Post("claims/:id/review-requests")
+  @HttpCode(200)
+  requestClaimReview(
+    @Req() r: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Headers("idempotency-key") key: string | undefined,
+    @Headers("if-match") match: string | undefined,
+  ) {
+    return this.finance.requestClaimReview(
+      r.principal,
+      id,
+      key,
+      revision(match),
+    );
+  }
+
+  @Post("claims/:id/referrals")
+  @HttpCode(200)
+  referClaimToVet(
+    @Req() r: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Headers("idempotency-key") key: string | undefined,
+    @Headers("if-match") match: string | undefined,
+    @Body() d: ClaimReferralDto,
+  ) {
+    return this.finance.referClaimToVet(
+      r.principal,
+      id,
+      key,
+      revision(match),
+      d,
+    );
+  }
+
+  @Post("claims/:id/opinions")
+  @HttpCode(200)
+  submitClaimVetOpinion(
+    @Req() r: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Headers("idempotency-key") key: string | undefined,
+    @Headers("if-match") match: string | undefined,
+    @Body() d: ClaimVetOpinionDto,
+  ) {
+    return this.finance.submitClaimVetOpinion(
+      r.principal,
+      id,
+      key,
+      revision(match),
+      d,
+    );
+  }
+
+  @Post("claims/:id/decision")
+  @HttpCode(200)
+  decideClaim(
+    @Req() r: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Headers("idempotency-key") key: string | undefined,
+    @Headers("if-match") match: string | undefined,
+    @Body() d: ClaimDecisionDto,
+  ) {
+    return this.finance.decideClaim(r.principal, id, key, revision(match), d);
+  }
+
+  @Post("claims/:id/settlements")
+  @HttpCode(200)
+  settleClaim(
+    @Req() r: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Headers("idempotency-key") key: string | undefined,
+    @Headers("if-match") match: string | undefined,
+    @Body() d: ClaimSettlementDto,
+  ) {
+    return this.finance.settleClaim(r.principal, id, key, revision(match), d);
   }
 }

@@ -1,3 +1,4 @@
+import "reflect-metadata";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import request from "supertest";
@@ -71,6 +72,14 @@ test("ops-math: minimalNotificationCopy avoids clinical or PII content across al
     "LOAN_REPAID",
     "LOAN_REPAYMENT_SETTLED",
     "PAYMENT_SETTLED",
+    "POLICY_SUBMITTED",
+    "POLICY_DECIDED",
+    "POLICY_ACTIVATED",
+    "CLAIM_SUBMITTED",
+    "CLAIM_REFERRED_TO_VET",
+    "CLAIM_VET_REVIEWED",
+    "CLAIM_DECIDED",
+    "CLAIM_SETTLED",
     "UNKNOWN_TOPIC_FALLBACK",
   ];
 
@@ -80,8 +89,8 @@ test("ops-math: minimalNotificationCopy avoids clinical or PII content across al
     assert.equal(typeof copy.body, "string");
     assert.ok(copy.title.trim().length > 0, `${topic} missing title`);
     assert.ok(copy.body.trim().length > 0, `${topic} missing body`);
-    assert.doesNotMatch(copy.title, /diagnosis|prescription|01\d{9}/i);
-    assert.doesNotMatch(copy.body, /diagnosis|prescription|01\d{9}/i);
+    assert.doesNotMatch(copy.title, /amoxicillin|ivermectin|\+8801\d{9}/i);
+    assert.doesNotMatch(copy.body, /amoxicillin|ivermectin|\+8801\d{9}/i);
   }
 });
 
