@@ -11,6 +11,7 @@ import {
   Res,
   Headers,
   ParseUUIDPipe,
+  BadRequestException,
 } from "@nestjs/common";
 import type { Response } from "express";
 import type { AuthRequest } from "../platform/auth.js";
@@ -248,7 +249,11 @@ export class CareController {
     @Param("id", ParseUUIDPipe) id: string,
     @Headers("content-type") type: string,
   ) {
-    return this.care.content(r.principal, id, type, r.body);
+    const body = r.body as unknown;
+    if (!Buffer.isBuffer(body) || Array.isArray(body)) {
+      throw new BadRequestException();
+    }
+    return this.care.content(r.principal, id, type, body);
   }
   @Post("files/:id/completion") fileComplete(
     @Req() r: AuthRequest,
