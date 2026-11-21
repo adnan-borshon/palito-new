@@ -155,3 +155,15 @@ test("native finance screen stays fail-closed when EXPO_PUBLIC_FIREBASE_NATIVE_E
     screen.getByText(/requires a configured development build/i),
   ).toBeTruthy();
 });
+
+test("native insurer has a named claims control after verified sign-in", async () => {
+  profile.memberships = [{ role: "INSURER_STAFF" }];
+  await render(<FinanceScreen />);
+  await waitFor(() => expect(screen.getByRole("header", { name: /Insurer dashboard/ })).toBeTruthy());
+  await fireEvent.press(screen.getByRole("button", { name: "দাবি · Claims" }));
+  await waitFor(() => expect(screen.getByRole("header", { name: /Insurer dashboard.*claims/ })).toBeTruthy());
+  expect(globalThis.fetch).toHaveBeenCalledWith(
+    "https://api.palito.test/api/v1/claims?limit=25",
+    expect.objectContaining({ headers: { Authorization: "Bearer synthetic-sdk-token" } }),
+  );
+});

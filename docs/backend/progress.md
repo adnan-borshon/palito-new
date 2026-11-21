@@ -1,5 +1,11 @@
 # M8, M9 and M10 implementation and pilot readiness checkpoint
 
+## Release verification
+
+- A fresh npm installation, empty PostgreSQL database and Firebase Auth emulator exercised the README setup. After creating a farm through the API, a PostgreSQL restart preserved the record. A second farmer could see only their own farm.
+- The browser regression exercises the verified entry and staff MFA, bank and insurer landing pages, administrator-only access, content publication and retry after an API outage. It checks keyboard focus and layout at a 375 px viewport. Native tests check named controls and account access.
+- Native sign-in and assistive-technology use on physical devices require a configured development build. The local startup rehearsal used a standalone PostgreSQL server.
+
 ## Verified bank, insurer and administration dashboards — 2026-11-21
 
 | Workspace | API and permission |

@@ -401,9 +401,9 @@ if(process.env.FIREBASE_AUTH_EMULATOR_HOST) test('staff invitation, official emu
  }finally{await app.close();}
 });
 
-if(process.env.BROWSER_E2E==='true') test('Chromium phone sign-in, cookie restore, CSRF, isolated browser and logout via Next proxy',async()=>{
+if(process.env.BROWSER_E2E==='true') test('Chromium verified sign-in, care synchronization and staff dashboards via Next proxy',async()=>{
  const {createApplication}=await import('../../src/application.js');const {loadConfig}=await import('../../src/platform/config.js');const {createLogger}=await import('../../src/platform/logger.js');
- const config=loadConfig({...urls(databaseName),AUTH_MODE:'emulator',FIREBASE_PROJECT_ID:'demo-palito',FIREBASE_AUTH_EMULATOR_HOST:process.env.FIREBASE_AUTH_EMULATOR_HOST,HEALTHCARE_NO_CHARGE_PILOT:'true',LOG_LEVEL:'silent',CORS_ORIGINS:'http://localhost:3000',RATE_LIMIT_MAX:'1000'});
+ const config=loadConfig({...urls(databaseName),AUTH_MODE:'emulator',FIREBASE_PROJECT_ID:'demo-palito',FIREBASE_AUTH_EMULATOR_HOST:process.env.FIREBASE_AUTH_EMULATOR_HOST,HEALTHCARE_NO_CHARGE_PILOT:'true',FINANCE_SANDBOX_ENABLED:'true',PAYMENT_PROVIDER:'sandbox',SANDBOX_WEBHOOK_SECRET:'synthetic-browser-audit-only',EXTENSIONS_SANDBOX_ENABLED:'true',LOG_LEVEL:'silent',CORS_ORIGINS:'http://localhost:3000',RATE_LIMIT_MAX:'1000'});
  const app=await createApplication(config,createLogger(config));await app.listen(4000,'127.0.0.1');
  try{const {careVet}=await import('./care-api.scenario.js');const vet=await careVet(prisma);const {browserJourney}=await import('./browser.scenario.js');await browserJourney(vet);}finally{await app.close();}
 });

@@ -199,3 +199,14 @@ test("disabled native care never initializes provider transport", async () => {
   ).toBeTruthy();
   expect(globalThis.fetch).not.toHaveBeenCalled();
 });
+
+test("native administration hides operational actions without an administrator session", async () => {
+  await render(<CareScreen operations />);
+  await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/Check sign-in and access/));
+  expect(screen.queryByRole("button", { name: /Users & access/ })).toBeNull();
+  expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+  expect(globalThis.fetch).toHaveBeenCalledWith(
+    "https://api.palito.test/api/v1/me",
+    expect.objectContaining({ headers: { Authorization: "Bearer synthetic-sdk-token" } }),
+  );
+});

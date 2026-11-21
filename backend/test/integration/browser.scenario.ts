@@ -71,6 +71,8 @@ export async function browserJourney(vet?:import('./care-browser.scenario.js').B
   await page.getByText('All sessions revoked.',{exact:true}).waitFor();
   assert.equal(await page.evaluate(async()=>{const response=await fetch('/api/v1/me');return response.status;}),401);
   await context.close();
+  const {staffBrowserJourney}=await import('./staff-browser.scenario.js');
+  await staffBrowserJourney(browser);
  }finally{
   await browser?.close();
   if(child.exitCode===null){const stopped=once(child,'exit');child.kill('SIGTERM');await Promise.race([stopped,new Promise(r=>setTimeout(r,5000))]);if(child.exitCode===null)child.kill('SIGKILL');}

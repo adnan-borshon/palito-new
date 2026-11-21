@@ -33,6 +33,16 @@ FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099
 WEB_ORIGIN=http://localhost:3000
 ```
 
+For a local walkthrough of all five role dashboards, also add these settings to `backend/.env`. Choose your own local-only webhook secret of at least 16 characters.
+
+```dotenv
+HEALTHCARE_NO_CHARGE_PILOT=true
+FINANCE_SANDBOX_ENABLED=true
+PAYMENT_PROVIDER=sandbox
+SANDBOX_WEBHOOK_SECRET=choose-a-local-only-webhook-secret
+EXTENSIONS_SANDBOX_ENABLED=true
+```
+
 Create `frontend/web/.env.development.local` with these emulator settings. Next.js loads this file during development.
 
 ```dotenv
@@ -75,12 +85,12 @@ Run `npm run db:seed:local` from the repository root, then set `SEED_SYNTHETIC=f
 | Insurance staff | `insurer@palito.example`, MFA phone `+8801700000113` |
 | Administrator | `admin@palito.example`, MFA phone `+8801700000114` |
 
-- **Farmer:** Open [verified sign-in](http://localhost:3000/identity). Enter a name and the sample phone number, consent and request a code. Get the code from the Auth emulator terminal, then open **Farm & care**. You can also skip the seed and sign up with a different synthetic phone to start with an empty farm list.
+- **Farmer:** Open [Palito](http://localhost:3000). The app opens verified sign-in. Enter a name and the sample phone number, consent and request a code. Get the code from the Auth emulator terminal, then open **Farm & care**. You can also skip the seed and sign up with a different synthetic phone to start with an empty farm list.
 - **Staff:** Open [staff sign-in](http://localhost:3000/identity/staff). Sign in with the sample email and your local staff password. On the first visit, enter the matching MFA phone, choose **Enroll SMS MFA** and verify the code from the emulator terminal. Sign in again, verify the MFA sign-in code and choose **Open staff session**. Sample memberships are already active. The emulator handles both verification flows locally.
 
 ### 5. Verify that records persist
 
-As the first sample farmer, open **Farm & care** → **Add farm** and save a uniquely named farm. Refresh, then sign in as the same farmer in a private browser window. The farm should appear in both sessions. The second farmer should see only their own farms.
+As the first sample farmer, open **Farm & care** → **Add farm** and save a uniquely named farm. Refresh, then sign in as the same farmer in a private browser window. The farm should appear in both sessions. The second farmer should see only their own farms. To verify persistence after a restart, stop the API, run `npm run db:down --workspace @palito/backend`, start PostgreSQL again with `db:up`, then restart the API and open the first farmer's dashboard. The named PostgreSQL volume keeps the record.
 
 ## Use the same records on web and mobile
 
@@ -88,7 +98,9 @@ The verified dashboard on both clients uses the Palito API as its data source. P
 
 - Farmers can register animals, view their farms and passports, book a vet visit, and open signed prescriptions.
 - Verified veterinarians can manage availability, open consented visits, and sign consultations and prescriptions. Staff access requires the existing MFA sign-in.
-- Open dashboard lists refresh every 30 seconds and reload when the client returns to the foreground. Use **Load / refresh care** to refresh immediately. Saved changes go to PostgreSQL. Local demo records stay on their original device.
+- Bank staff can review their organization's loan applications, active loans and settlements. Insurer staff can review policy applications, policies and claims. Staff balances and transfers shown in the finance workspace are sandbox records.
+- Administrators can review system health, users, educational drafts, audits and reports. The operations workspace requires a verified administrator session.
+- Open dashboard lists refresh every 30 seconds and reload when the client returns to the foreground. Use the workspace's **Refresh** action to update immediately. Saved changes go to PostgreSQL. Local demo records stay on their original device.
 
 ## Other entry points
 
@@ -96,11 +108,10 @@ The verified dashboard on both clients uses the Palito API as its data source. P
 |---|---|
 | Explore mobile role designs with local examples | `npm start` starts Expo. `npm run web` opens the Expo browser preview. |
 | Explore the web role demo | Run `npm run dev:web`, open `/demo` and follow the labeled demo sign-in. |
-| Review bank loans or insurer policies and claims | Sign in as sample staff with MFA, then open **Bank & insurance workspace**. See [lending](docs/backend/lending-m6.md) and [insurance](docs/backend/insurance-m7.md) for the sandbox settings. |
+| Review bank loans or insurer policies and claims | Sign in as sample staff with MFA, then open **Bank & insurance workspace**. The sample staff accounts start with empty queues until a farmer submits records. |
 | Open administration | Sign in as the sample administrator with MFA. **Administration dashboard** opens system health, users, content, audit and reports. Users, content and reports require the extensions sandbox. |
 | Use verified native sign-in | Use a configured native development build, platform Firebase files and a reachable HTTPS API. See the [identity guide](docs/backend/identity.md). |
 | Process reminders and notifications | With PostgreSQL and the API configured, run `npm run worker --workspace @palito/backend` in another terminal. |
-| Try lending and insurance | The verified `/finance` workspace uses database records and opt-in simulated payments. See [lending](docs/backend/lending-m6.md) and [insurance](docs/backend/insurance-m7.md) for flags, role setup and provider configuration. |
 
 ## Troubleshooting
 
@@ -111,4 +122,4 @@ The verified dashboard on both clients uses the Palito API as its data source. P
 
 ## Project checks
 
-From the root, run `npm run lint:all`, `npm run typecheck` and `npm test`. Database integration tests require a disposable PostgreSQL database and the Auth emulator. See the [CI workflow](.github/workflows/ci.yml) for the full setup. The [backend guide index](docs/backend/README.md) covers the API, worker, migrations, security and pilot readiness.
+From the root, run `npm run lint:all`, `npm run typecheck` and `npm test`. Database integration tests require a disposable PostgreSQL database and the Auth emulator. The browser regression covers role sign-in, database synchronization, a phone-width layout, and a service outage and retry. See the [CI workflow](.github/workflows/ci.yml) for the full setup. The [backend guide index](docs/backend/README.md) covers the API, worker, migrations, security and pilot readiness.
