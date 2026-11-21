@@ -40,6 +40,9 @@
     "db:seed:local": "npm run db:seed --workspace @palito/backend -- --local-sample"
   },
   "overrides": {
-    "@grpc/grpc-js": "1.14.7"
+    "@grpc/grpc-js": "1.14.7",
+    "@prisma/config": {
+      "effect": "3.22.5"
+    }
   }
 }
