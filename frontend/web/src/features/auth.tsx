@@ -44,7 +44,7 @@ export function WelcomeView() {
   async function finish() {
     const res = await run({ type: 'session.onboard' });
     if (res.ok) {
-      router.replace('/login');
+      router.replace('/demo');
     }
   }
 

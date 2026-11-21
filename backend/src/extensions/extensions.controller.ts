@@ -308,6 +308,11 @@ export class ExtensionsController {
     return this.extensions.publishContent(r.principal, id, key, revision(match));
   }
 
+  @Get("admin/content")
+  listAdminContent(@Req() r: AuthRequest, @Query() q: ContentPageDto) {
+    return this.extensions.listAdminContent(r.principal, q);
+  }
+
   @Get("content")
   listPublishedContent(@Query() q: ContentPageDto) {
     return this.extensions.listPublishedContent(q);

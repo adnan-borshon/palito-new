@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
+  CARE_REFRESH_MS,
   CareFailure,
   FinanceWorkspace,
   financeInitialView,
@@ -126,16 +127,27 @@ export default function FinancePage() {
       ),
   );
   useEffect(() => {
-    const clear = () => {
-      if (document.visibilityState === "hidden") workspace.clear();
+    const load = () => {
+      if (document.visibilityState === "visible") void workspace.act(() => workspace.open());
     };
-    const hide = () => workspace.clear();
-    document.addEventListener("visibilitychange", clear);
-    window.addEventListener("pagehide", hide);
+    const refresh = () => {
+      if (document.visibilityState === "visible") void workspace.refresh();
+    };
+    const clear = () => workspace.clear();
+    const visibility = () => document.visibilityState === "hidden" ? clear() : load();
+    document.addEventListener("visibilitychange", visibility);
+    window.addEventListener("pagehide", clear);
+    window.addEventListener("pageshow", load);
+    window.addEventListener("focus", refresh);
+    const interval = window.setInterval(refresh, CARE_REFRESH_MS);
+    load();
     return () => {
-      document.removeEventListener("visibilitychange", clear);
-      window.removeEventListener("pagehide", hide);
-      workspace.clear();
+      document.removeEventListener("visibilitychange", visibility);
+      window.removeEventListener("pagehide", clear);
+      window.removeEventListener("pageshow", load);
+      window.removeEventListener("focus", refresh);
+      window.clearInterval(interval);
+      clear();
     };
   }, [workspace]);
 
@@ -148,7 +160,7 @@ export default function FinancePage() {
           <Link href="/care">খামার ও চিকিৎসা · Farm & care</Link>
           <button
             disabled={view.busy}
-            onClick={() => void workspace.act(() => workspace.home())}
+            onClick={() => void workspace.act(() => workspace.open())}
           >
             তথ্য আনুন · Load / refresh finance sandbox
           </button>
@@ -184,6 +196,7 @@ export default function FinancePage() {
             busy={view.busy}
           />
         )}
+        {view.profile && !view.busy && !view.cards.length && !view.form && <p>কোনো রেকর্ড নেই · No records to show.</p>}
         <div className="grid gap-4 sm:grid-cols-2">
           {view.cards.map((card) => (
             <article

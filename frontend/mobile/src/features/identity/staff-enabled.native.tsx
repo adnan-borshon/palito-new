@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Link } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { ScrollView, Text, TextInput, Button } from 'react-native';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, reload, multiFactor, getMultiFactorResolver, PhoneAuthProvider, PhoneMultiFactorGenerator, signOut, getAuth, type MultiFactorResolver } from '@react-native-firebase/auth';
 async function api(path:string,init:RequestInit={}) {
@@ -10,6 +10,7 @@ async function api(path:string,init:RequestInit={}) {
  if(!response.ok)throw new Error('Request failed');return response.json();
 }
 export default function StaffScreen(){
+  const router = useRouter();
   const [email,setEmail]=useState(''); const [password,setPassword]=useState(''); const [phone,setPhone]=useState(''); const [code,setCode]=useState('');
   const [name,setName]=useState('');const [invite,setInvite]=useState('');const [registration,setRegistration]=useState('');
   const [message,setMessage]=useState('');const [busy,setBusy]=useState(false);
@@ -30,7 +31,11 @@ export default function StaffScreen(){
     else{if(!auth.currentUser)throw new Error('Sign in');await multiFactor(auth.currentUser).enroll(assertion,'Palito staff');await signOut(auth);setMessage('MFA enrolled. Sign in again with password and SMS.');}
     setCode('');verification.current='';}
   async function accept(){const user=getAuth().currentUser;if(!user)throw new Error('Sign in');await api('/staff/invitations/accept',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idToken:await user.getIdToken(true),invitationToken:invite,displayName:name,...(registration?{registrationNumber:registration}:{})})});setInvite('');setMessage('Invitation accepted. Open your staff session.');}
-  async function session(){const value=await api('/me');setMessage(`Signed in: ${value.displayName}. Active staff contexts: ${value.memberships.length}`);}
+  async function session(){
+    const profile: { memberships: { role: string }[] } = await api('/me');
+    if (!profile.memberships.length) { setMessage('Staff approval or recent MFA is required.'); return; }
+    router.replace('/identity');
+  }
   const input=(label:string,value:string,set:(value:string)=>void,secret=false)=><TextInput accessibilityLabel={label} placeholder={label} value={value} onChangeText={set} secureTextEntry={secret} autoCapitalize="none" />;
   if(process.env.EXPO_PUBLIC_FIREBASE_NATIVE_ENABLED!=='true')return <Text>Native Firebase is not configured.</Text>;
   return <ScrollView contentContainerStyle={{padding:24,gap:16}} keyboardShouldPersistTaps="handled"><Text accessibilityRole="header">Staff sign-in / MFA</Text>
@@ -42,7 +47,6 @@ export default function StaffScreen(){
    {input('SMS code',code,setCode)}<Button title="Verify MFA code" disabled={busy} onPress={()=>void act(confirm)} />
    {input('Name',name,setName)}{input('Invitation token',invite,setInvite,true)}{input('Vet registration',registration,setRegistration)}
    <Button title="Accept invitation" disabled={busy} onPress={()=>void act(accept)}/><Button title="Open staff profile" disabled={busy} onPress={()=>void act(session)}/>
-   <Link href="/care">যাচাইকৃত ড্যাশবোর্ড · Open live care</Link>
    <Button title="Sign out" disabled={busy} onPress={()=>void act(async()=>{await signOut(getAuth());setPassword('');setCode('');setInvite('');resolver.current=null;verification.current='';setMessage('Signed out.');})}/>
    <Text accessibilityRole="alert">{busy?'Please wait…':message}</Text>
   </ScrollView>;

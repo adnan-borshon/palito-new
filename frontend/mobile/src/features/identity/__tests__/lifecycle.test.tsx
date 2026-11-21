@@ -12,7 +12,7 @@ jest.mock('@react-native-firebase/auth',()=>({
 }));
 jest.mock('expo-router',()=>({Link:'Text'}));
 const originalFetch=globalThis.fetch;
-beforeEach(()=>{process.env.EXPO_PUBLIC_FIREBASE_NATIVE_ENABLED='true';process.env.EXPO_PUBLIC_PALITO_API_ORIGIN='https://api.palito.test';mockAuth.currentUser={uid:'alice',getIdToken:async()=>'synthetic-token'};Object.defineProperty(globalThis,'fetch',{configurable:true,writable:true,value:jest.fn(async()=>({ok:true,json:async()=>({displayName:'Alice'})}))});});
+beforeEach(()=>{process.env.EXPO_PUBLIC_FIREBASE_NATIVE_ENABLED='true';process.env.EXPO_PUBLIC_PALITO_API_ORIGIN='https://api.palito.test';mockAuth.currentUser={uid:'alice',getIdToken:async()=>'synthetic-token'};Object.defineProperty(globalThis,'fetch',{configurable:true,writable:true,value:jest.fn(async()=>({ok:true,json:async()=>({displayName:'Alice',memberships:[]})}))});});
 afterEach(()=>{Object.defineProperty(globalThis,'fetch',{configurable:true,writable:true,value:originalFetch});delete process.env.EXPO_PUBLIC_FIREBASE_NATIVE_ENABLED;delete process.env.EXPO_PUBLIC_PALITO_API_ORIGIN;});
 test('SDK session restores profile after component remount and SDK sign-out clears it',async()=>{
  const view=await render(<Identity/>);await waitFor(()=>expect(screen.getByText('স্বাগতম · Alice')).toBeTruthy());
@@ -20,5 +20,5 @@ test('SDK session restores profile after component remount and SDK sign-out clea
  await fireEvent.press(screen.getByText('সাইন আউট · Sign out'));await waitFor(()=>expect(screen.queryByText('স্বাগতম · Alice')).toBeNull());expect(mockAuth.currentUser).toBeNull();
 });
 test('disabled native route does not initialize Firebase or expose cached profile',async()=>{
- process.env.EXPO_PUBLIC_FIREBASE_NATIVE_ENABLED='false';await render(<DisabledIdentity/>);expect(screen.getByText('Native sign-in is not configured for this build.')).toBeTruthy();expect(globalThis.fetch).not.toHaveBeenCalled();
+ process.env.EXPO_PUBLIC_FIREBASE_NATIVE_ENABLED='false';await render(<DisabledIdentity/>);expect(screen.getByText('Native sign-in requires a configured development build.')).toBeTruthy();expect(globalThis.fetch).not.toHaveBeenCalled();
 });

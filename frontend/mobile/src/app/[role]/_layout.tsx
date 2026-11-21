@@ -13,15 +13,15 @@ export default function RoleLayout() {
   const path = usePathname();
   const insets = useSafeAreaInsets();
   if (!ready) return <LoadingState />;
-  if (!user) return <Redirect href="/login" />;
+  if (!user) return <Redirect href="/demo" />;
   if (!isRole(routeRole) || routeRole !== user.role) return <Redirect href={routeFor(user.role)} />;
   return <ScreenInsetContext.Provider value={false}><View style={[styles.shell, { paddingTop: insets.top }]}>
     {state.settings.offline ? <View style={styles.offline}><Icon name="cloud-offline-outline" color={colors.warning} size={17} /><AppText variant="small" color={colors.warning}>{t('অফলাইন মোড · সংরক্ষিত তথ্য দেখানো হচ্ছে', 'Offline mode · showing cached records')}</AppText></View> : null}
     <AppFeedback />
-    {(user.role === 'farmer' || user.role === 'vet') && path.split('/')[2] === 'home' && (
+    {path.split('/')[2] === 'home' && (
       <View style={styles.carePreview}>
         <AppText variant="small">{t('নমুনা দেখুন', 'Demo preview')}</AppText>
-        <Link href="/care" style={styles.liveCare}>{t('যাচাইকৃত ড্যাশবোর্ড', 'Open live care')}</Link>
+        <Link href="/identity" style={styles.liveCare}>{t('যাচাইকৃত ড্যাশবোর্ড', 'Open verified workspace')}</Link>
       </View>
     )}
     <Stack screenOptions={{ headerShown: false }} />

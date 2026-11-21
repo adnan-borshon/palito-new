@@ -13,9 +13,14 @@ export function firebaseAuth() {
   if (emulator) { connectAuthEmulator(auth, 'http://127.0.0.1:9099'); auth.settings.appVerificationDisabledForTesting=true; }
   return auth;
 }
+export class IdentityRequestError extends Error {
+  constructor(readonly status: number) {
+    super(status === 401 ? 'Please sign in again.' : status === 403 ? 'Access is not approved.' : 'Request failed. Please try again.');
+  }
+}
 export async function api(path: string, init: RequestInit = {}) {
   const response = await fetch(`/api/v1${path}`, { ...init, credentials: 'same-origin', cache: 'no-store' });
-  if (!response.ok) throw new Error(response.status === 401 ? 'Please sign in again.' : response.status === 403 ? 'Access is not approved.' : 'Request failed. Please try again.');
+  if (!response.ok) throw new IdentityRequestError(response.status);
   return response.json();
 }
 export async function csrf() { return (await api('/sessions/csrf')).csrfToken as string; }

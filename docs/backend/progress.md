@@ -1,5 +1,16 @@
 # M8, M9 and M10 implementation and pilot readiness checkpoint
 
+## Verified bank, insurer and administration dashboards — 2026-11-21
+
+| Workspace | API and permission |
+|---|---|
+| Bank loan queues, collateral review, decisions and settlements | `/loans`, `/animals/:id/valuations`, `/animals/:id/collateral-risk`, loan commands and `/loans/:id/settlements`. Bank memberships and organization scope are checked on the API. |
+| Insurer applications, policies and claims | `/policies`, `/claims` and underwriting, referral and settlement commands. The API checks insurer organization and review permissions. |
+| Administration | `/admin/system-health`, `/admin/outbox/dead-letter`, `/admin/users`, `/staff/organizations`, staff and recovery commands, `/admin/content`, `/admin/audit-events`, `/admin/reports`, and audited summary exports. Administration requires recent MFA. |
+| Account and notifications | Verified profile and account security use `/me` and the identity endpoints. User-scoped notifications remain available in **Farm & care**. |
+
+Web and native use the same API and PostgreSQL database. The main entry takes users to verified sign-in. The demo is available from **Try the demo**. Finance and extensions keep their existing sandbox gates.
+
 ## Shared farmer and veterinarian dashboard — 2026-11-21
 
 Verified web and native care now share the same API for farms, animal registration, bookings, visits and signed prescriptions. Lists refresh on foreground and every 30 seconds while visible, with manual refresh available. Local demo home screens link to verified care. The API filters the signed prescription list by current ownership or verified veterinary authorship with active patient consent.

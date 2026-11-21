@@ -1657,11 +1657,23 @@ export class ExtensionsService {
 
   async listPublishedContent(q: ContentPageDto = {}) {
     this.requireExtensionsEnabled();
+    return this.listContent(this.db.prisma, q, true);
+  }
+
+  async listAdminContent(p: AccountPrincipal, q: ContentPageDto = {}) {
+    this.requireExtensionsEnabled();
+    return this.db.prisma.$transaction(async (tx) => {
+      await this.requireAdmin(tx, p);
+      return this.listContent(tx, q, false);
+    });
+  }
+
+  private async listContent(tx: Tx, q: ContentPageDto, publishedOnly: boolean) {
     const limit = q.limit ?? 25;
     const after = parseCursor(q.cursor);
-    const rows = await this.db.prisma.educationalContent.findMany({
+    const rows = await tx.educationalContent.findMany({
       where: {
-        status: "PUBLISHED",
+        ...(publishedOnly ? { status: "PUBLISHED" } : {}),
         ...(q.category ? { category: q.category } : {}),
         ...(after
           ? {

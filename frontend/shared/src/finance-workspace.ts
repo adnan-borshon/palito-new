@@ -253,11 +253,17 @@ export function financeInitialView(): FinanceView {
 }
 
 /** Memory-only lending & ledger sandbox workspace with generation fencing. */
+type LoanQueue = "all" | "SUBMITTED" | "ACTIVE" | "SETTLED";
+type InsuranceQueue = "all" | "SUBMITTED" | "ACTIVE" | "claims";
+
 export class FinanceWorkspace {
   view: FinanceView = financeInitialView();
   private generation = 0;
   private keys = new Map<string, string>();
   private identity: string | null = null;
+  private loanQueue: LoanQueue = "all";
+  private insuranceQueue: InsuranceQueue = "all";
+  private reload: (() => Promise<void>) | null = null;
   private readonly transport: CareTransport;
   private readonly newKey: () => string;
   private readonly changed: (view: FinanceView) => void;
@@ -281,6 +287,9 @@ export class FinanceWorkspace {
     this.generation++;
     this.identity = null;
     this.keys.clear();
+    this.reload = null;
+    this.loanQueue = "all";
+    this.insuranceQueue = "all";
     this.emit({
       profile: null,
       cards: [],
@@ -293,23 +302,38 @@ export class FinanceWorkspace {
 
   private async request<T>(path: string, request?: CareRequest): Promise<T> {
     const epoch = this.generation;
-    const expected = this.identity;
     const before = await this.transport<CareProfile>("/me");
-    if (
-      epoch !== this.generation ||
-      (expected && before.userId !== expected)
-    ) {
-      this.clear();
+    if (epoch !== this.generation || (this.identity && this.identity !== before.userId))
       throw new CareFailure(401);
-    }
     this.identity = before.userId;
+    if (path === "/me" && !request) return before as T;
+
     const result = await this.transport<T>(path, request);
+    if (epoch !== this.generation) throw new CareFailure(401);
     const after = await this.transport<CareProfile>("/me");
-    if (epoch !== this.generation || after.userId !== before.userId) {
-      this.clear();
+    if (epoch !== this.generation || after.userId !== before.userId)
       throw new CareFailure(401);
-    }
+    if (before.memberships.some((member) => !after.memberships.some(
+      (current) => current.role === member.role && current.organizationId === member.organizationId,
+    ))) throw new CareFailure(403);
     return result;
+  }
+
+  async open() {
+    const profile = await this.request<CareProfile>("/me");
+    if (profile.memberships.some((member) => member.role === "INSURER_STAFF"))
+      await this.insuranceHome();
+    else await this.home();
+  }
+
+  refresh() {
+    if (this.view.form || !this.reload) return;
+    return this.act(this.reload);
+  }
+
+  // Keep the automatic refresh on list screens, away from details and forms.
+  private list(work: () => Promise<void>) {
+    this.reload = work;
   }
 
   async act(work: () => Promise<void>) {
@@ -390,32 +414,50 @@ export class FinanceWorkspace {
     });
   }
 
-  async home() {
+  async home(queue = this.loanQueue, cursor?: string) {
+    this.loanQueue = queue;
     const profile = await this.request<CareProfile>("/me");
-    const [wallet, loansPage, animalsPage] = await Promise.all([
-      this.request<FinanceWallet>("/me/wallet"),
-      this.request<CarePage<FinanceLoan>>("/loans?limit=25"),
-      this.request<CarePage<CareAnimal>>("/animals?limit=25"),
-    ]);
-    const isBankStaff = profile.memberships.some(
-      (m) => m.role === "BANK_STAFF",
+    const isBankStaff = profile.memberships.some((m) => m.role === "BANK_STAFF");
+    const isInstitution = profile.memberships.some((m) =>
+      ["BANK_STAFF", "INSURER_STAFF", "ADMIN", "VET"].includes(m.role),
     );
     const isAdmin = profile.memberships.some((m) => m.role === "ADMIN");
+    const query = new URLSearchParams({ limit: "25" });
+    if (queue !== "all") query.set("status", queue);
+    if (cursor) query.set("cursor", cursor);
+    const [wallet, loansPage, animalsPage] = await Promise.all([
+      isInstitution ? null : this.request<FinanceWallet>("/me/wallet"),
+      this.request<CarePage<FinanceLoan>>(`/loans?${query}`),
+      isInstitution ? null : this.request<CarePage<CareAnimal>>("/animals?limit=25"),
+    ]);
+    this.list(() => this.home(queue, cursor));
 
     this.emit({
       profile,
-      title: "স্যান্ডবক্স ঋণ ও লেজার · Lending & ledger sandbox",
-      disclosure: wallet.disclosure || SANDBOX_DISCLOSURE,
+      title: isBankStaff
+        ? `ব্যাংক ড্যাশবোর্ড · Bank dashboard · ${queue === "all" ? "All loans" : queue}`
+        : "স্যান্ডবক্স ঋণ ও লেজার · Lending & ledger sandbox",
+      disclosure: wallet?.disclosure || SANDBOX_DISCLOSURE,
       notice:
         "All valuations, quotes, loans, and ledger entries operate in opt-in sandbox mode (70% LTV cap, maker/checker separation).",
       form: null,
       actions: [
-        this.action("রিলোড · Refresh", () => this.home()),
+        this.action("রিলোড · Refresh", () => this.home(queue, cursor)),
+        ...(isBankStaff ? [
+          this.action("সব ঋণ · All loans", () => this.home("all")),
+          this.action("আবেদন · Loan applications", () => this.home("SUBMITTED")),
+          this.action("চলমান ঋণ · Active loans", () => this.home("ACTIVE")),
+          this.action("নিষ্পত্তি · Settled loans", () => this.home("SETTLED")),
+        ] : []),
+        ...(loansPage.nextCursor ? [
+          this.action("পরের পাতা · Next loans", () => this.home(queue, loansPage.nextCursor!)),
+        ] : []),
+        ...(cursor ? [this.action("প্রথম পাতা · First loans", () => this.home(queue))] : []),
         this.action(
           "বীমা ও দাবি স্যান্ডবক্স · Insurance & claims",
           () => this.insuranceHome(),
         ),
-        ...(animalsPage.items.length
+        ...(animalsPage?.items.length
           ? [
               this.action(
                 "জামানত যাচাই ও ঋণ কোট · Check collateral & quote",
@@ -445,7 +487,7 @@ export class FinanceWorkspace {
           : []),
       ],
       cards: [
-        {
+        ...(wallet ? [{
           id: "wallet-summary",
           title: `স্যান্ডবক্স ওয়ালেট · Sandbox ledger balance: ${formatMinorBdt(wallet.balanceMinor)}`,
           lines: [
@@ -454,11 +496,11 @@ export class FinanceWorkspace {
             `Recent ledger entries: ${wallet.entries.length} · Payment intents: ${wallet.paymentIntents.length}`,
           ],
           actions: [],
-        },
+        }] : []),
         ...loansPage.items.map((loan) =>
           this.loanCard(loan, profile, isBankStaff),
         ),
-        ...wallet.entries.slice(0, 5).map((entry) => ({
+        ...(wallet?.entries ?? []).slice(0, 5).map((entry) => ({
           id: entry.id,
           title: `লেজার এন্ট্রি · ${entry.direction} · ${formatMinorBdt(entry.amountMinor)}`,
           lines: [
@@ -491,6 +533,21 @@ export class FinanceWorkspace {
         this.action("কিস্তির সূচি · Installments", () =>
           this.installmentsView(loan, isBankStaff),
         ),
+        this.action("বীমা নিষ্পত্তি · Loan settlements", async () => {
+          const settlements = await this.request<{ items: (FinanceClaimAllocation & { createdAt: string })[] }>(`/loans/${loan.id}/settlements`);
+          this.reload = null;
+          this.emit({
+            title: "বীমা নিষ্পত্তি · Loan settlements",
+            actions: [this.action("Back to loans", () => this.home())],
+            notice: settlements.items.length ? "" : "No insurance settlements for this loan.",
+            cards: settlements.items.map((item) => ({
+              id: item.id,
+              title: formatMinorBdt(item.debtAllocatedMinor),
+              lines: [careTime(item.createdAt)],
+              actions: [],
+            })),
+          });
+        }),
         ...(isBankStaff && loan.status === "SUBMITTED"
           ? [
               this.action("Approve loan", async () =>
@@ -536,6 +593,7 @@ export class FinanceWorkspace {
         ),
       })),
     );
+    this.reload = null;
     this.emit({
       title: "জামানত যোগ্যতা · Collateral eligibility (70% LTV cap)",
       form: null,
@@ -665,6 +723,7 @@ export class FinanceWorkspace {
         clinicalDetailsRedacted: boolean;
       }>(`/animals/${animalId}/collateral-risk`),
     ]);
+    this.reload = null;
     this.emit({
       title: `পশুর জামানত ও ঝুঁকি · Collateral & risk (${animalId.slice(0, 8)})`,
       form: null,
@@ -757,6 +816,7 @@ export class FinanceWorkspace {
       items: FinanceInstallment[];
     }>(`/loans/${loan.id}/installments`);
 
+    this.reload = null;
     this.emit({
       title: `কিস্তির সূচি · Installments (${schedule.status})`,
       form: null,
@@ -813,6 +873,7 @@ export class FinanceWorkspace {
       totalCreditMinor: string;
       unbalancedTransactionIds: string[];
     }>("/admin/ledger/reconciliation");
+    this.reload = null;
     this.emit({
       title: "লেজার সমন্বয় · Admin ledger reconciliation",
       form: null,
@@ -833,35 +894,48 @@ export class FinanceWorkspace {
     });
   }
 
-  async insuranceHome() {
+  async insuranceHome(queue = this.insuranceQueue, cursor?: string, claimCursor?: string) {
+    this.insuranceQueue = queue;
     const profile = await this.request<CareProfile>("/me");
+    const query = new URLSearchParams({ limit: "25" });
+    if (queue === "SUBMITTED" || queue === "ACTIVE") query.set("status", queue);
+    if (cursor) query.set("cursor", cursor);
     const [policiesPage, claimsPage] = await Promise.all([
-      this.request<CarePage<FinancePolicy>>("/policies?limit=25"),
-      this.request<CarePage<FinanceClaim>>("/claims?limit=25"),
+      queue === "claims" ? null : this.request<CarePage<FinancePolicy>>(`/policies?${query}`),
+      queue === "all" || queue === "claims"
+        ? this.request<CarePage<FinanceClaim>>(`/claims?limit=25${claimCursor ? `&cursor=${encodeURIComponent(claimCursor)}` : ""}`)
+        : null,
     ]);
-    const isInsurerStaff = profile.memberships.some(
-      (m) => m.role === "INSURER_STAFF",
-    );
+    const isInsurerStaff = profile.memberships.some((m) => m.role === "INSURER_STAFF");
     const isVet = profile.memberships.some((m) => m.role === "VET");
+    this.list(() => this.insuranceHome(queue, cursor, claimCursor));
 
     this.emit({
       profile,
-      title: "স্যান্ডবক্স বীমা ও দাবি · Insurance & claim settlement sandbox",
+      title: isInsurerStaff
+        ? `বীমা ড্যাশবোর্ড · Insurer dashboard · ${queue === "all" ? "Overview" : queue}`
+        : "স্যান্ডবক্স বীমা ও দাবি · Insurance & claim settlement sandbox",
       notice:
         "Insurance sandbox (ins-sandbox-v1): policy activation requires confirmed premium; death claims require private READY evidence, review/referral, maker/checker separation, and debt-first ledger settlement.",
       form: null,
       actions: [
         this.action("Back to finance sandbox", () => this.home()),
-        this.action("Refresh insurance", () => this.insuranceHome()),
-        this.action("নতুন বীমা আবেদন · Apply for policy", async () =>
-          this.applyPolicyForm(),
-        ),
+        this.action("Refresh insurance", () => this.insuranceHome(queue, cursor, claimCursor)),
+        this.action("বীমা সারাংশ · Insurance overview", () => this.insuranceHome("all")),
+        this.action("আবেদন · Policy applications", () => this.insuranceHome("SUBMITTED")),
+        this.action("সক্রিয় পলিসি · Active policies", () => this.insuranceHome("ACTIVE")),
+        this.action("দাবি · Claims", () => this.insuranceHome("claims")),
+        ...(policiesPage?.nextCursor ? [this.action("Next policies", () => this.insuranceHome(queue, policiesPage.nextCursor!, claimCursor))] : []),
+        ...(claimsPage?.nextCursor ? [this.action("Next claims", () => this.insuranceHome(queue, cursor, claimsPage.nextCursor!))] : []),
+        ...(cursor || claimCursor ? [this.action("First page", () => this.insuranceHome(queue))] : []),
+        ...(!isInsurerStaff && !isVet && !profile.memberships.length
+          ? [this.action("নতুন বীমা আবেদন · Apply for policy", async () => this.applyPolicyForm())] : []),
       ],
       cards: [
-        ...policiesPage.items.map((policy) =>
+        ...(policiesPage?.items ?? []).map((policy) =>
           this.policyCard(policy, profile, isInsurerStaff),
         ),
-        ...claimsPage.items.map((claim) =>
+        ...(claimsPage?.items ?? []).map((claim) =>
           this.claimCard(claim, profile, isInsurerStaff, isVet),
         ),
       ],

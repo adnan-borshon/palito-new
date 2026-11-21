@@ -2,7 +2,7 @@
 
 Palito is a Bangla-first livestock care platform for farmers, veterinarians, banks, insurers and administrators. The Next.js web app and Expo mobile app share TypeScript workflows. The NestJS API stores business records in PostgreSQL and uses Firebase for identity.
 
-**Use verified sign-in to open the farmer or veterinarian dashboard.** Choose **Farm & care** from your signed-in profile or **Open live care** from the demo home. The local demo is available through `/login`.
+**Start with verified sign-in.** From your profile, open the dashboard for your approved role. Use **Try the demo** for a device-local preview.
 
 ## Start locally with PostgreSQL
 
@@ -95,7 +95,9 @@ The verified dashboard on both clients uses the Palito API as its data source. P
 | Goal | How to start |
 |---|---|
 | Explore mobile role designs with local examples | `npm start` starts Expo. `npm run web` opens the Expo browser preview. |
-| Explore the web role demo | Run `npm run dev:web`, open `/login` and follow the labeled demo sign-in. |
+| Explore the web role demo | Run `npm run dev:web`, open `/demo` and follow the labeled demo sign-in. |
+| Review bank loans or insurer policies and claims | Sign in as sample staff with MFA, then open **Bank & insurance workspace**. See [lending](docs/backend/lending-m6.md) and [insurance](docs/backend/insurance-m7.md) for the sandbox settings. |
+| Open administration | Sign in as the sample administrator with MFA. **Administration dashboard** opens system health, users, content, audit and reports. Users, content and reports require the extensions sandbox. |
 | Use verified native sign-in | Use a configured native development build, platform Firebase files and a reachable HTTPS API. See the [identity guide](docs/backend/identity.md). |
 | Process reminders and notifications | With PostgreSQL and the API configured, run `npm run worker --workspace @palito/backend` in another terminal. |
 | Try lending and insurance | The verified `/finance` workspace uses database records and opt-in simulated payments. See [lending](docs/backend/lending-m6.md) and [insurance](docs/backend/insurance-m7.md) for flags, role setup and provider configuration. |

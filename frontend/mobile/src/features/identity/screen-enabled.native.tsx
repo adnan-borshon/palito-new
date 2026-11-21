@@ -7,7 +7,7 @@ export default function IdentityScreen() {
   const [phone, setPhone] = useState(''); const [code, setCode] = useState(''); const [name, setName] = useState('');
   const [consent, setConsent] = useState(false); const [busy, setBusy] = useState(false);
   const [confirmation, setConfirmation] = useState<Awaited<ReturnType<typeof signInWithPhoneNumber>> | null>(null);
-  const [profile, setProfile] = useState<{ displayName: string } | null>(null); const [message, setMessage] = useState('');
+  const [profile, setProfile] = useState<{ displayName: string; memberships: { role: string }[] } | null>(null); const [message, setMessage] = useState('');
   const enabled = process.env.EXPO_PUBLIC_FIREBASE_NATIVE_ENABLED === 'true';
   const api = useCallback(async (path: string, init: RequestInit = {}) => {
     const origin = process.env.EXPO_PUBLIC_PALITO_API_ORIGIN;
@@ -50,9 +50,11 @@ export default function IdentityScreen() {
     } catch (error) { await signOut(getAuth()); throw error; }
   }
   if (!enabled) return <ScrollView contentContainerStyle={{ padding: 24 }}><Text>Sign-in is not configured for this build.</Text></ScrollView>;
+  const roles = profile?.memberships.map((membership) => membership.role) ?? [];
+  const financeStaff = roles.includes('BANK_STAFF') || roles.includes('INSURER_STAFF');
   return <ScrollView contentContainerStyle={{ padding: 24, gap: 16 }} keyboardShouldPersistTaps="handled">
-    <Link href="/account-security">Account security</Link><Link href="/staff-identity">Staff invitation / MFA</Link><Text accessibilityRole="header">পালিতো · Palito sign-in</Text>
-    {profile ? <><Text>স্বাগতম · {profile.displayName}</Text><Link href="/care">খামার ও চিকিৎসা · Farm & care</Link><Link href="/finance">স্যান্ডবক্স ঋণ ও লেজার · Finance sandbox</Link><Button title="সাইন আউট · Sign out" disabled={busy} onPress={() => void act(async () => { await signOut(getAuth()); setProfile(null); setPhone(''); setName(''); setCode(''); setConfirmation(null); })} /></> : <>
+    <Link href="/account-security">Account security</Link><Link href="/staff-identity">Staff invitation / MFA</Link><Link href="/demo">নমুনা · Try the demo</Link><Text accessibilityRole="header">পালিতো · Palito sign-in</Text>
+    {profile ? <><Text>স্বাগতম · {profile.displayName}</Text>{roles.includes('ADMIN') && <Link href="/operations">প্রশাসন · Administration dashboard</Link>}{(!roles.length || roles.includes('VET')) && <Link href="/care">খামার ও চিকিৎসা · Farm & care</Link>}<Link href="/finance">{financeStaff ? 'আর্থিক কর্মক্ষেত্র · Bank & insurance workspace' : 'স্যান্ডবক্স ঋণ ও লেজার · Finance sandbox'}</Link><Button title="সাইন আউট · Sign out" disabled={busy} onPress={() => void act(async () => { await signOut(getAuth()); setProfile(null); setPhone(''); setName(''); setCode(''); setConfirmation(null); })} /></> : <>
       <TextInput accessibilityLabel="Name" placeholder="নাম · Name" maxLength={120} value={name} onChangeText={setName} />
       <TextInput accessibilityLabel="Phone" placeholder="+880" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
       <Text>I agree to receive a verification SMS. Message rates may apply.</Text><Switch accessibilityLabel="SMS consent" value={consent} onValueChange={setConsent} />

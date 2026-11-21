@@ -23,7 +23,11 @@ jest.mock("@react-native-firebase/auth", () => ({
     };
   },
 }));
-jest.mock("expo-router", () => ({ Link: "Text" }));
+jest.mock("expo-router", () => ({
+  Link: "Text",
+  useFocusEffect: (effect: () => void) =>
+    jest.requireActual<typeof import("react")>("react").useEffect(effect, [effect]),
+}));
 jest.mock("expo-crypto", () => ({
   randomUUID: () => "synthetic-finance-command-key",
 }));

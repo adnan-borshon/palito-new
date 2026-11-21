@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   AppState,
   Button,
@@ -8,10 +8,11 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { Link } from "expo-router";
+import { Link, useFocusEffect } from "expo-router";
 import { getAuth, onAuthStateChanged } from "@react-native-firebase/auth";
 import { randomUUID } from "expo-crypto";
 import {
+  CARE_REFRESH_MS,
   CareFailure,
   FinanceWorkspace,
   financeInitialView,
@@ -36,7 +37,7 @@ const transport: CareTransport = async <T,>(
   const user = getAuth().currentUser;
   if (!user) throw new CareFailure(401);
   const headers: Record<string, string> = {
-    Authorization: `Bearer ${await user.getIdToken(true)}`,
+    Authorization: `Bearer ${await user.getIdToken()}`,
   };
   if (r.body !== undefined) headers["Content-Type"] = "application/json";
   if (r.key) headers["Idempotency-Key"] = r.key;
@@ -140,17 +141,29 @@ export default function FinanceScreen() {
   const [workspace] = useState(
     () => new FinanceWorkspace(transport, randomUUID, (v) => setView(v)),
   );
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(getAuth(), () => workspace.clear());
-    const listener = AppState.addEventListener("change", () =>
-      workspace.clear(),
-    );
+  useFocusEffect(useCallback(() => {
+    const active = () => AppState.currentState !== "background" && AppState.currentState !== "inactive";
+    const load = () => {
+      if (active() && getAuth().currentUser) void workspace.act(() => workspace.open());
+    };
+    const unsubscribe = onAuthStateChanged(getAuth(), () => {
+      workspace.clear();
+      load();
+    });
+    const listener = AppState.addEventListener("change", (state) => {
+      if (state === "active") load();
+      else workspace.clear();
+    });
+    const interval = setInterval(() => {
+      if (active()) void workspace.refresh();
+    }, CARE_REFRESH_MS);
     return () => {
       unsubscribe();
       listener.remove();
+      clearInterval(interval);
       workspace.clear();
     };
-  }, [workspace]);
+  }, [workspace]));
 
   return (
     <ScrollView
@@ -169,7 +182,7 @@ export default function FinanceScreen() {
       <Button
         title="তথ্য আনুন · Load / refresh finance sandbox"
         disabled={view.busy}
-        onPress={() => void workspace.act(() => workspace.home())}
+        onPress={() => void workspace.act(() => workspace.open())}
       />
       {view.profile && (
         <Text style={styles.text}>{view.profile.displayName}</Text>
@@ -192,6 +205,9 @@ export default function FinanceScreen() {
           workspace={workspace}
           busy={view.busy}
         />
+      )}
+      {view.profile && !view.busy && !view.cards.length && !view.form && (
+        <Text style={styles.text}>কোনো রেকর্ড নেই · No records to show.</Text>
       )}
       {view.cards.map((card) => (
         <View key={card.id} style={styles.card}>

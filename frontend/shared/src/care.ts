@@ -2,7 +2,7 @@
 export interface CareProfile {
   userId: string;
   displayName: string;
-  memberships: { role: string }[];
+  memberships: { role: string; organizationId?: string }[];
 }
 export interface CareFarm {
   id: string;
@@ -140,7 +140,7 @@ export class CareFailure extends Error {
       status === 409
         ? "তথ্য বদলেছে · Details changed. Refresh and try again."
         : status === 503
-          ? "Booking is not enabled for this pilot."
+          ? "সেবা সাময়িকভাবে বন্ধ · This service is unavailable or not enabled in this environment."
           : status === 400
             ? "তথ্য পরীক্ষা করুন · Check the form values."
             : status === 429
@@ -159,6 +159,7 @@ export interface CareField {
   type?: "text" | "multiline" | "number" | "date" | "check" | "select";
   options?: { value: string; label: string }[];
   optional?: boolean;
+  maxLength?: number;
 }
 export interface CareAction {
   label: string;
@@ -250,7 +251,7 @@ export class CareWorkspace {
     this.newKey = newKey;
     this.changed = changed;
   }
-  private emit(patch: Partial<CareView>) {
+  protected emit(patch: Partial<CareView>) {
     this.view = { ...this.view, ...patch };
     this.changed(this.view);
   }
@@ -261,7 +262,7 @@ export class CareWorkspace {
     this.returnTo = () => this.home();
     this.emit(careInitialView());
   }
-  private async authenticated<T>(
+  protected async authenticated<T>(
     work: (send: CareTransport, profile: CareProfile) => Promise<T>,
   ): Promise<T> {
     const epoch = this.generation;
@@ -278,12 +279,12 @@ export class CareWorkspace {
     const result = await work(send, before);
     const after = await send<CareProfile>("/me");
     if (after.userId !== before.userId) throw new CareFailure(401);
-    if (before.memberships.some((membership) => membership.role === "VET") &&
-        !after.memberships.some((membership) => membership.role === "VET"))
-      throw new CareFailure(403);
+    if (before.memberships.some((member) => !after.memberships.some(
+      (current) => current.role === member.role && current.organizationId === member.organizationId,
+    ))) throw new CareFailure(403);
     return result;
   }
-  private request<T>(path: string, request?: CareRequest): Promise<T> {
+  protected request<T>(path: string, request?: CareRequest): Promise<T> {
     return this.authenticated((send) => send<T>(path, request));
   }
   async act(work: () => Promise<void>) {
@@ -310,7 +311,7 @@ export class CareWorkspace {
       if (epoch === this.generation) this.emit({ busy: false });
     }
   }
-  private async write<T>(
+  protected async write<T>(
     path: string,
     body: unknown = {},
     version?: number,
@@ -343,7 +344,7 @@ export class CareWorkspace {
     } while (cursor);
     return rows;
   }
-  private action(label: string, work: () => Promise<void>): CareAction {
+  protected action(label: string, work: () => Promise<void>): CareAction {
     return {
       label,
       run: () => {
@@ -351,7 +352,7 @@ export class CareWorkspace {
       },
     };
   }
-  private form(
+  protected form(
     title: string,
     fields: CareField[],
     submit: CareForm["submit"],

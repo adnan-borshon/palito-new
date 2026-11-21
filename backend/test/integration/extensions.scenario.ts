@@ -414,6 +414,10 @@ export async function extensionsScenario(
       category: "HEALTH",
     });
     await denied(extensions.publishedContentDetail(draft.id), 404);
+    await denied(extensions.listAdminContent(farmer, { limit: 25 }), 403);
+    const adminDrafts = await extensions.listAdminContent(admin, { limit: 25 });
+    assert.ok(adminDrafts.items.some((item) => item.id === draft.id && item.status === "DRAFT"));
+    assert.ok(!(await extensions.listPublishedContent()).items.some((item) => item.id === draft.id));
 
     await extensions.publishContent(admin, draft.id, key(), 1);
     const published = await extensions.listPublishedContent({ limit: 25 });

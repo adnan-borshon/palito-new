@@ -15,7 +15,7 @@ export default function Welcome() {
     { title: t('যত্নে থাকুক\nপ্রতিটি প্রাণ', 'Every animal.\nCarefully cared for.'), body: t('পশুর স্বাস্থ্য দেখুন, সতর্কতা পান এবং প্রয়োজনে পশুচিকিৎসকের সহায়তা নিন।', 'Follow animal health, notice alerts and reach a veterinarian when your animals need care.') },
     { title: t('আগামীর জন্য\nনিরাপদ খামার', 'A secure farm.\nA brighter tomorrow.'), body: t('যাচাইকৃত স্বাস্থ্য পাসপোর্টের মাধ্যমে পশুবীমা ও সহজ শর্তে খামার ঋণ সুবিধা পান।', 'Access livestock insurance and health-linked farm credit backed by verified digital health passports.') },
   ];
-  async function finish() { const result = await run({ type: 'session.onboard' }); if (result.ok) router.replace('/login'); }
+  async function finish() { const result = await run({ type: 'session.onboard' }); if (result.ok) router.replace('/demo'); }
   return <Screen testID="welcome-screen" style={styles.content}>
     <View style={styles.top}><View style={styles.brand}><Image source={palitoImages.mark} style={styles.mark} contentFit="contain" /><AppText variant="title" color={colors.brandDeep}>পালিত</AppText></View><Button title={locale === 'bn' ? 'English' : 'বাংলা'} variant="ghost" onPress={() => void run({ type: 'session.locale', locale: locale === 'bn' ? 'en' : 'bn' })} /></View>
     <View style={styles.illustration}><Image source={palitoImages.onboarding} style={styles.image} contentFit="contain" accessibilityLabel={t('পালিতের পশুস্বাস্থ্য সেবা', 'Palito livestock care services')} /></View>

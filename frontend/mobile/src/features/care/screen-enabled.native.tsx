@@ -17,6 +17,7 @@ import * as ImagePicker from "expo-image-picker";
 import { File } from "expo-file-system";
 import { randomUUID } from "expo-crypto";
 import {
+  AdminWorkspace,
   CARE_REFRESH_MS,
   CareFailure,
   careSections,
@@ -131,7 +132,7 @@ function EntryForm({
               multiline={field.type === "multiline"}
               keyboardType={field.type === "number" ? "decimal-pad" : "default"}
               autoCapitalize="none"
-              maxLength={4000}
+              maxLength={field.maxLength ?? 4000}
             />
           )}
         </View>
@@ -174,10 +175,10 @@ function EntryForm({
     </View>
   );
 }
-export default function CareScreen() {
+export default function CareScreen({ operations = false }: { operations?: boolean }) {
   const [view, setView] = useState<CareView>(careInitialView);
   const [workspace] = useState(
-    () => new CareWorkspace(transport, randomUUID, (v) => setView(v)),
+    () => new (operations ? AdminWorkspace : CareWorkspace)(transport, randomUUID, (v) => setView(v)),
   );
   const picking = useRef(false);
   useFocusEffect(useCallback(() => {
@@ -243,9 +244,9 @@ export default function CareScreen() {
       keyboardShouldPersistTaps="handled"
     >
       <Link href="/identity">Sign-in & account</Link>
-      <Link href="/staff-identity">Vet MFA sign-in</Link>
+      <Link href="/staff-identity">Staff MFA sign-in</Link>
       <Link href="/finance">স্যান্ডবক্স ঋণ ও লেজার · Finance sandbox</Link>
-      {view.profile && (
+      {view.profile && !operations && (
         <View accessibilityRole="tablist" style={styles.sections}>
           {careSections.map((section) => {
             const selected = view.section === section.id;
@@ -270,7 +271,7 @@ export default function CareScreen() {
         {view.title}
       </Text>
       <Button
-        title="তথ্য আনুন · Load / refresh care"
+        title={operations ? "তথ্য আনুন · Refresh administration" : "তথ্য আনুন · Load / refresh care"}
         disabled={view.busy}
         onPress={() => void workspace.act(() => workspace.home())}
       />
