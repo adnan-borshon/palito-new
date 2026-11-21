@@ -33,7 +33,7 @@ FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099
 WEB_ORIGIN=http://localhost:3000
 ```
 
-Create `frontend/web/.env.local` with these local emulator settings.
+Create `frontend/web/.env.development.local` with these emulator settings. Next.js loads this file during development.
 
 ```dotenv
 PALITO_API_ORIGIN=http://127.0.0.1:4000
