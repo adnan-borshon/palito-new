@@ -274,7 +274,7 @@ export async function extensionsScenario(
     );
 
     // 3. M8c & M8d: Consult -> Prescription -> Participant Call Token -> Emergency -> Commerce & Refund
-    const slotAt = new Date(Date.now() + 2 * 3_600_000);
+    const slotAt = new Date(Date.now() + 2 * 60_000);
     slotAt.setUTCSeconds(0, 0);
     await care.availability(vet, key(), 0, [slotAt.toISOString()]);
     const vetSlots = await care.slots(vet.userId);
@@ -304,6 +304,15 @@ export async function extensionsScenario(
       symptoms: "Sustained 39.8C temperature",
     });
     assert.equal(emerg.status, "NO_COVERAGE_FALLBACK");
+
+    const coverageAt = new Date(slotAt.getTime() + 5 * 60_000);
+    await care.availability(otherVet, key(), 0, [coverageAt.toISOString()]);
+    const covered = await extensions.createEmergencyRequest(farmer, key(), {
+      animalId: animal.id,
+      symptoms: "Needs a veterinary assessment",
+    });
+    assert.equal(covered.status, "OPEN");
+    assert.equal(covered.assignedVetId, otherVet.userId);
 
     await care.start(vet, appt.id, key(), 2);
     const completed = await care.complete(vet, appt.id, key(), 3, {

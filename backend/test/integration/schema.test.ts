@@ -307,9 +307,9 @@ if(process.env.FIREBASE_AUTH_EMULATOR_HOST) test('staff invitation, official emu
  const endpoint=(method:string,v='v1')=>`/identitytoolkit.googleapis.com/${v}/accounts:${method}?key=synthetic-emulator-key`;
  const mfa=(method:string)=>`/identitytoolkit.googleapis.com/v2/accounts/${method}?key=synthetic-emulator-key`;
  async function code(sessionInfo:string){const values=await rest('/emulator/v1/projects/demo-palito/verificationCodes');return values.verificationCodes.find((v:{sessionInfo:string})=>v.sessionInfo===sessionInfo).code;}
- async function identity(email:string,phone:string){
+ async function identity(email:string,phone:string, seeded = false){
   const password='Synthetic-emulator-password-only-123!';const firebase=getAuth(getApps().find(a=>a.name==='palito-demo-palito'));
-  const user=await firebase.createUser({email,password,emailVerified:true});
+  const user=seeded ? await firebase.getUserByEmail(email) : await firebase.createUser({email,password,emailVerified:true});
   const primary=await rest(endpoint('signInWithPassword'),{email,password,returnSecureToken:true});
   const start=await rest(mfa('mfaEnrollment:start'),{idToken:primary.idToken,phoneEnrollmentInfo:{phoneNumber:phone}});
   const info=start.phoneSessionInfo.sessionInfo;
@@ -359,6 +359,45 @@ if(process.env.FIREBASE_AUTH_EMULATOR_HOST) test('staff invitation, official emu
   await rejected('UPDATE palito.identity_audit SET action=$1',['FORGED'],'42501');
   await rejected('DELETE FROM palito.identity_audit',[],'23514',migrator);
   const events=await prisma.identityAudit.findMany();assert.ok(events.some(e=>e.action==='INITIAL_ADMIN_PROVISIONED'));assert.ok(events.some(e=>e.action==='INVITATION_ACCEPTED'));
+
+  const seed = (overrides: NodeJS.ProcessEnv = {}) => spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL('../../src/seed.js', import.meta.url)), '--local-sample'],
+    { env: { ...process.env, ...urls(databaseName), AUTH_MODE: 'emulator',
+      FIREBASE_PROJECT_ID: 'demo-palito', LOCAL_SAMPLE_STAFF_PASSWORD: 'Synthetic-emulator-password-only-123!',
+      ...overrides }, encoding: 'utf8', timeout: 30000 },
+  );
+  assert.equal(seed({ SEED_SYNTHETIC: 'false' }).status, 1);
+  assert.equal(seed({ AUTH_MODE: 'firebase' }).status, 1);
+  for (let run = 0; run < 2; run++) {
+    const result = seed();
+    assert.equal(result.status, 0, result.stderr);
+  }
+  assert.equal(await prisma.user.count({ where: { firebaseUid: { startsWith: 'palito-local-' } } }), 6);
+  for (const [phoneNumber, expectedFarm] of [
+    ['+8801700000101', 'Shapla Farm'],
+    ['+8801700000102', 'Doyel Farm'],
+  ] as const) {
+    const { sessionInfo } = await rest(endpoint('sendVerificationCode'), { phoneNumber });
+    const farmer = await rest(endpoint('signInWithPhoneNumber'), { sessionInfo, code: await code(sessionInfo) });
+    const farms = await request(server).get('/api/v1/farms').set('Authorization', `Bearer ${farmer.idToken}`).expect(200);
+    assert.deepEqual(farms.body.items.map((farm: { name: string }) => farm.name), [expectedFarm]);
+  }
+
+  for (const [name, phone, role] of [
+    ['vet', '+8801700000111', 'VET'],
+    ['bank', '+8801700000112', 'BANK_STAFF'],
+    ['insurer', '+8801700000113', 'INSURER_STAFF'],
+    ['admin', '+8801700000114', 'ADMIN'],
+  ] as const) {
+    const account = await identity(`${name}@palito.example`, phone, true);
+    const primary = await request(server).get('/api/v1/me').set('Authorization', `Bearer ${account.primary}`).expect(200);
+    assert.deepEqual(primary.body.memberships, []);
+    const approved = await request(server).get('/api/v1/me').set('Authorization', `Bearer ${account.token}`).expect(200);
+    assert.deepEqual(approved.body.memberships.map((membership: { role: string }) => membership.role), [role]);
+  }
+  assert.equal(seed().status, 0, 'Reseeding after MFA enrollment must preserve identities');
+
  }finally{await app.close();}
 });
 

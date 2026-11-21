@@ -320,15 +320,21 @@ export class OutboxWorkerService implements OnApplicationShutdown {
         dedupeKey: string;
         payload: Record<string, unknown>;
         attemptNumber: number;
+        attemptBudgetUsed: number;
         maxAttempts: number;
       }[] = [];
       for (const row of rows) {
-        const attemptNumber = row.attempts + 1;
+        const attemptBudgetUsed = row.attempts + 1;
+        const history = await tx.jobAttempt.aggregate({
+          where: { outboxEventId: row.id },
+          _max: { attemptNumber: true },
+        });
+        const attemptNumber = (history._max.attemptNumber ?? 0) + 1;
         await tx.outboxEvent.update({
           where: { id: row.id },
           data: {
             status: "PROCESSING",
-            attempts: attemptNumber,
+            attempts: attemptBudgetUsed,
             lockedUntil: leaseUntil,
             lockOwner: workerId,
           },
@@ -348,6 +354,7 @@ export class OutboxWorkerService implements OnApplicationShutdown {
           dedupeKey: row.dedupe_key,
           payload: row.payload ?? {},
           attemptNumber,
+          attemptBudgetUsed,
           maxAttempts: row.max_attempts,
         });
       }
@@ -377,12 +384,12 @@ export class OutboxWorkerService implements OnApplicationShutdown {
           });
         }
         await this.db.prisma.$transaction(async (tx) => {
-          await tx.jobAttempt.update({
+          await tx.$queryRaw`SELECT id FROM palito.outbox_events WHERE id = ${item.id}::uuid FOR UPDATE`;
+          const attempt = await tx.jobAttempt.updateMany({
             where: {
-              outboxEventId_attemptNumber: {
-                outboxEventId: item.id,
-                attemptNumber: item.attemptNumber,
-              },
+              outboxEventId: item.id,
+              attemptNumber: item.attemptNumber,
+              outcome: "STARTED",
             },
             data: {
               outcome: "SUCCEEDED",
@@ -390,6 +397,7 @@ export class OutboxWorkerService implements OnApplicationShutdown {
               finishedAt: new Date(),
             },
           });
+          if (!attempt.count) return;
           await tx.outboxEvent.update({
             where: { id: item.id },
             data: {
@@ -408,9 +416,10 @@ export class OutboxWorkerService implements OnApplicationShutdown {
           err instanceof Error && /^[A-Z0-9_]{3,64}$/.test(err.message)
             ? err.message
             : "DELIVERY_FAILURE";
-        const dead = item.attemptNumber >= item.maxAttempts;
+        const dead = item.attemptBudgetUsed >= item.maxAttempts;
         await this.db.prisma.$transaction(async (tx) => {
-          await tx.jobAttempt.updateMany({
+          await tx.$queryRaw`SELECT id FROM palito.outbox_events WHERE id = ${item.id}::uuid FOR UPDATE`;
+          const attempt = await tx.jobAttempt.updateMany({
             where: {
               outboxEventId: item.id,
               attemptNumber: item.attemptNumber,
@@ -422,6 +431,7 @@ export class OutboxWorkerService implements OnApplicationShutdown {
               finishedAt: new Date(),
             },
           });
+          if (!attempt.count) return;
           await tx.outboxEvent.update({
             where: { id: item.id },
             data: {
@@ -431,7 +441,9 @@ export class OutboxWorkerService implements OnApplicationShutdown {
               lastErrorCode: code,
               nextAttemptAt: dead
                 ? now
-                : new Date(now.getTime() + computeBackoffMs(item.attemptNumber)),
+                : new Date(
+                    now.getTime() + computeBackoffMs(item.attemptBudgetUsed),
+                  ),
             },
           });
           if (dead) {

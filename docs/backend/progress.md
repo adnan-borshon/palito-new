@@ -1,5 +1,12 @@
 # M8, M9 and M10 implementation and pilot readiness checkpoint
 
+## Database setup and verification — 2026-11-21
+
+- The database-first local walkthrough is in the [root README](../../README.md). `npm run db:migrate` loads the ignored backend environment, and `npm run db:seed:local` pairs two sample farms and four sample staff memberships with local Firebase Auth emulator accounts.
+- M5 retry preserves attempt history and prevents a reclaimed attempt from overwriting the new lease's result. Lending, insurance and commerce share the wallet spend lock under the restricted database role. M8 immediate coverage uses the next 15 minutes.
+- Lint, typecheck, 98 default tests and 24 PostgreSQL plus Firebase emulator integration tests passed locally. The standalone Chromium launch was blocked by the environment's socket policy. No migration changes were needed.
+- The next implementation step is to connect the existing farmer and vet dashboards to the verified API. The source of truth is PostgreSQL for `/care` and `/finance`. The default role dashboards currently use their local demo stores.
+
 Updated 2026-11-19. Following verified review of Milestones 4–7, Milestones **8 (M8a–M8e extensions)**, **9 (system QA and security remediation)**, and **10 (deployment preparation and controlled pilot readiness)** are implemented and verified locally. All M0–M10 software deliverables in the implementation plan are complete for review. No production deployment/migration, merge, paid activation, real-money transfer, or live OTP/SMS/provider campaign has been executed.
 
 Read [deployment & pilot M10](deployment-pilot-m10.md), [QA & security M9](qa-security-m9.md), and [extensions M8](extensions-m8.md) for actual routes, state machines, SQL invariants, extension sandbox gates, M9 security findings, M10 deployment preflight checks, and the pilot readiness matrix. Prior milestones remain active foundations: [M3 identity](milestone-3-completion-checkpoint.md), [M4 healthcare](healthcare.md), [M5 ops](ops-m5.md), [M6 lending](lending-m6.md), and [M7 insurance](insurance-m7.md).

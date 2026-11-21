@@ -128,7 +128,7 @@ export async function financeScenario(
       weightKg: "310.0",
       estimateMinor: "12000000",
     });
-    const slotTime = new Date(Date.now() + 2 * 3_600_000);
+    const slotTime = new Date(Date.now() + 2 * 60_000);
     slotTime.setUTCSeconds(0, 0);
     await care.availability(vet, key(), 0, [slotTime.toISOString()]);
     const vetSlots = await care.slots(vet.userId);
@@ -223,7 +223,10 @@ export async function financeScenario(
     });
     await prisma.loanQuote.update({
       where: { id: expiredQuote.id },
-      data: { expiresAt: new Date(Date.now() - 60_000) },
+      data: {
+        createdAt: new Date(Date.now() - 31 * 60_000),
+        expiresAt: new Date(Date.now() - 60_000),
+      },
     });
     await denied(
       finance.createLoan(farmer, key(), {
@@ -358,11 +361,12 @@ export async function financeScenario(
     assert.equal(schedule.items[2]!.principalMinor, "1000001");
 
     // Reviewed grace extension on installment #1
+    const activeLoan = await finance.loanDetail(farmer, liveLoan.id);
     const graced = await finance.grantGrace(
       approver,
       liveLoan.id,
       key(),
-      3,
+      activeLoan.version,
       {
         installmentId: schedule.items[0]!.id,
         graceDays: 14,

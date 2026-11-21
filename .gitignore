@@ -64,6 +64,7 @@ backend/src/generated/
 backend/.migration-test-*/
 
 # Local Firebase emulator output and native provider files
+backend/.firebase-local/
 **/firebase-debug.log
 **/ui-debug.log
 **/auth-debug.log

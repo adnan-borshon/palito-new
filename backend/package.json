@@ -26,7 +26,7 @@
     "db:bootstrap": "node --env-file=.env scripts/bootstrap-db.mjs",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
-    "migrate:deploy": "node --env-file-if-exists=.env --run migrate:run",
+    "migrate:deploy": "node --env-file-if-exists=.env scripts/migrate-deploy.mjs",
     "db:seed": "npm run build && node --env-file=.env dist/seed.js",
     "migrate:run": "prisma migrate deploy",
     "test:auth:emulator": "npm run build:test && npm exec --yes --ignore-scripts --package firebase-tools@15.36.0 -- firebase emulators:exec --project demo-palito --only auth \"node --test dist-test/test/integration/*.test.js\"",

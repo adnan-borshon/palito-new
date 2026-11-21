@@ -12,6 +12,7 @@ import { createHash } from "node:crypto";
 import { Prisma } from "../generated/prisma/client.js";
 import type { AccountPrincipal } from "../identity/accounts.js";
 import { APP_CONFIG, type AppConfig } from "../platform/config.js";
+import { lockWalletSpend } from "../platform/wallet-lock.js";
 import { parseMinorUnits } from "../platform/data-contracts.js";
 import { DatabaseService } from "../platform/database.js";
 import { OutboxWorkerService } from "../ops/outbox.worker.js";
@@ -1388,7 +1389,7 @@ export class FinanceService {
         const walletAccount = await this.ensureAccount(tx, "USER_WALLET", {
           ownerUserId: p.userId,
         });
-        await tx.$queryRaw`SELECT id FROM palito.ledger_accounts WHERE id = ${walletAccount.id}::uuid FOR UPDATE`;
+        await lockWalletSpend(tx, walletAccount.id);
         const balance = await this.computeAccountBalanceMinor(
           tx,
           walletAccount.id,
@@ -2477,7 +2478,7 @@ export class FinanceService {
           const walletAccount = await this.ensureAccount(tx, "USER_WALLET", {
             ownerUserId: p.userId,
           });
-          await tx.$queryRaw`SELECT id FROM palito.ledger_accounts WHERE id = ${walletAccount.id}::uuid FOR UPDATE`;
+          await lockWalletSpend(tx, walletAccount.id);
           const balance = await this.computeAccountBalanceMinor(
             tx,
             walletAccount.id,

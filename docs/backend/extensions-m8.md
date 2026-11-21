@@ -16,7 +16,7 @@ M8 delivers the five remaining functional scope tracks (`20261115000900_extensio
 
 ### M8c — Call Tokens & Emergency Triage
 - `POST /consultations/:id/call-token`: issues short-lived (`15m`) sandbox room tokens **only** to the appointment's `farmerId` or `vetId` when appointment status is `ACCEPTED`/`IN_PROGRESS` and an active non-revoked `CareGrant` exists within `endsAt + 72h` (`404` otherwise).
-- `POST /emergency-requests`, `GET /emergency-requests`: records symptoms/linked alert and derives honest real-time `coverageStatus` (`VERIFIED_VET_COVERAGE_AVAILABLE` vs `NO_IMMEDIATE_COVERAGE_FALLBACK`) from active verified vets' open `VetSlot` rows.
+- `POST /emergency-requests`, `GET /emergency-requests`: records symptoms/linked alert and derives honest real-time `coverageStatus` (`VERIFIED_VET_COVERAGE_AVAILABLE` vs `NO_IMMEDIATE_COVERAGE_FALLBACK`) from active verified vets' open `VetSlot` rows that start within the next 15 minutes. This is the sandbox triage window.
 
 ### M8d — Prescription-Checked Commerce & Fulfillment
 - `POST /admin/products`, `GET /products`, `GET /products/:id`: versioned BDT minor-unit product catalog.

@@ -437,7 +437,7 @@ export class OpsService {
     });
   }
 
-  retryDeadLetter(
+  async retryDeadLetter(
     p: AccountPrincipal,
     id: string,
     key: string | undefined,
@@ -450,6 +450,7 @@ export class OpsService {
       {},
       async (tx) => {
         await this.verifyAdmin(tx, p);
+        await tx.$queryRaw`SELECT id FROM palito.outbox_events WHERE id = ${id}::uuid FOR UPDATE`;
         const event = await tx.outboxEvent.findUnique({ where: { id } });
         if (!event) throw new NotFoundException();
         if (event.status !== "DEAD_LETTER") throw new ConflictException();

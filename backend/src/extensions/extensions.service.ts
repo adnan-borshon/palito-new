@@ -13,6 +13,7 @@ import { Prisma } from "../generated/prisma/client.js";
 import type { AccountPrincipal } from "../identity/accounts.js";
 import { OutboxWorkerService } from "../ops/outbox.worker.js";
 import { APP_CONFIG, type AppConfig } from "../platform/config.js";
+import { lockWalletSpend } from "../platform/wallet-lock.js";
 import { parseMinorUnits } from "../platform/data-contracts.js";
 import { DatabaseService } from "../platform/database.js";
 import type {
@@ -41,6 +42,8 @@ import {
 } from "./extensions-math.js";
 
 type Tx = Prisma.TransactionClient;
+
+const IMMEDIATE_VET_COVERAGE_MS = 15 * 60_000;
 
 const json = <T>(value: T): T =>
   JSON.parse(
@@ -871,10 +874,11 @@ export class ExtensionsService {
         });
         if (!alert) throw new NotFoundException("Referenced alert not found");
       }
+      const now = new Date();
       const openSlot = await tx.vetSlot.findFirst({
         where: {
           status: "OPEN",
-          startsAt: { gt: new Date() },
+          startsAt: { gt: now, lte: new Date(now.getTime() + IMMEDIATE_VET_COVERAGE_MS) },
           vet: {
             status: "VERIFIED",
             user: { status: "ACTIVE" },
@@ -1197,7 +1201,7 @@ export class ExtensionsService {
 
       if (provider === "WALLET") {
         const walletAccount = await this.ensureAccount(tx, "USER_WALLET", p.userId);
-        await tx.$queryRaw`SELECT id FROM palito.ledger_accounts WHERE id = ${walletAccount.id}::uuid FOR UPDATE`;
+        await lockWalletSpend(tx, walletAccount.id);
         const balance = await this.computeBalanceMinor(tx, walletAccount.id);
         if (balance < totalMinor) {
           throw new ConflictException("Insufficient sandbox wallet balance for order");

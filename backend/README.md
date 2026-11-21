@@ -6,6 +6,8 @@ NestJS 12 ESM API. M1 exposes operational endpoints only; every non-public contr
 
 ## Local setup
 
+For web sign-in and a database-backed walkthrough with farmer and staff sample accounts, start with the [root README](../README.md#start-locally-with-postgresql).
+
 Use repository-pinned Node 24.22.3 and Docker Compose v2. From the repository root:
 
 ```bash

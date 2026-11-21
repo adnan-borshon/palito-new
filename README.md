@@ -1,66 +1,104 @@
-> Current M3 update (2026-11-15): Firebase identity/session paths and opt-in `/identity` client screens are implemented. M3 software now includes staff invitation/approval, MFA/recovery, verified contact changes, revocation and native configuration; live-provider/device acceptance remains separate. Read [identity checkpoint](docs/backend/identity.md) for exact endpoints, setup, actual tests and provider/device release gates and completed staff/recovery implementation. Earlier milestone descriptions below remain historical or proposed unless superseded there.
-
 # Palito
 
-Bangla-first livestock care, veterinary, insurance, lending, and administration frontend for **Farmer**, **Veterinarian**, **Bank**, **Insurer**, and **Administrator** roles.
+Palito is a Bangla-first livestock care platform for farmers, veterinarians, banks, insurers and administrators. The Next.js web app and Expo mobile app share TypeScript workflows. The NestJS API stores business records in PostgreSQL and uses Firebase for identity.
 
-- `frontend/mobile`: Complete Expo SDK 58 + React Native 0.88 + Expo Router + TypeScript mobile application across all five roles.
-- `frontend/shared`: Portable TypeScript domain engine, validation, Bangla/English localization, deterministic fixtures, and versioned local storage repository.
-- `frontend/web`: Existing Next.js App Router web application across all five roles.
-- `backend`: NestJS foundation plus M2 Prisma/PostgreSQL core schema, reviewed migrations, restricted runtime role, OpenAPI and CI. [Run locally](backend/README.md) or [review progress](docs/backend/progress.md). Existing client authentication and domain workflows still use the local demo repository.
+**Start with the web app at `/identity` to try the database-backed workflow.** The regular role dashboards at `/login` use a local demo store. Changes made there stay in that browser or app installation.
 
-## Current backend review
+## Start locally with PostgreSQL
 
-M0/M1 were reviewed and M2 is delivered for review. See [backend progress](docs/backend/progress.md) for executed checks and limits. M3 requires the user's next instruction. The frontend walkthroughs below still operate on local records.
+Install Git, Node.js **24.22.3**, npm and Docker with Compose v2. Start Docker Desktop if you use Windows. The commands below also work in PowerShell. Use a local development database.
 
-## Run locally
+### 1. Install and prepare the database
 
-Use **Node 24 LTS** (`24.22.3` pinned in `.nvmrc` and `.node-version`). On Windows PowerShell with `nvm-windows`:
-
-```powershell
-$env:Path = "$env:NVM_HOME\v24.22.3;" + $env:Path
-npm install
-npm start
+```sh
+git clone https://github.com/adnan-borshon/palito-new.git
+cd palito-new
+npm ci --ignore-scripts --no-audit --no-fund
+npm run setup:backend
+npm run db:up --workspace @palito/backend
+npm run db:bootstrap
+npm run db:migrate
 ```
 
-| Root command | Purpose |
+Setup creates `backend/.env` with generated local passwords. Bootstrap creates the database roles. Migrate installs the schema. Keep that file private and keep the generated database URLs when editing it.
+
+### 2. Connect local sign-in
+
+In `backend/.env`, update or add the following settings, keeping one entry per key.
+
+```dotenv
+AUTH_MODE=emulator
+FIREBASE_PROJECT_ID=demo-palito
+FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099
+WEB_ORIGIN=http://localhost:3000
+```
+
+Create `frontend/web/.env.local` with these local emulator settings.
+
+```dotenv
+PALITO_API_ORIGIN=http://127.0.0.1:4000
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-palito
+NEXT_PUBLIC_FIREBASE_API_KEY=synthetic-emulator-key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=demo-palito.firebaseapp.com
+NEXT_PUBLIC_AUTH_EMULATOR=true
+```
+
+### 3. Start the app
+
+Run each command from the repository root. Keep the terminals open.
+
+| Terminal | Command |
 |---|---|
-| `npm start` | Start the Expo development server (`frontend/mobile`) |
-| `npm run web` | Open the Expo mobile preview in the browser |
-| `npm run android` | Launch on a connected Android device or configured emulator |
-| `npm run ios` | Launch on an iOS simulator (requires macOS) |
-| `npm run typecheck` | Run TypeScript `--noEmit` across all three frontend workspaces |
-| `npm run lint` | Run `expo lint` on the mobile workspace |
-| `npm run test` | Run shared, mobile and web domain/component test suites |
-| `npm run test:shared` | Run the 18 shared domain & journey tests (`node --test`) |
-| `npm run test:mobile` | Run the 11 Jest + React Native Testing Library mobile tests |
-| `npm run doctor` | Run `npx expo-doctor` diagnostics (record actual current results) |
-| `npm run export:web` | Build the static mobile preview bundle in `frontend/mobile/dist/` |
+| 1 · Firebase Auth emulator | `npm exec --yes --ignore-scripts --package firebase-tools@15.36.0 -- firebase emulators:start --config backend/firebase.json --project demo-palito --only auth --export-on-exit=backend/.firebase-local` |
+| 2 · Palito API | `npm run dev:backend` |
+| 3 · Next.js web app | `npm run dev:web` |
 
-## Seeded demo accounts & OTP
+Open [database readiness](http://127.0.0.1:4000/api/v1/health/ready). A ready response means the API can query PostgreSQL. After the first graceful emulator shutdown, add `--import=backend/.firebase-local` to terminal 1's command on subsequent starts to keep the same emulator identities. The export contains local sign-in data and is ignored by Git.
 
-On the sign-in screen (`/login`), tap any role row (or enter its phone number), tap **Get verification code**, and enter the demo OTP **`123456`**. Once signed in, you can switch roles at any time via **Profile → Demo controls (`/[role]/demo`)** while keeping the same local records.
+### 4. Load sample records and sign in
 
-| Role | Name (BN / EN) | Phone | Default ID |
-|---|---|---|---|
-| **Farmer** | রহিম উদ্দিন / Rahim Uddin | `+8801712345678` | `farmer-rahim` |
-| **Farmer (2nd)** | সালমা বেগম / Salma Begum | `+8801812345678` | `farmer-salma` |
-| **Veterinarian** | ডা. ফারহানা আহমেদ / Dr. Farhana Ahmed | `+8801912345678` | `vet-farhana` |
-| **Bank** | পদ্মা ব্যাংক ডেমো / Padma Bank Demo | `+8801612345678` | `bank-padma` |
-| **Insurer** | সুরক্ষা বীমা ডেমো / Suraksha Insurance Demo | `+8801512345678` | `insurer-suraksha` |
-| **Administrator** | পালিত অ্যাডমিন / Palito Admin | `+8801312345678` | `admin-palito` |
+With PostgreSQL and the Auth emulator running, temporarily add these settings to `backend/.env`. Choose a password of at least 12 characters for local staff sign-in.
 
-## Cross-role walkthroughs
+```dotenv
+SEED_SYNTHETIC=true
+LOCAL_SAMPLE_STAFF_PASSWORD=choose-a-local-only-password
+```
 
-1. **UC-001 (Health anomaly → Priority vet care → Prescription & reminder):**
-   - Sign in as **Farmer** → open **Review alert** on Home (`alert-temperature` for Moti, `PL-1002`) → tap **Book priority visit** (or advance the demo clock by 4 hours in Demo Controls to trigger escalation).
-   - Switch to **Veterinarian** → open the appointment from **Visits** → review Moti's 7-day vitals and health history → tap **Accept appointment** → **Start consultation** → complete the diagnosis and medicine prescription.
-   - Switch to **Farmer** → check **Prescriptions** and **Medication reminders** to mark today's dose taken; switch to **Insurer** → check **Notifications** for the preventive care record.
-2. **UC-002 (Insurance enrollment → Claim evidence → Review → Debt-first payout):**
-   - As **Farmer**, open **Wallet → Submit an insurance claim** on Shyamoli (`PL-1003`, insured for `90,000 BDT` and securing `loan-active` with `32,000 BDT` outstanding debt). Attach the sample photo and sample GPS/time evidence and submit.
-   - Switch to **Insurer** → open the claim in **Claims** → run **Demo automatic review** (or refer to the **Veterinarian** for clinical assessment) → tap **Simulate payout**.
-   - Verify that `32,000 BDT` settles the bank loan (`loan-active` becomes `settled`), `58,000 BDT` credits the farmer's wallet, and Shyamoli's passport records the settled death claim.
-3. **UC-003 (Collateral selection → 70% LTV cap → Bank review & disbursement → Repayment & grace):**
-   - As **Farmer**, open **Wallet → Apply for a farm loan** → select Lali (`PL-1001`, value `140,000 BDT`, 70% cap `98,000 BDT`) or Moti (`PL-1002`, health score `66`, adjusted valuation `88,000 BDT`, 70% cap `61,600 BDT` at `15%` sample rate) → generate the offer and accept terms.
-   - Switch to **Bank** → open **Applications** → inspect the linked health passport, approve the loan, and tap **Simulate disbursement**.
-   - Switch to **Farmer** to make a partial or full repayment, or inspect **Bank → Loan portfolio (Production drop / Grace)** to grant a repayment grace period.
+Run `npm run db:seed:local` from the repository root, then set `SEED_SYNTHETIC=false`. You can run the seed again with the flag enabled. It keeps the same records and does not reset existing emulator passwords or MFA enrollment.
+
+| Role | Local sign-in details |
+|---|---|
+| Farmer | `+8801700000101`, owns **Shapla Farm** and **Shapla** |
+| Second farmer | `+8801700000102`, owns **Doyel Farm** and **Doyel** |
+| Veterinarian | `vet@palito.example`, MFA phone `+8801700000111` |
+| Bank staff | `bank@palito.example`, MFA phone `+8801700000112` |
+| Insurance staff | `insurer@palito.example`, MFA phone `+8801700000113` |
+| Administrator | `admin@palito.example`, MFA phone `+8801700000114` |
+
+- **Farmer:** Open [verified sign-in](http://localhost:3000/identity). Enter a name and the sample phone number, consent and request a code. Get the code from the Auth emulator terminal, then open **Farm & care**. You can also skip the seed and sign up with a different synthetic phone to start with an empty farm list.
+- **Staff:** Open [staff sign-in](http://localhost:3000/identity/staff). Sign in with the sample email and your local staff password. On the first visit, enter the matching MFA phone, choose **Enroll SMS MFA** and verify the code from the emulator terminal. Sign in again, verify the MFA sign-in code and choose **Open staff session**. Sample memberships are already active. The emulator handles both verification flows locally.
+
+### 5. Verify that records persist
+
+As the first sample farmer, open **Farm & care** → **Add farm** and save a uniquely named farm. Refresh, then sign in as the same farmer in a private browser window. The farm should appear in both sessions. The second farmer should see only their own farms.
+
+## Other entry points
+
+| Goal | How to start |
+|---|---|
+| Explore mobile role designs with local examples | `npm start` starts Expo. `npm run web` opens the Expo browser preview. |
+| Explore the web role demo | Run `npm run dev:web`, open `/login` and follow the labeled demo sign-in. |
+| Use verified native sign-in | Use a configured native development build, platform Firebase files and a reachable HTTPS API. See the [identity guide](docs/backend/identity.md). |
+| Process reminders and notifications | With PostgreSQL and the API configured, run `npm run worker --workspace @palito/backend` in another terminal. |
+| Try lending and insurance | The verified `/finance` workspace uses database records and opt-in simulated payments. See [lending](docs/backend/lending-m6.md) and [insurance](docs/backend/insurance-m7.md) for flags, role setup and provider configuration. |
+
+## Troubleshooting
+
+- **I see role switching or the fixed demo code.** Open `http://localhost:3000/identity`. Use `npm run dev:web` for Next.js.
+- **Sign-in or API calls fail.** Confirm the emulator and API terminals are running, check database readiness, and restart the API and Next.js after editing env files. Use `localhost:3000` consistently for the web session.
+- **The API is alive but readiness returns 503.** Check Docker is running, run `npm run db:up --workspace @palito/backend`, and check bootstrap and migration output. Keep the generated credentials paired with their Docker volume.
+- **Stop and resume.** Stop the terminals with Ctrl+C. Run `npm run db:down --workspace @palito/backend` to stop PostgreSQL and retain the development volume. Start it again with the same db:up command. Stop the Auth emulator with Ctrl+C so it saves its export. Use the import option above when restarting it.
+
+## Project checks
+
+From the root, run `npm run lint:all`, `npm run typecheck` and `npm test`. Database integration tests require a disposable PostgreSQL database and the Auth emulator. See the [CI workflow](.github/workflows/ci.yml) for the full setup. The [backend guide index](docs/backend/README.md) covers the API, worker, migrations, security and pilot readiness.

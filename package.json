@@ -36,7 +36,8 @@
     "setup:backend": "npm run setup:dev --workspace @palito/backend",
     "db:bootstrap": "npm run db:bootstrap --workspace @palito/backend",
     "db:migrate": "npm run migrate:deploy --workspace @palito/backend",
-    "db:seed": "npm run db:seed --workspace @palito/backend"
+    "db:seed": "npm run db:seed --workspace @palito/backend",
+    "db:seed:local": "npm run db:seed --workspace @palito/backend -- --local-sample"
   },
   "overrides": {
     "@grpc/grpc-js": "1.14.7"
