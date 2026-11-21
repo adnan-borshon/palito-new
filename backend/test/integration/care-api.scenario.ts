@@ -203,6 +203,21 @@ export async function careApiScenario(
       .send({ ...body, ownerId: "forged" })
       .expect(400);
     const animal = (await post(a, "/animals").send(body).expect(201)).body;
+    // The web session reads the same row created through the native-style bearer API.
+    const csrf = await request(server).get("/api/v1/sessions/csrf").expect(200);
+    const csrfCookie = (csrf.headers["set-cookie"] as unknown as string[])[0]!.split(";")[0]!;
+    const exchanged = await request(server)
+      .post("/api/v1/sessions")
+      .set("Origin", "http://localhost:3000")
+      .set("Cookie", csrfCookie)
+      .set("X-CSRF-Token", csrf.body.csrfToken)
+      .send({ idToken: a })
+      .expect(201);
+    const webCookie = (exchanged.headers["set-cookie"] as unknown as string[])
+      .find((value) => value.startsWith("__Host-palito-session=") && !value.startsWith("__Host-palito-session=;"))!.split(";")[0]!;
+    const webGet = (path: string) => request(server).get(`/api/v1${path}`).set("Cookie", webCookie);
+    assert.equal((await webGet("/animals").expect(200)).body.items[0].id, animal.id);
+
     const badCursor = Buffer.from(
       JSON.stringify([new Date().toISOString(), "-".repeat(36)]),
     ).toString("base64url");
@@ -274,7 +289,22 @@ export async function careApiScenario(
         .expect(201)
     ).body;
     await get(a, `/prescriptions/${signed.prescriptionId}`).expect(200);
+    assert.equal((await webGet("/prescriptions").expect(200)).body.items[0].id, signed.prescriptionId);
     await get(b, `/prescriptions/${signed.prescriptionId}`).expect(404);
+    for (const token of [a, vet.token]) {
+      const list = (await get(token, "/prescriptions?limit=1").expect(200)).body;
+      assert.equal(list.items.length, 1);
+      assert.equal(list.items[0].id, signed.prescriptionId);
+      assert.equal(list.items[0].animalName, "API animal");
+      assert.equal(list.items[0].advice, undefined);
+      assert.equal(list.nextCursor, null);
+    }
+    for (const token of [b, vet.primary]) {
+      const list = (await get(token, "/prescriptions").expect(200)).body;
+      assert.deepEqual(list.items, []);
+    }
+    await request(server).get("/api/v1/prescriptions").expect(401);
+
     const png = await sharp({
       create: { width: 1, height: 1, channels: 3, background: "#447744" },
     })
@@ -313,6 +343,9 @@ export async function careApiScenario(
       .expect(201);
     await get(vet.token, `/files/${file.id}/download`).expect(404);
     await get(vet.token, `/animals/${animal.id}/records`).expect(404);
+    assert.deepEqual((await get(vet.token, "/prescriptions").expect(200)).body.items, []);
+    assert.equal((await get(a, "/prescriptions").expect(200)).body.items[0].id, signed.prescriptionId);
+
     assert.equal((await get(a, "/reminders").expect(200)).body.items.length, 1);
     await request(server)
       .put(`/api/v1/files/${file.id}/content`)

@@ -2,7 +2,7 @@
 
 Palito is a Bangla-first livestock care platform for farmers, veterinarians, banks, insurers and administrators. The Next.js web app and Expo mobile app share TypeScript workflows. The NestJS API stores business records in PostgreSQL and uses Firebase for identity.
 
-**Start with the web app at `/identity` to try the database-backed workflow.** The regular role dashboards at `/login` use a local demo store. Changes made there stay in that browser or app installation.
+**Use verified sign-in to open the farmer or veterinarian dashboard.** Choose **Farm & care** from your signed-in profile or **Open live care** from the demo home. The local demo is available through `/login`.
 
 ## Start locally with PostgreSQL
 
@@ -81,6 +81,14 @@ Run `npm run db:seed:local` from the repository root, then set `SEED_SYNTHETIC=f
 ### 5. Verify that records persist
 
 As the first sample farmer, open **Farm & care** → **Add farm** and save a uniquely named farm. Refresh, then sign in as the same farmer in a private browser window. The farm should appear in both sessions. The second farmer should see only their own farms.
+
+## Use the same records on web and mobile
+
+The verified dashboard on both clients uses the Palito API as its data source. Point the web app's `PALITO_API_ORIGIN` and the native build's `EXPO_PUBLIC_PALITO_API_ORIGIN` at the same API environment. Both clients must use Firebase apps from the project configured on that API. The native URL must be reachable over HTTPS, and native Firebase sign-in requires a configured Expo development build.
+
+- Farmers can register animals, view their farms and passports, book a vet visit, and open signed prescriptions.
+- Verified veterinarians can manage availability, open consented visits, and sign consultations and prescriptions. Staff access requires the existing MFA sign-in.
+- Open dashboard lists refresh every 30 seconds and reload when the client returns to the foreground. Use **Load / refresh care** to refresh immediately. Saved changes go to PostgreSQL. Local demo records stay on their original device.
 
 ## Other entry points
 

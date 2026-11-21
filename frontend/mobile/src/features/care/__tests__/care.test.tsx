@@ -21,7 +21,11 @@ jest.mock("@react-native-firebase/auth", () => ({
     };
   },
 }));
-jest.mock("expo-router", () => ({ Link: "Text" }));
+jest.mock("expo-router", () => ({
+  Link: "Text",
+  useFocusEffect: (effect: () => void) =>
+    jest.requireActual<typeof import("react")>("react").useEffect(effect, [effect]),
+}));
 jest.mock("expo-crypto", () => ({
   randomUUID: () => "synthetic-care-command-key",
 }));
@@ -55,6 +59,11 @@ beforeEach(() => {
       if (path === "/me") value = profile;
       else if (path.startsWith("/appointments?"))
         value = { items: appointments, nextCursor: null };
+      else if (path.startsWith("/prescriptions?"))
+        value = {
+          items: [{ id: "rx", animalName: "Synced cow", animalTag: "SYNC-01", signedAt: new Date().toISOString() }],
+          nextCursor: null,
+        };
       else if (path === "/prescriptions/rx")
         value = {
           id: "rx",
@@ -167,6 +176,20 @@ test("native verified-vet consultation form sends structured medicines and rende
       },
     ],
   });
+});
+test("native dashboard reads the signed prescription list through the authenticated API", async () => {
+  await render(<CareScreen />);
+  await waitFor(() => expect(screen.getByText("খামারি ড্যাশবোর্ড · Farmer dashboard")).toBeTruthy());
+  await fireEvent.press(screen.getByRole("tab", { name: "প্রেসক্রিপশন · Prescriptions" }));
+  await waitFor(() => expect(screen.getByText("Synced cow · SYNC-01")).toBeTruthy());
+  expect(globalThis.fetch).toHaveBeenCalledWith(
+    "https://api.palito.test/api/v1/prescriptions?limit=100",
+    expect.objectContaining({
+      headers: { Authorization: "Bearer synthetic-sdk-token" },
+    }),
+  );
+  await fireEvent.press(screen.getByText("প্রেসক্রিপশন দেখুন · View signed prescription"));
+  await waitFor(() => expect(screen.getByText("Signed synthetic advice")).toBeTruthy());
 });
 test("disabled native care never initializes provider transport", async () => {
   process.env.EXPO_PUBLIC_FIREBASE_NATIVE_ENABLED = "false";

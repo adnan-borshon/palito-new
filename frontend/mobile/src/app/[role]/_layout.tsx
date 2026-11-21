@@ -1,4 +1,4 @@
-import { Redirect, Stack, router, useLocalSearchParams, usePathname } from 'expo-router';
+import { Link, Redirect, Stack, router, useLocalSearchParams, usePathname } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppFeedback } from '@/components/app-feedback';
@@ -18,6 +18,12 @@ export default function RoleLayout() {
   return <ScreenInsetContext.Provider value={false}><View style={[styles.shell, { paddingTop: insets.top }]}>
     {state.settings.offline ? <View style={styles.offline}><Icon name="cloud-offline-outline" color={colors.warning} size={17} /><AppText variant="small" color={colors.warning}>{t('অফলাইন মোড · সংরক্ষিত তথ্য দেখানো হচ্ছে', 'Offline mode · showing cached records')}</AppText></View> : null}
     <AppFeedback />
+    {(user.role === 'farmer' || user.role === 'vet') && path.split('/')[2] === 'home' && (
+      <View style={styles.carePreview}>
+        <AppText variant="small">{t('নমুনা দেখুন', 'Demo preview')}</AppText>
+        <Link href="/care" style={styles.liveCare}>{t('যাচাইকৃত ড্যাশবোর্ড', 'Open live care')}</Link>
+      </View>
+    )}
     <Stack screenOptions={{ headerShown: false }} />
     <View style={[styles.tabs, { paddingBottom: Math.max(insets.bottom, 8) }]} accessibilityRole="tablist">
       {roleTabs[user.role].map(tab => {
@@ -41,6 +47,8 @@ export default function RoleLayout() {
 }
 const styles = StyleSheet.create({
   shell: { flex: 1, backgroundColor: colors.background },
+  carePreview: { paddingHorizontal: 16, paddingVertical: 8, backgroundColor: colors.brandPale, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+  liveCare: { paddingVertical: 8, color: colors.brandDark, textDecorationLine: 'underline' },
   tabs: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 6, paddingHorizontal: 4 },
   tab: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 58, paddingHorizontal: 2, gap: 2 },
   tabLabel: { textAlign: 'center', fontSize: 12, lineHeight: 16 },

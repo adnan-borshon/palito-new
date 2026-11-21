@@ -4,6 +4,8 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import {
   CareWorkspace,
+  CARE_REFRESH_MS,
+  careSections,
   careInitialView,
   CareFailure,
   careMedicineFields,
@@ -173,16 +175,31 @@ export default function CarePage() {
       ),
   );
   useEffect(() => {
-    const clear = () => {
-      if (document.visibilityState === "hidden") workspace.clear();
+    const load = () => {
+      if (document.visibilityState === "visible")
+        void workspace.act(() => workspace.home());
     };
-    const hide = () => workspace.clear();
-    document.addEventListener("visibilitychange", clear);
-    window.addEventListener("pagehide", hide);
+    const refresh = () => {
+      if (document.visibilityState === "visible") void workspace.refresh();
+    };
+    const clear = () => workspace.clear();
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") clear();
+      else load();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", clear);
+    window.addEventListener("pageshow", load);
+    window.addEventListener("focus", refresh);
+    const interval = window.setInterval(refresh, CARE_REFRESH_MS);
+    load();
     return () => {
-      document.removeEventListener("visibilitychange", clear);
-      window.removeEventListener("pagehide", hide);
-      workspace.clear();
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", clear);
+      window.removeEventListener("pageshow", load);
+      window.removeEventListener("focus", refresh);
+      window.clearInterval(interval);
+      clear();
     };
   }, [workspace]);
   return (
@@ -199,11 +216,32 @@ export default function CarePage() {
             তথ্য আনুন · Load / refresh care
           </button>
         </nav>
+        {view.profile && (
+          <nav aria-label="Care dashboard sections" className="flex flex-wrap gap-2">
+            {careSections.map((section) => (
+              <button
+                key={section.id}
+                type="button"
+                aria-pressed={view.section === section.id}
+                disabled={view.busy}
+                className="rounded-lg border border-emerald-700 bg-white px-4 py-2 aria-pressed:bg-emerald-800 aria-pressed:text-white"
+                onClick={() => void workspace.act(() => workspace.home(section.id))}
+              >
+                {section.label}
+              </button>
+            ))}
+          </nav>
+        )}
         <h1 className="text-3xl font-bold">{view.title}</h1>
         {view.profile && <p>{view.profile.displayName}</p>}
-        <p role="status" className="rounded-xl bg-white p-4">
-          {view.busy ? "অপেক্ষা করুন · Please wait…" : view.notice}
-        </p>
+        {(view.busy || view.notice) && (
+          <p role="status" className="rounded-xl bg-white p-4">
+            {view.busy ? "অপেক্ষা করুন · Please wait…" : view.notice}
+          </p>
+        )}
+        {view.section && !view.busy && !view.notice && !view.cards.length && (
+          <p className="rounded-xl bg-white p-4">এই তালিকা খালি · No records to show.</p>
+        )}
         <div className="flex flex-wrap gap-3">
           {view.actions.map((a) => (
             <button

@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   AppState,
   Button,
   Image,
+  Pressable,
   ScrollView,
   StyleSheet,
   Switch,
@@ -10,13 +11,15 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { Link } from "expo-router";
+import { Link, useFocusEffect } from "expo-router";
 import { getAuth, onAuthStateChanged } from "@react-native-firebase/auth";
 import * as ImagePicker from "expo-image-picker";
 import { File } from "expo-file-system";
 import { randomUUID } from "expo-crypto";
 import {
+  CARE_REFRESH_MS,
   CareFailure,
+  careSections,
   CareWorkspace,
   careInitialView,
   careMedicineFields,
@@ -25,6 +28,7 @@ import {
   type CareTransport,
   type CareView,
 } from "@palito/shared";
+import { colors } from "@/theme";
 const transport: CareTransport = async <T,>(
   path: string,
   r: CareRequest = {},
@@ -39,7 +43,7 @@ const transport: CareTransport = async <T,>(
   const user = getAuth().currentUser;
   if (!user) throw new CareFailure(401);
   const headers: Record<string, string> = {
-    Authorization: `Bearer ${await user.getIdToken(true)}`,
+    Authorization: `Bearer ${await user.getIdToken()}`,
   };
   if (r.body !== undefined) headers["Content-Type"] = "application/json";
   if (r.contentType) headers["Content-Type"] = r.contentType;
@@ -55,7 +59,10 @@ const transport: CareTransport = async <T,>(
   return (r.binary ? await response.arrayBuffer() : await response.json()) as T;
 };
 const styles = StyleSheet.create({
-  page: { padding: 20, gap: 16, backgroundColor: "#edf6ef" },
+  page: { padding: 20, gap: 16, backgroundColor: colors.brandPale },
+  sections: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  section: { borderRadius: 8, borderWidth: 1, borderColor: colors.brand, minHeight: 44, justifyContent: "center", paddingHorizontal: 10 },
+  selected: { backgroundColor: colors.brandDark },
   card: { padding: 16, gap: 12, backgroundColor: "white", borderRadius: 14 },
   title: { fontSize: 24, fontWeight: "700", color: "#145734" },
   input: {
@@ -172,28 +179,47 @@ export default function CareScreen() {
   const [workspace] = useState(
     () => new CareWorkspace(transport, randomUUID, (v) => setView(v)),
   );
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(getAuth(), () => workspace.clear());
-    const listener = AppState.addEventListener("change", () =>
-      workspace.clear(),
-    );
+  const picking = useRef(false);
+  useFocusEffect(useCallback(() => {
+    const active = () => AppState.currentState !== "background" && AppState.currentState !== "inactive";
+    const load = () => {
+      if (active() && !picking.current && getAuth().currentUser)
+        void workspace.act(() => workspace.home());
+    };
+    const unsubscribe = onAuthStateChanged(getAuth(), () => {
+      workspace.clear();
+      load();
+    });
+    const listener = AppState.addEventListener("change", (state) => {
+      if (state === "active") load();
+      else workspace.clear();
+    });
+    const interval = setInterval(() => {
+      if (active() && !picking.current) void workspace.refresh();
+    }, CARE_REFRESH_MS);
     return () => {
       unsubscribe();
       listener.remove();
+      clearInterval(interval);
       workspace.clear();
     };
-  }, [workspace]);
+  }, [workspace]));
   async function image() {
     const id = view.uploadAnimalId,
       uid = getAuth().currentUser?.uid;
     if (!id || !uid) return;
+    picking.current = true;
     const selected = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       quality: 0.7,
       exif: false,
       allowsMultipleSelection: false,
-    });
-    if (selected.canceled) return;
+    }).finally(() => { picking.current = false; });
+    if (selected.canceled) {
+      if (getAuth().currentUser?.uid === uid)
+        await workspace.act(() => workspace.passport(id));
+      return;
+    }
     const asset = selected.assets[0];
     if (!asset || getAuth().currentUser?.uid !== uid) return;
     const file = new File(asset.uri);
@@ -219,6 +245,27 @@ export default function CareScreen() {
       <Link href="/identity">Sign-in & account</Link>
       <Link href="/staff-identity">Vet MFA sign-in</Link>
       <Link href="/finance">স্যান্ডবক্স ঋণ ও লেজার · Finance sandbox</Link>
+      {view.profile && (
+        <View accessibilityRole="tablist" style={styles.sections}>
+          {careSections.map((section) => {
+            const selected = view.section === section.id;
+            return (
+              <Pressable
+                key={section.id}
+                accessibilityRole="tab"
+                accessibilityState={{ selected, disabled: view.busy }}
+                disabled={view.busy}
+                style={[styles.section, selected && styles.selected]}
+                onPress={() => void workspace.act(() => workspace.home(section.id))}
+              >
+                <Text style={{ color: selected ? colors.surface : colors.brandDark }}>
+                  {section.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
       <Text accessibilityRole="header" style={styles.title}>
         {view.title}
       </Text>
@@ -230,9 +277,14 @@ export default function CareScreen() {
       {view.profile && (
         <Text style={styles.text}>{view.profile.displayName}</Text>
       )}
-      <Text accessibilityRole="alert">
-        {view.busy ? "অপেক্ষা করুন · Please wait…" : view.notice}
-      </Text>
+      {(view.busy || view.notice) && (
+        <Text accessibilityRole="alert">
+          {view.busy ? "অপেক্ষা করুন · Please wait…" : view.notice}
+        </Text>
+      )}
+      {view.section && !view.busy && !view.notice && !view.cards.length && (
+        <Text style={styles.text}>এই তালিকা খালি · No records to show.</Text>
+      )}
       {view.actions.map((a) => (
         <Button
           key={a.label}

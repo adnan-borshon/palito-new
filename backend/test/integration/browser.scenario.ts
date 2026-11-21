@@ -21,7 +21,9 @@ export async function browserJourney(vet?:import('./care-browser.scenario.js').B
   const codes=await (await fetch(`http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/emulator/v1/projects/demo-palito/verificationCodes`)).json();
   const code=codes.verificationCodes.find((v:{phoneNumber:string})=>v.phoneNumber==='+8801700000021').code;
   await page.getByLabel('কোড · Code',{exact:true}).fill(code);
+  const exchanged=page.waitForResponse(r=>r.url().endsWith('/api/v1/sessions')&&r.request().method()==='POST'&&r.ok());
   await page.getByRole('button',{name:'যাচাই করুন · Verify',exact:true}).click();
+  const {idToken:farmerToken}=(await exchanged).request().postDataJSON() as {idToken:string};
   await page.getByText('স্বাগতম · Welcome, Browser farmer',{exact:true}).waitFor();
   const cookie=(await context.cookies()).find(c=>c.name==='__Host-palito-session');assert.ok(cookie?.httpOnly&&cookie.secure&&cookie.sameSite==='Strict');
   assert.ok(!(await page.evaluate(()=>document.cookie)).includes('__Host-palito-session'));
@@ -30,7 +32,7 @@ export async function browserJourney(vet?:import('./care-browser.scenario.js').B
   const denied=await page.evaluate(async()=>{const response=await fetch('/api/v1/sessions/current',{method:'DELETE'});return response.status;});assert.equal(denied,403);
   // A separate browser identity cannot inherit another browser's cookies or profile.
   const isolated=await browser.newContext();const other=await isolated.newPage();await other.goto('http://localhost:3000/identity');assert.equal(await other.getByText('স্বাগতম · Welcome, Browser farmer',{exact:true}).count(),0);await isolated.close();
-  if(vet){const {careBrowserJourney}=await import('./care-browser.scenario.js');await careBrowserJourney(page,browser,vet);await page.goto('http://localhost:3000/identity');await page.getByText('স্বাগতম · Welcome, Browser farmer',{exact:true}).waitFor();}
+  if(vet){const {careBrowserJourney}=await import('./care-browser.scenario.js');await careBrowserJourney(page,browser,vet,farmerToken);await page.goto('http://localhost:3000/identity');await page.getByText('স্বাগতম · Welcome, Browser farmer',{exact:true}).waitFor();}
   await page.getByRole('button',{name:'সাইন আউট · Sign out',exact:true}).click();await page.getByLabel('নাম · Name',{exact:true}).waitFor();
   await page.reload();await page.getByLabel('নাম · Name',{exact:true}).waitFor();
   assert.ok(!(await context.cookies()).some(c=>c.name==='__Host-palito-session'));

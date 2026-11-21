@@ -102,6 +102,20 @@ export interface CarePrescription {
     days: number;
   }[];
 }
+export const CARE_REFRESH_MS = 30_000;
+export const careSections = [
+  { id: "home", label: "প্রধান পাতা · Home" },
+  { id: "animals", label: "খামার ও পশু · Farms & animals" },
+  { id: "visits", label: "ভিজিট · Visits" },
+  { id: "prescriptions", label: "প্রেসক্রিপশন · Prescriptions" },
+] as const;
+export type CareSection = (typeof careSections)[number]["id"];
+interface CarePrescriptionSummary {
+  id: string;
+  signedAt: string;
+  animalName: string;
+  animalTag: string;
+}
 export interface CarePage<T> {
   items: T[];
   nextCursor: string | null;
@@ -129,7 +143,11 @@ export class CareFailure extends Error {
           ? "Booking is not enabled for this pilot."
           : status === 400
             ? "তথ্য পরীক্ষা করুন · Check the form values."
-            : "সেশন বা অনুমতি যাচাই করুন · Check sign-in and access.",
+            : status === 429
+              ? "একটু অপেক্ষা করুন · Too many requests. Try again shortly."
+              : status >= 500
+                ? "সার্ভারে সমস্যা · The server could not load your records. Try again."
+                : "সেশন বা অনুমতি যাচাই করুন · Check sign-in and access.",
     );
     this.status = status;
   }
@@ -159,6 +177,7 @@ export interface CareForm {
   submit: (values: Record<string, string>) => Promise<void>;
 }
 export interface CareView {
+  section: CareSection | null;
   profile: CareProfile | null;
   title: string;
   notice: string;
@@ -198,9 +217,10 @@ const required = (v: Record<string, string>, key: string) => {
 };
 export function careInitialView(): CareView {
   return {
+    section: null,
     profile: null,
     title: "খামার ও চিকিৎসা · Farm & care",
-    notice: "Sign in, then load your care workspace.",
+    notice: "যাচাইকৃত অ্যাকাউন্ট দিয়ে প্রবেশ করুন · Sign in to open your care dashboard.",
     busy: false,
     cards: [],
     actions: [],
@@ -216,6 +236,7 @@ export class CareWorkspace {
   private generation = 0;
   private keys = new Map<string, string>();
   private identity: string | null = null;
+  private section: CareSection = "home";
   private returnTo: () => Promise<void> = () => this.home();
   private readonly transport: CareTransport;
   private readonly newKey: () => string;
@@ -237,34 +258,33 @@ export class CareWorkspace {
     this.generation++;
     this.identity = null;
     this.keys.clear();
-    this.emit({
-      profile: null,
-      cards: [],
-      actions: [],
-      form: null,
-      image: null,
-      uploadAnimalId: null,
-      uploadOwner: false,
-      busy: false,
-      notice: "Reload after signing in.",
-    });
+    this.returnTo = () => this.home();
+    this.emit(careInitialView());
   }
-  private async request<T>(path: string, request?: CareRequest): Promise<T> {
+  private async authenticated<T>(
+    work: (send: CareTransport, profile: CareProfile) => Promise<T>,
+  ): Promise<T> {
     const epoch = this.generation;
     const expected = this.identity;
-    const before = await this.transport<CareProfile>("/me");
-    if (epoch !== this.generation || (expected && before.userId !== expected)) {
-      this.clear();
-      throw new CareFailure(401);
-    }
+    const send: CareTransport = async <R>(path: string, request?: CareRequest) => {
+      if (epoch !== this.generation) throw new CareFailure(401);
+      const result = await this.transport<R>(path, request);
+      if (epoch !== this.generation) throw new CareFailure(401);
+      return result;
+    };
+    const before = await send<CareProfile>("/me");
+    if (expected && before.userId !== expected) throw new CareFailure(401);
     this.identity = before.userId;
-    const result = await this.transport<T>(path, request);
-    const after = await this.transport<CareProfile>("/me");
-    if (epoch !== this.generation || after.userId !== before.userId) {
-      this.clear();
-      throw new CareFailure(401);
-    }
+    const result = await work(send, before);
+    const after = await send<CareProfile>("/me");
+    if (after.userId !== before.userId) throw new CareFailure(401);
+    if (before.memberships.some((membership) => membership.role === "VET") &&
+        !after.memberships.some((membership) => membership.role === "VET"))
+      throw new CareFailure(403);
     return result;
+  }
+  private request<T>(path: string, request?: CareRequest): Promise<T> {
+    return this.authenticated((send) => send<T>(path, request));
   }
   async act(work: () => Promise<void>) {
     if (this.view.busy) return;
@@ -306,11 +326,14 @@ export class CareWorkspace {
     this.keys.delete(fingerprint);
     return result;
   }
-  private async all<T>(path: string): Promise<T[]> {
+  private async all<T>(
+    path: string,
+    read: CareTransport = (endpoint, request) => this.request(endpoint, request),
+  ): Promise<T[]> {
     const rows: T[] = [];
     let cursor: string | null = null;
     do {
-      const page: CarePage<T> = await this.request<CarePage<T>>(
+      const page: CarePage<T> = await read<CarePage<T>>(
         `${path}${path.includes("?") ? "&" : "?"}limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
       );
       rows.push(...page.items);
@@ -357,54 +380,62 @@ export class CareWorkspace {
       this.emit({ form: null, notice: "সংরক্ষিত · Saved" });
     });
   }
-  async home() {
-    const profile = await this.request<CareProfile>("/me");
-    const [farms, animals, appointments, reminders] = await Promise.all([
-      this.all<CareFarm>("/farms"),
-      this.all<CareAnimal>("/animals"),
-      this.all<CareAppointment>("/appointments"),
-      this.all<CareReminder>("/reminders"),
-    ]);
+  refresh() {
+    if (!this.view.section || this.view.form || this.view.image) return;
+    return this.act(() => this.home());
+  }
+  async home(section: CareSection = this.section) {
+    this.section = section;
+    const { profile, isVet, showAnimals, showVisits, farms, animals, appointments, reminders, prescriptions } =
+      await this.authenticated(async (read, profile) => {
+        const isVet = profile.memberships.some((membership) => membership.role === "VET");
+        const showAnimals = section === "animals" || (section === "home" && !isVet);
+        const showVisits = section === "home" || section === "visits";
+        const [farms, animals, appointments, reminders, prescriptions] = await Promise.all([
+          showAnimals ? this.all<CareFarm>("/farms", read) : [],
+          showAnimals || (section === "visits" && !isVet) ? this.all<CareAnimal>("/animals", read) : [],
+          showVisits ? this.all<CareAppointment>("/appointments", read) : [],
+          showVisits && !isVet ? this.all<CareReminder>("/reminders", read) : [],
+          section === "prescriptions" ? this.all<CarePrescriptionSummary>("/prescriptions", read) : [],
+        ]);
+        return { profile, isVet, showAnimals, showVisits, farms, animals, appointments, reminders, prescriptions };
+      });
     this.returnTo = () => this.home();
     this.emit({
+      section,
       profile,
-      title: "খামার ও চিকিৎসা · Farm & care",
+      title: section === "home"
+        ? isVet ? "পশুচিকিৎসক ড্যাশবোর্ড · Vet dashboard" : "খামারি ড্যাশবোর্ড · Farmer dashboard"
+        : careSections.find((tab) => tab.id === section)!.label,
       image: null,
       form: null,
       uploadAnimalId: null,
-      notice:
-        "No-charge pilot only. No payment is taken. Reminders and notifications are delivered via the M5 outbox worker.",
+      notice: "",
       actions: [
-        this.action("খামার যোগ · Add farm", async () => this.farmForm()),
-        this.action("পশু নিবন্ধন · Register animal", async () =>
-          this.animalForm(farms),
-        ),
-        this.action("পশু চিকিৎসক · Find a vet", () => this.directory(animals)),
-        this.action("বিজ্ঞপ্তি · Notifications", () => this.notifications()),
-        this.action("বিজ্ঞপ্তি পছন্দ · Notification prefs", () =>
-          this.preferencesForm(),
-        ),
-        this.action("তথ্যভাণ্ডার · Published content", () =>
-          this.publishedContent(),
-        ),
-        ...(animals.length
+        ...(showAnimals
           ? [
-              this.action("এআই সহায়তা · AI triage (sandbox)", () =>
-                this.aiTriageForm(animals),
-              ),
+              this.action("খামার যোগ · Add farm", async () => this.farmForm()),
+              this.action("পশু নিবন্ধন · Register animal", async () => this.animalForm(farms)),
             ]
           : []),
-        this.action("ফার্মেসি ও অর্ডার · Pharmacy & orders", () =>
-          this.pharmacyCatalog(),
-        ),
-        ...(profile.memberships.some((m) => m.role === "VET")
+        ...(showVisits && !isVet
+          ? [this.action("পশু চিকিৎসক · Find a vet", () => this.directory(animals))]
+          : []),
+        ...(showVisits && isVet
           ? [
-              this.action("Professional profile", () =>
-                this.professionalForm(),
-              ),
-              this.action("আমার সময়সূচি · My availability", () =>
-                this.schedule(),
-              ),
+              this.action("Professional profile", () => this.professionalForm()),
+              this.action("আমার সময়সূচি · My availability", () => this.schedule()),
+            ]
+          : []),
+        ...(section === "home"
+          ? [
+              this.action("বিজ্ঞপ্তি · Notifications", () => this.notifications()),
+              this.action("বিজ্ঞপ্তি পছন্দ · Notification prefs", () => this.preferencesForm()),
+              this.action("তথ্যভাণ্ডার · Published content", () => this.publishedContent()),
+              ...(animals.length
+                ? [this.action("এআই সহায়তা · AI triage (sandbox)", () => this.aiTriageForm(animals))]
+                : []),
+              this.action("ফার্মেসি ও অর্ডার · Pharmacy & orders", () => this.pharmacyCatalog()),
             ]
           : []),
       ],
@@ -415,7 +446,7 @@ export class CareWorkspace {
           lines: [farm.district, farm.address, `${farm.areaAcres} acres`],
           actions: [this.action("Edit farm", async () => this.farmForm(farm))],
         })),
-        ...animals.map((animal) => ({
+        ...(showAnimals ? animals : []).map((animal) => ({
           id: animal.id,
           title: `${animal.name} · ${animal.tag}`,
           lines: [
@@ -448,6 +479,12 @@ export class CareWorkspace {
           ],
         })),
         ...appointments.map((row) => this.appointmentCard(row, profile)),
+        ...prescriptions.map((row) => ({
+          id: row.id,
+          title: `${row.animalName} · ${row.animalTag}`,
+          lines: [careTime(row.signedAt)],
+          actions: [this.action("প্রেসক্রিপশন দেখুন · View signed prescription", () => this.prescription(row.id))],
+        })),
         ...reminders.map((row) => ({
           id: row.id,
           title: "পরবর্তী চিকিৎসা · Follow-up",
@@ -598,6 +635,7 @@ export class CareWorkspace {
       this.view.profile ?? (await this.request<CareProfile>("/me"));
     this.returnTo = () => this.passport(id);
     this.emit({
+      section: null,
       title: `${passport.animal.name} · পাসপোর্ট`,
       form: null,
       image: null,
@@ -759,6 +797,7 @@ export class CareWorkspace {
   private async prescription(id: string) {
     const rx = await this.request<CarePrescription>(`/prescriptions/${id}`);
     this.emit({
+      section: null,
       title: "প্রেসক্রিপশন · Signed prescription",
       uploadAnimalId: null,
       form: null,
@@ -776,7 +815,7 @@ export class CareWorkspace {
           actions: [],
         },
       ],
-      actions: [this.action("Back to passport", this.returnTo)],
+      actions: [this.action("ফিরে যান · Back", this.returnTo)],
     });
   }
   async directory(animals: CareAnimal[], query = "") {
@@ -786,6 +825,7 @@ export class CareWorkspace {
       professional: { district: string; species: string[]; bio: string } | null;
     }>(`/vets${query}`);
     this.emit({
+      section: null,
       title: "যাচাইকৃত পশু চিকিৎসক · Verified vets",
       uploadAnimalId: null,
       form: null,
@@ -892,6 +932,7 @@ export class CareWorkspace {
       `/vets/${vetId}/slots`,
     );
     this.emit({
+      section: null,
       title: "সময় নির্বাচন · Available times",
       uploadAnimalId: null,
       form: null,
@@ -1165,6 +1206,7 @@ export class CareWorkspace {
     const unreadIds = page.items.filter((n) => !n.readAt).map((n) => n.id);
     this.returnTo = () => this.notifications();
     this.emit({
+      section: null,
       title: `বিজ্ঞপ্তি · Notifications (${page.unreadCount ?? unreadIds.length} unread)`,
       uploadAnimalId: null,
       form: null,
@@ -1258,6 +1300,7 @@ export class CareWorkspace {
     }>("/content?limit=25");
     this.returnTo = () => this.publishedContent();
     this.emit({
+      section: null,
       title: "তথ্যভাণ্ডার · Published educational content",
       uploadAnimalId: null,
       form: null,
@@ -1301,6 +1344,7 @@ export class CareWorkspace {
           locale: "bn",
         });
         this.emit({
+          section: null,
           title: "এআই পরামর্শ · Bounded AI triage response",
           form: null,
           actions: [this.action("Back to workspace", () => this.home())],
@@ -1341,6 +1385,7 @@ export class CareWorkspace {
     ]);
     this.returnTo = () => this.pharmacyCatalog();
     this.emit({
+      section: null,
       title: "ফার্মেসি ও অর্ডার · Verified veterinary pharmacy (sandbox)",
       uploadAnimalId: null,
       form: null,

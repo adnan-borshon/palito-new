@@ -82,6 +82,7 @@ function pageInput(query: PageDto) {
   }
   return {
     limit: query.limit ?? 25,
+    after,
     where: after
       ? {
           OR: [
@@ -1331,6 +1332,42 @@ export class CareService {
         };
       },
     );
+  }
+  async prescriptions(p: AccountPrincipal, q: PageDto) {
+    const { limit, after } = pageInput(q);
+    return this.db.prisma.$transaction(async (tx) => {
+      const isVet = p.memberships.some((membership) => membership.role === "VET");
+      if (isVet) await this.vet(tx, p);
+      const cursor = after
+        ? Prisma.sql`AND (rx.created_at, rx.id) > (${after.createdAt}, ${after.id}::uuid)`
+        : Prisma.empty;
+      const rows = await tx.$queryRaw<{
+        id: string;
+        createdAt: Date;
+        signedAt: Date;
+        animalName: string;
+        animalTag: string;
+      }[]>`
+        SELECT rx.id, rx.created_at AS "createdAt", rx.signed_at AS "signedAt",
+               animal.name AS "animalName", animal.tag AS "animalTag"
+        FROM palito.prescriptions rx
+        JOIN palito.animals animal ON animal.id = rx.animal_id
+        WHERE rx.signed_at IS NOT NULL AND (
+          animal.owner_id = ${p.userId}::uuid OR (
+            ${isVet} AND rx.vet_id = ${p.userId}::uuid AND EXISTS (
+              SELECT 1 FROM palito.care_grants grant_row
+              JOIN palito.appointments visit ON visit.id = grant_row.appointment_id
+              WHERE visit.animal_id = animal.id AND visit.vet_id = rx.vet_id
+                AND visit.farmer_id = animal.owner_id AND grant_row.farmer_id = animal.owner_id
+                AND visit.status NOT IN ('CANCELLED', 'REJECTED')
+                AND grant_row.revoked_at IS NULL AND grant_row.expires_at > CURRENT_TIMESTAMP
+            )
+          )
+        ) ${cursor}
+        ORDER BY rx.created_at, rx.id
+        LIMIT ${limit + 1}`;
+      return page(rows, limit);
+    });
   }
   async prescription(p: AccountPrincipal, id: string) {
     return this.db.prisma.$transaction(async (tx) => {

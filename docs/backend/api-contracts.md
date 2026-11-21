@@ -56,6 +56,7 @@ Domain contracts remain M0 design. M1 implements only GET `/api/v1/health/live`,
 |---|---|---|
 | Livestock | GET /farms, /farms/:id/summary, /animals, /animals/:id, /animals/:id/records, /animals/:id/files | M4 |
 | Care | GET /vets, /vets/:id, /vets/:id/slots, /appointments, /appointments/:id, /consultations/:id, /prescriptions, /prescriptions/:id, /reminders | M4/5 |
+| Signed prescription list | GET /prescriptions?limit=&cursor= | Current animal owners and verified authors with active patient consent. Lists return animal name, tag, signing time and prescription ID. |
 | Inbox/content | GET /notifications, /content (published only), /content/:id | M5/M8e |
 | Lending/money | GET /loans, /loans/:id, /loans/:id/installments, /animals/:id/collateral-eligibility, /me/wallet, /payments, /payments/:id; POST /valuations, /loans; methods in command inventory | M6; accepted rate/terms/rounding DTOs require B08–10 |
 | Insurance | GET /policies, /policies/:id, /claims, /claims/:id; renewal, referral, opinion, decision and settlement methods in command inventory | M7; coverage/incident/appeal DTOs require B11 |

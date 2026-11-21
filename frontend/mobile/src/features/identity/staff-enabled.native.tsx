@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { Link } from 'expo-router';
 import { ScrollView, Text, TextInput, Button } from 'react-native';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, reload, multiFactor, getMultiFactorResolver, PhoneAuthProvider, PhoneMultiFactorGenerator, signOut, getAuth, type MultiFactorResolver } from '@react-native-firebase/auth';
 async function api(path:string,init:RequestInit={}) {
@@ -41,6 +42,7 @@ export default function StaffScreen(){
    {input('SMS code',code,setCode)}<Button title="Verify MFA code" disabled={busy} onPress={()=>void act(confirm)} />
    {input('Name',name,setName)}{input('Invitation token',invite,setInvite,true)}{input('Vet registration',registration,setRegistration)}
    <Button title="Accept invitation" disabled={busy} onPress={()=>void act(accept)}/><Button title="Open staff profile" disabled={busy} onPress={()=>void act(session)}/>
+   <Link href="/care">যাচাইকৃত ড্যাশবোর্ড · Open live care</Link>
    <Button title="Sign out" disabled={busy} onPress={()=>void act(async()=>{await signOut(getAuth());setPassword('');setCode('');setInvite('');resolver.current=null;verification.current='';setMessage('Signed out.');})}/>
    <Text accessibilityRole="alert">{busy?'Please wait…':message}</Text>
   </ScrollView>;

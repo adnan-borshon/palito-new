@@ -210,6 +210,9 @@ export class CareController {
   ) {
     return this.care.complete(r.principal, id, k, revision(v), d);
   }
+  @Get("prescriptions") prescriptions(@Req() r: AuthRequest, @Query() q: PageDto) {
+    return this.care.prescriptions(r.principal, q);
+  }
   @Get("prescriptions/:id") prescription(
     @Req() r: AuthRequest,
     @Param("id", ParseUUIDPipe) id: string,

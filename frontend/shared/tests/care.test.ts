@@ -93,6 +93,30 @@ test("account changes invalidate workspace before a write and background clear f
   assert.equal(workspace.view.profile, null);
   assert.equal(workspace.view.busy, false);
 });
+test("care refresh reads the active list again and leaves an open form alone", async () => {
+  const calls: string[] = [];
+  const farm = { id: "farm", name: "Original name", district: "Dhaka", address: "Private", areaAcres: "1", version: 1 };
+  const transport: CareTransport = async <T>(path: string) => {
+    calls.push(path);
+    if (path === "/me") return profile as T;
+    return { items: path.startsWith("/farms?") ? [{ ...farm }] : [], nextCursor: null } as T;
+  };
+  const workspace = new CareWorkspace(transport, () => "synthetic-key", () => {});
+  await workspace.act(() => workspace.home("animals"));
+  assert.equal(workspace.view.cards[0]?.title, "Original name");
+  farm.name = "Updated on another client";
+  await workspace.refresh();
+  assert.equal(workspace.view.section, "animals");
+  assert.equal(workspace.view.cards[0]?.title, farm.name);
+  assert.ok(calls.every((path) => !path.startsWith("/appointments")));
+
+  workspace.view.actions.find((action) => action.label.includes("Add farm"))!.run();
+  await new Promise((resolve) => setImmediate(resolve));
+  const before = calls.length;
+  await workspace.refresh();
+  assert.equal(calls.length, before);
+  assert.ok(workspace.view.form);
+});
 test("care base64 is portable and errors distinguish stale data from a disabled pilot", () => {
   for (const text of ["", "a", "ab", "abc", "hello"])
     assert.equal(

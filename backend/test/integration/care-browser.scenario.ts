@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import sharp from "sharp";
 import type { Browser, Page } from "playwright";
 export interface BrowserVet {
@@ -9,18 +10,12 @@ export async function careBrowserJourney(
   farmer: Page,
   browser: Browser,
   vet: BrowserVet,
+  farmerToken: string,
 ) {
-  const load = async (page: Page) => {
+  const load = async (page: Page, heading = /Farmer dashboard/) => {
+    await page.bringToFront();
     await page.goto("http://localhost:3000/care");
-    await page
-      .getByRole("button", {
-        name: "তথ্য আনুন · Load / refresh care",
-        exact: true,
-      })
-      .click();
-    await page
-      .getByRole("button", { name: "খামার যোগ · Add farm", exact: true })
-      .waitFor();
+    await page.getByRole("heading", { name: heading }).waitFor();
   };
   await load(farmer);
   await farmer
@@ -60,6 +55,36 @@ export async function careBrowserJourney(
       exact: true,
     })
     .waitFor();
+  // Use the native client's bearer-token auth path against the same backend
+  // that accepted the web client's cookie-authenticated animal registration.
+  const api = "http://127.0.0.1:4000/api/v1";
+  const bearer = { Authorization: `Bearer ${farmerToken}` };
+  const animals = await fetch(`${api}/animals`, { headers: bearer });
+  assert.equal(animals.status, 200);
+  const animal = (await animals.json()).items.find(
+    (row: { tag: string }) => row.tag === "BROWSER-M4",
+  );
+  assert.ok(animal);
+  const updated = await fetch(`${api}/animals/${animal.id}`, {
+    method: "PATCH",
+    headers: {
+      ...bearer,
+      "Content-Type": "application/json",
+      "If-Match": String(animal.version),
+      "Idempotency-Key": randomUUID(),
+    },
+    body: JSON.stringify({
+      name: "Browser M4 animal synced",
+      breed: animal.breed,
+      weightKg: animal.weightKg,
+      estimateMinor: animal.estimateMinor,
+    }),
+  });
+  assert.equal(updated.status, 200);
+  await farmer.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await farmer.getByRole("heading", { name: "Browser M4 animal synced · BROWSER-M4", exact: true }).waitFor();
+  await farmer.getByRole("button", { name: "খামার ও পশু · Farms & animals", exact: true }).click();
+  await farmer.getByRole("heading", { name: "Browser M4 animal synced · BROWSER-M4", exact: true }).waitFor();
   const context = await browser.newContext();
   const doctor = await context.newPage();
   try {
@@ -96,7 +121,7 @@ export async function careBrowserJourney(
     await doctor
       .getByText("স্বাগতম · Welcome, Synthetic care vet", { exact: true })
       .waitFor();
-    await load(doctor);
+    await load(doctor, /Vet dashboard/);
     await doctor
       .getByRole("button", {
         name: "আমার সময়সূচি · My availability",
@@ -145,7 +170,7 @@ export async function careBrowserJourney(
         exact: true,
       })
       .waitFor();
-    await load(doctor);
+    await load(doctor, /Vet dashboard/);
     await doctor
       .getByRole("button", { name: "Accept appointment", exact: true })
       .click();
@@ -187,18 +212,16 @@ export async function careBrowserJourney(
     await farmer
       .getByRole("heading", { name: "পরবর্তী চিকিৎসা · Follow-up", exact: true })
       .waitFor();
-    await farmer
-      .getByRole("button", { name: "পাসপোর্ট · Passport", exact: true })
-      .click();
-    await farmer
-      .getByRole("button", { name: "প্রেসক্রিপশন · Prescription", exact: true })
-      .click();
-    await farmer
-      .getByText("Synthetic browser advice", { exact: true })
-      .waitFor();
-    await farmer
-      .getByRole("button", { name: "Back to passport", exact: true })
-      .click();
+    await farmer.getByRole("button", { name: "প্রেসক্রিপশন · Prescriptions", exact: true }).click();
+    await farmer.getByRole("button", { name: "প্রেসক্রিপশন দেখুন · View signed prescription", exact: true }).click();
+    await farmer.getByText("Synthetic browser advice", { exact: true }).waitFor();
+    const prescriptions = await fetch(`${api}/prescriptions`, { headers: bearer });
+    assert.equal(prescriptions.status, 200);
+    assert.ok((await prescriptions.json()).items.some(
+      (row: { animalTag: string }) => row.animalTag === "BROWSER-M4",
+    ));
+    await farmer.getByRole("button", { name: "খামার ও পশু · Farms & animals", exact: true }).click();
+    await farmer.getByRole("button", { name: "পাসপোর্ট · Passport", exact: true }).click();
     const png = await sharp({
       create: { width: 2, height: 2, channels: 3, background: "#447744" },
     })
@@ -231,7 +254,7 @@ export async function careBrowserJourney(
       .getByRole("button", { name: "সংরক্ষণ · Save", exact: true })
       .click();
     await farmer.getByText("সংরক্ষিত · Saved", { exact: true }).waitFor();
-    await load(doctor);
+    await load(doctor, /Vet dashboard/);
     assert.equal(
       await doctor
         .getByRole("button", { name: "Patient passport", exact: true })

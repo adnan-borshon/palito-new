@@ -383,6 +383,12 @@ export function AppShell({
 
         {/* Centered Capped Container (Hallmark Floor 44d: max 1440px) */}
         <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 lg:px-8 py-6 flex flex-col gap-6">
+          {(role === 'farmer' || role === 'vet') && activeScreen === 'home' && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950">
+              <span>নমুনা দেখুন · Demo preview</span>
+              <Link href="/care" className="font-semibold underline">যাচাইকৃত ড্যাশবোর্ড · Open live care</Link>
+            </div>
+          )}
           {children}
         </main>
       </div>

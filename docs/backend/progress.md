@@ -1,11 +1,15 @@
 # M8, M9 and M10 implementation and pilot readiness checkpoint
 
+## Shared farmer and veterinarian dashboard — 2026-11-21
+
+Verified web and native care now share the same API for farms, animal registration, bookings, visits and signed prescriptions. Lists refresh on foreground and every 30 seconds while visible, with manual refresh available. Local demo home screens link to verified care. The API filters the signed prescription list by current ownership or verified veterinary authorship with active patient consent.
+
 ## Database setup and verification — 2026-11-21
 
 - The database-first local walkthrough is in the [root README](../../README.md). `npm run db:migrate` loads the ignored backend environment, and `npm run db:seed:local` pairs two sample farms and four sample staff memberships with local Firebase Auth emulator accounts.
 - M5 retry preserves attempt history and prevents a reclaimed attempt from overwriting the new lease's result. Lending, insurance and commerce share the wallet spend lock under the restricted database role. M8 immediate coverage uses the next 15 minutes.
 - Lint, typecheck, 98 default tests and 24 PostgreSQL plus Firebase emulator integration tests passed locally. The standalone Chromium launch was blocked by the environment's socket policy. No migration changes were needed.
-- The next implementation step is to connect the existing farmer and vet dashboards to the verified API. The source of truth is PostgreSQL for `/care` and `/finance`. The default role dashboards currently use their local demo stores.
+- PostgreSQL is the source of truth for verified care and finance. Role demo previews keep their local stores.
 
 Updated 2026-11-19. Following verified review of Milestones 4–7, Milestones **8 (M8a–M8e extensions)**, **9 (system QA and security remediation)**, and **10 (deployment preparation and controlled pilot readiness)** are implemented and verified locally. All M0–M10 software deliverables in the implementation plan are complete for review. No production deployment/migration, merge, paid activation, real-money transfer, or live OTP/SMS/provider campaign has been executed.
 
