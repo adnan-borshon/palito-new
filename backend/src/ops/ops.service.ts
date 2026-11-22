@@ -52,7 +52,7 @@ function instant(value: string): Date {
   return date;
 }
 
-function pageInput(query: PageDto) {
+function pageInput(query: PageDto, order: "asc" | "desc" = "asc") {
   let after: { createdAt: Date; id: string } | undefined;
   if (query.cursor) {
     try {
@@ -80,8 +80,8 @@ function pageInput(query: PageDto) {
     where: after
       ? {
           OR: [
-            { createdAt: { gt: after.createdAt } },
-            { createdAt: after.createdAt, id: { gt: after.id } },
+            { createdAt: { [order === "desc" ? "lt" : "gt"]: after.createdAt } },
+            { createdAt: after.createdAt, id: { [order === "desc" ? "lt" : "gt"]: after.id } },
           ],
         }
       : {},
@@ -264,7 +264,9 @@ export class OpsService {
   }
 
   async listNotifications(p: AccountPrincipal, q: NotificationsPageDto) {
-    const paging = pageInput(q);
+    const snapshotAt = new Date().toISOString();
+    const order = q.order ?? "asc";
+    const paging = pageInput(q, order);
     const unreadFilter = q.unreadOnly === "true" ? { readAt: null } : {};
     const [rows, unreadCount] = await Promise.all([
       this.db.prisma.notification.findMany({
@@ -273,7 +275,7 @@ export class OpsService {
           ...unreadFilter,
           ...paging.where,
         },
-        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        orderBy: [{ createdAt: order }, { id: order }],
         take: paging.limit + 1,
       }),
       this.db.prisma.notification.count({
@@ -284,6 +286,7 @@ export class OpsService {
     return {
       ...paged,
       unreadCount,
+      snapshotAt,
       channelMode: this.config.NOTIFICATION_CHANNEL_MODE,
     };
   }
@@ -499,3 +502,4 @@ export class OpsService {
     });
   }
 }
+

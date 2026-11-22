@@ -22,6 +22,7 @@ export class NotificationPrefsDto {
 }
 
 export class NotificationsPageDto extends PageDto {
+  @IsOptional() @IsIn(["asc", "desc"]) order?: "asc" | "desc";
   @IsOptional() @IsIn(["true", "false"]) unreadOnly?: "true" | "false";
 }
 
@@ -51,3 +52,4 @@ export class AuditEventsPageDto extends PageDto {
   @IsOptional() @IsString() @MaxLength(40) targetKind?: string;
   @IsOptional() @IsUUID() targetId?: string;
 }
+

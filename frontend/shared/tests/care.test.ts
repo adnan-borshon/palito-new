@@ -160,6 +160,7 @@ test("care workspace loads notifications, updates notify-v1 preferences, and mar
           },
         ],
         unreadCount: readAt ? 0 : 1,
+        snapshotAt: "2026-11-15T10:04:00.000Z",
         nextCursor: null,
       } as T;
     }
@@ -306,4 +307,34 @@ test("care workspace loads M8 published content, submits bounded AI triage, and 
     promptText: "Reduced appetite since morning",
   });
   assert.ok(calls.some((c) => c.path === "/ai/requests" && c.method === "POST"));
+});
+
+
+test("notification pagination reaches record 26 and marks the server snapshot", async () => {
+  const calls: { path: string; body?: unknown }[] = [];
+  const workspace = new CareWorkspace(async <T>(path: string, request?: CareRequest) => {
+    calls.push({ path, body: request?.body });
+    if (path === "/me") return profile as T;
+    if (request?.method) return { updated: 26 } as T;
+    const second = path.includes("cursor=");
+    return {
+      items: Array.from({ length: second ? 1 : 25 }, (_, i) => ({
+        id: String(second ? 26 : i + 1), title: "Reminder", body: "",
+        category: "reminder", readAt: null, createdAt: "2026-11-15T10:00:00Z",
+      })),
+      nextCursor: second ? null : "page-two",
+      unreadCount: 26,
+      snapshotAt: "2026-11-15T10:04:00.000Z",
+    } as T;
+  }, () => "notification-command", () => {});
+  await workspace.notifications();
+  assert.equal(workspace.view.cards.length, 25);
+  workspace.view.actions.find(a => a.label.includes("Next notifications"))!.run();
+  await new Promise(r => setImmediate(r));
+  assert.equal(workspace.view.cards[0]!.id, "26");
+  workspace.view.actions.find(a => a.label === "Mark all read")!.run();
+  await new Promise(r => setImmediate(r));
+  assert.deepEqual(calls.find(c => c.path === "/notifications/read")!.body,
+    { readBefore: "2026-11-15T10:04:00.000Z" });
+  assert.ok(calls.some(c => c.path.includes("order=desc")));
 });

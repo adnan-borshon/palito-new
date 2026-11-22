@@ -1198,14 +1198,15 @@ export class CareWorkspace {
       },
     );
   }
-  async notifications() {
+  async notifications(cursor?: string) {
     const page = await this.request<{
       items: CareNotification[];
       unreadCount?: number;
+      snapshotAt?: string;
       nextCursor: string | null;
-    }>("/notifications?limit=25");
+    }>(`/notifications?limit=25&order=desc${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`);
     const unreadIds = page.items.filter((n) => !n.readAt).map((n) => n.id);
-    this.returnTo = () => this.notifications();
+    this.returnTo = () => this.notifications(cursor);
     this.emit({
       section: null,
       title: `বিজ্ঞপ্তি · Notifications (${page.unreadCount ?? unreadIds.length} unread)`,
@@ -1214,10 +1215,12 @@ export class CareWorkspace {
       image: null,
       actions: [
         this.action("Back to workspace", () => this.home()),
-        ...(unreadIds.length
+        ...(page.nextCursor ? [this.action("আরও বিজ্ঞপ্তি · Next notifications", () => this.notifications(page.nextCursor!))] : []),
+        ...(cursor ? [this.action("নতুন বিজ্ঞপ্তি · Latest notifications", () => this.notifications())] : []),
+        ...((page.unreadCount ?? unreadIds.length)
           ? [
-              this.action("Mark all read", async () => {
-                await this.write("/notifications/read", { ids: unreadIds });
+              this.action(page.snapshotAt ? "Mark all read" : "Mark this page read", async () => {
+                await this.write("/notifications/read", page.snapshotAt ? { readBefore: page.snapshotAt } : { ids: unreadIds });
                 await this.notifications();
               }),
             ]
@@ -1440,3 +1443,4 @@ export function careMedicineFields(count: number): CareField[] {
     f(`medicine${i}Days`, `Medicine ${i + 1} days`, "", "number"),
   ]).flat();
 }
+

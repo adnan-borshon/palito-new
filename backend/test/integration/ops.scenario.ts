@@ -192,6 +192,37 @@ export async function opsScenario(
     });
     assert.equal(marked.unreadCount, 0);
 
+    const pagedFarmer = await actor();
+    const tiedAt = new Date(Date.now() - 60_000);
+    await prisma.notification.createMany({
+      data: Array.from({ length: 26 }, () => ({
+        recipientId: pagedFarmer.userId, category: "reminder",
+        title: "Pagination reminder", body: "Test reminder", dedupeKey: key(),
+        createdAt: tiedAt,
+      })),
+    });
+    const first = await ops.listNotifications(pagedFarmer, { limit: 25, order: "desc" });
+    assert.equal(first.items.length, 25);
+    assert.ok(first.nextCursor);
+    const second = await ops.listNotifications(pagedFarmer, {
+      limit: 25, order: "desc", cursor: first.nextCursor!,
+    });
+    assert.equal(second.items.length, 1);
+    assert.equal(new Set([...first.items, ...second.items].map(item => item.id)).size, 26);
+    const legacy = await ops.listNotifications(pagedFarmer, { limit: 25 });
+    assert.equal(legacy.items[0]!.id, second.items[0]!.id);
+    const late = await prisma.notification.create({ data: {
+      recipientId: pagedFarmer.userId, category: "reminder",
+      title: "Later reminder", body: "Keep unread", dedupeKey: key(),
+      createdAt: new Date(Date.parse(first.snapshotAt) + 1000),
+    } });
+    const snapshotRead = await ops.markRead(pagedFarmer, key(), { readBefore: first.snapshotAt });
+    assert.equal(snapshotRead.markedCount, 26);
+    assert.equal(snapshotRead.unreadCount, 1);
+    assert.equal((await prisma.notification.findUniqueOrThrow({ where: { id: late.id } })).readAt, null);
+    const foreignRead = await ops.markRead(otherFarmer, key(), { readBefore: first.snapshotAt });
+    assert.equal(foreignRead.markedCount, 0);
+
     // 2. Notification preferences (notify-v1 + optimistic concurrency)
     const prefs0 = await ops.getPreferences(farmer);
     const prefs1 = await ops.updatePreferences(farmer, key(), prefs0.version, {
