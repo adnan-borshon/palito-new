@@ -183,7 +183,7 @@ test("native dashboard reads the signed prescription list through the authentica
   await fireEvent.press(screen.getByRole("tab", { name: "প্রেসক্রিপশন · Prescriptions" }));
   await waitFor(() => expect(screen.getByText("Synced cow · SYNC-01")).toBeTruthy());
   expect(globalThis.fetch).toHaveBeenCalledWith(
-    "https://api.palito.test/api/v1/prescriptions?limit=100",
+    "https://api.palito.test/api/v1/prescriptions?limit=25",
     expect.objectContaining({
       headers: { Authorization: "Bearer synthetic-sdk-token" },
     }),
