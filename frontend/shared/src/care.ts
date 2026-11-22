@@ -238,6 +238,7 @@ export class CareWorkspace {
   private keys = new Map<string, string>();
   private identity: string | null = null;
   private section: CareSection = "home";
+  private listCursors: Record<string, string> = {};
   private returnTo: () => Promise<void> = () => this.home();
   private readonly transport: CareTransport;
   private readonly newKey: () => string;
@@ -258,6 +259,7 @@ export class CareWorkspace {
   clear() {
     this.generation++;
     this.identity = null;
+    this.listCursors = {};
     this.keys.clear();
     this.returnTo = () => this.home();
     this.emit(careInitialView());
@@ -386,18 +388,44 @@ export class CareWorkspace {
     return this.act(() => this.home());
   }
   async home(section: CareSection = this.section) {
+    if (section !== this.section) this.listCursors = {};
     this.section = section;
+    const pageActions: CareAction[] = [];
+    const failedLists: string[] = [];
     const { profile, isVet, showAnimals, showVisits, farms, animals, appointments, reminders, prescriptions } =
       await this.authenticated(async (read, profile) => {
         const isVet = profile.memberships.some((membership) => membership.role === "VET");
         const showAnimals = section === "animals" || (section === "home" && !isVet);
         const showVisits = section === "home" || section === "visits";
+        const loadPage = async <T,>(path: string): Promise<T[]> => {
+          const cursor = this.listCursors[path];
+          try {
+            const page = await read<CarePage<T>>(
+              `${path}?limit=25${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+            );
+            const label = path.slice(1);
+            if (page.nextCursor) pageActions.push(this.action(`Next ${label}`, async () => {
+              this.listCursors[path] = page.nextCursor!;
+              await this.home();
+            }));
+            if (cursor) pageActions.push(this.action(`First ${label}`, async () => {
+              delete this.listCursors[path];
+              await this.home();
+            }));
+            return page.items;
+          } catch (error) {
+            if (error instanceof CareFailure && error.status < 500) throw error;
+            failedLists.push(path.slice(1));
+            pageActions.push(this.action(`Retry ${path.slice(1)}`, () => this.home()));
+            return [];
+          }
+        };
         const [farms, animals, appointments, reminders, prescriptions] = await Promise.all([
-          showAnimals ? this.all<CareFarm>("/farms", read) : [],
-          showAnimals || (section === "visits" && !isVet) ? this.all<CareAnimal>("/animals", read) : [],
-          showVisits ? this.all<CareAppointment>("/appointments", read) : [],
-          showVisits && !isVet ? this.all<CareReminder>("/reminders", read) : [],
-          section === "prescriptions" ? this.all<CarePrescriptionSummary>("/prescriptions", read) : [],
+          showAnimals ? loadPage<CareFarm>("/farms") : [],
+          showAnimals || (section === "visits" && !isVet) ? loadPage<CareAnimal>("/animals") : [],
+          showVisits ? loadPage<CareAppointment>("/appointments") : [],
+          showVisits && !isVet ? loadPage<CareReminder>("/reminders") : [],
+          section === "prescriptions" ? loadPage<CarePrescriptionSummary>("/prescriptions") : [],
         ]);
         return { profile, isVet, showAnimals, showVisits, farms, animals, appointments, reminders, prescriptions };
       });
@@ -411,16 +439,17 @@ export class CareWorkspace {
       image: null,
       form: null,
       uploadAnimalId: null,
-      notice: "",
+      notice: failedLists.length ? `Could not load ${failedLists.join(", ")}. Retry the affected lists.` : "Showing up to 25 records per list.",
       actions: [
+        ...pageActions,
         ...(showAnimals
           ? [
               this.action("খামার যোগ · Add farm", async () => this.farmForm()),
-              this.action("পশু নিবন্ধন · Register animal", async () => this.animalForm(farms)),
+              this.action("পশু নিবন্ধন · Register animal", () => this.chooseFarm()),
             ]
           : []),
         ...(showVisits && !isVet
-          ? [this.action("পশু চিকিৎসক · Find a vet", () => this.directory(animals))]
+          ? [this.action("পশু চিকিৎসক · Find a vet", () => this.chooseAnimal("Choose an animal for a vet visit", animal => this.directory([animal])))]
           : []),
         ...(showVisits && isVet
           ? [
@@ -434,7 +463,7 @@ export class CareWorkspace {
               this.action("বিজ্ঞপ্তি পছন্দ · Notification prefs", () => this.preferencesForm()),
               this.action("তথ্যভাণ্ডার · Published content", () => this.publishedContent()),
               ...(animals.length
-                ? [this.action("এআই সহায়তা · AI triage (sandbox)", () => this.aiTriageForm(animals))]
+                ? [this.action("এআই সহায়তা · AI triage (sandbox)", () => this.chooseAnimal("Choose an animal for triage", async animal => this.aiTriageForm([animal])))]
                 : []),
               this.action("ফার্মেসি ও অর্ডার · Pharmacy & orders", () => this.pharmacyCatalog()),
             ]
@@ -554,6 +583,53 @@ export class CareWorkspace {
         await this.home();
       },
     );
+  }
+  private async chooseFarm(cursor?: string) {
+    const page = await this.request<CarePage<CareFarm>>(
+      `/farms?limit=25${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+    );
+    if (!cursor && !page.nextCursor) {
+      this.animalForm(page.items);
+      return;
+    }
+    this.emit({
+      section: null, title: "Choose a farm", form: null, image: null,
+      cards: page.items.map(farm => ({
+        id: farm.id, title: farm.name, lines: [farm.district],
+        actions: [this.action("Select farm", async () => this.animalForm([farm]))],
+      })),
+      actions: [
+        this.action("Back to workspace", () => this.home()),
+        ...(page.nextCursor ? [this.action("Next farms", () => this.chooseFarm(page.nextCursor!))] : []),
+        ...(cursor ? [this.action("First farms", () => this.chooseFarm())] : []),
+      ],
+    });
+  }
+  private async chooseAnimal(
+    title: string,
+    choose: (animal: CareAnimal) => Promise<void>,
+    cursor?: string,
+  ) {
+    const page = await this.request<CarePage<CareAnimal>>(
+      `/animals?limit=25${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+    );
+    if (!cursor && !page.nextCursor && page.items.length === 1) {
+      await choose(page.items[0]!);
+      return;
+    }
+    this.emit({
+      section: null, title, form: null, image: null,
+      notice: page.items.length ? "" : "No animals on this page.",
+      cards: page.items.map(animal => ({
+        id: animal.id, title: `${animal.name} · ${animal.tag}`, lines: [animal.species],
+        actions: [this.action("Select animal", () => choose(animal))],
+      })),
+      actions: [
+        this.action("Back to workspace", () => this.home()),
+        ...(page.nextCursor ? [this.action("Next animals", () => this.chooseAnimal(title, choose, page.nextCursor!))] : []),
+        ...(cursor ? [this.action("First animals", () => this.chooseAnimal(title, choose))] : []),
+      ],
+    });
   }
   private animalForm(farms: CareFarm[]) {
     if (!farms.length)

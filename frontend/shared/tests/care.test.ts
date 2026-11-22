@@ -338,3 +338,59 @@ test("notification pagination reaches record 26 and marks the server snapshot", 
     { readBefore: "2026-11-15T10:04:00.000Z" });
   assert.ok(calls.some(c => c.path.includes("order=desc")));
 });
+
+test("dashboard pages 1,001 animals with bounded home requests and preserves refresh page", async () => {
+  const calls: string[] = [];
+  const workspace = new CareWorkspace(async <T>(path: string) => {
+    calls.push(path);
+    if (path === "/me") return profile as T;
+    if (path.startsWith("/animals?")) {
+      const query = new URL(path, "https://palito.test").searchParams;
+      const offset = Number(query.get("cursor") ?? 0);
+      return {
+        items: Array.from({ length: Math.min(25, 1001 - offset) }, (_, i) => ({
+          id: String(offset + i), name: "Cow", tag: String(offset + i),
+          species: "cattle", status: "ACTIVE", weightKg: "100",
+        })),
+        nextCursor: offset + 25 < 1001 ? String(offset + 25) : null,
+      } as T;
+    }
+    return { items: [], nextCursor: null } as T;
+  }, () => "dashboard-command", () => {});
+  await workspace.home();
+  assert.equal(calls.filter(p => p.startsWith("/animals?")).length, 1);
+  assert.equal(workspace.view.cards.length, 25);
+  for (let page = 0; page < 40; page++) {
+    workspace.view.actions.find(a => a.label === "Next animals")!.run();
+    await new Promise(r => setImmediate(r));
+  }
+  assert.equal(workspace.view.cards[0]!.id, "1000");
+  assert.equal(workspace.view.cards.length, 1);
+  await workspace.refresh();
+  assert.equal(workspace.view.cards[0]!.id, "1000");
+  workspace.view.actions.find(a => a.label === "First animals")!.run();
+  await new Promise(r => setImmediate(r));
+  assert.equal(workspace.view.cards[0]!.id, "0");
+});
+
+test("reminder outage preserves animals while authorization failure clears the workspace", async () => {
+  let status = 503;
+  const workspace = new CareWorkspace(async <T>(path: string) => {
+    if (path === "/me") return profile as T;
+    if (path.startsWith("/reminders?")) throw new CareFailure(status);
+    return {
+      items: path.startsWith("/animals?") ? [{
+        id: "animal", name: "Cow", tag: "A", species: "cattle",
+        status: "ACTIVE", weightKg: "100",
+      }] : [],
+      nextCursor: null,
+    } as T;
+  }, () => "outage-command", () => {});
+  await workspace.act(() => workspace.home());
+  assert.equal(workspace.view.cards[0]!.id, "animal");
+  assert.ok(workspace.view.actions.some(a => a.label === "Retry reminders"));
+  status = 403;
+  await workspace.act(() => workspace.home());
+  assert.equal(workspace.view.profile, null);
+  assert.equal(workspace.view.cards.length, 0);
+});
